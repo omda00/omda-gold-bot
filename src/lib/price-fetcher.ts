@@ -14,11 +14,82 @@ export interface CombinedPriceResult {
 }
 
 /**
- * Extract gold and USD/EGP prices from text content.
- * Handles both edahabapp.com format and general search results.
+ * Extract prices from banklive.net HTML content.
+ * banklive.net has structured tables with gold prices (sell/buy) and USD/EGP rates.
  *
- * edahabapp format: "الذهب عيار 21: بيع: 6110 جنيه شراء: 6080 جنيه"
- * Also JSON-LD: "سعر الذهب عيار 21 بيع", "value": "6110 جنيه"
+ * Table structure per row:
+ * [Symbol + Name] [Sell Price + Change%] [Buy Price + Change%]
+ * Example: "XAUEGP ذهب عيار 21" | "6,070 -0.16%" | "6,040 -0.17%"
+ */
+function extractFromBankliveHtml(html: string): {
+  gold21Sell: number | null;
+  gold21Buy: number | null;
+  usdEgpSell: number | null;
+  usdEgpBuy: number | null;
+} {
+  const result = {
+    gold21Sell: null as number | null,
+    gold21Buy: null as number | null,
+    usdEgpSell: null as number | null,
+    usdEgpBuy: null as number | null,
+  };
+
+  // Extract table rows
+  const tableBody = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
+  if (!tableBody) return result;
+
+  const rows = tableBody[1].match(/<tr>([\s\S]*?)<\/tr>/g) || [];
+
+  for (const row of rows) {
+    const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
+    const cleanCells = cells.map((c: string) =>
+      c.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+    );
+
+    const rowText = cleanCells.join(" ");
+
+    // Check for Gold 21K row
+    if (rowText.includes("عيار 21") || rowText.includes("21 karat")) {
+      // Extract numbers from sell and buy cells
+      const numbers = rowText.match(/\d[\d,]*\.?\d*/g) || [];
+      // First number is the sell price (after the karat number), second might be buy
+      for (let i = 0; i < numbers.length; i++) {
+        const val = parseFloat(numbers[i].replace(/,/g, ""));
+        if (val >= 5000 && val <= 15000) {
+          if (!result.gold21Sell) {
+            result.gold21Sell = val;
+          } else if (!result.gold21Buy) {
+            result.gold21Buy = val;
+          }
+        }
+      }
+    }
+
+    // Check for USD/EGP row
+    if (
+      (rowText.includes("USD/EGP") || rowText.includes("الدولار الأمريكي")) &&
+      !rowText.includes("الكندي")
+    ) {
+      const numbers = rowText.match(/\d[\d,]*\.?\d*/g) || [];
+      for (const num of numbers) {
+        const val = parseFloat(num.replace(/,/g, ""));
+        if (val >= 40 && val <= 80) {
+          if (!result.usdEgpSell) {
+            result.usdEgpSell = val;
+          } else if (!result.usdEgpBuy) {
+            result.usdEgpBuy = val;
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract gold and USD/EGP prices from text content (search snippets, etc.).
+ * Handles multiple formats from various Egyptian gold price sites.
  */
 function extractPricesFromText(text: string): {
   gold21Sell: number | null;
@@ -31,7 +102,7 @@ function extractPricesFromText(text: string): {
     usdEgpRate: null as number | null,
   };
 
-  // Strategy 1: JSON-LD PropertyValue format
+  // Strategy 1: JSON-LD PropertyValue format (edahabapp)
   const propertyValuePattern =
     /"name"\s*:\s*"([^"]+)"\s*,\s*"value"\s*:\s*"([0-9,.]+)\s*جنيه"/g;
   let match;
@@ -47,7 +118,7 @@ function extractPricesFromText(text: string): {
     }
   }
 
-  // Strategy 2: Plain text format "عيار 21: بيع: 6110 جنيه شراء: 6080 جنيه"
+  // Strategy 2: Plain text "عيار 21: بيع: 6110 جنيه شراء: 6080 جنيه"
   if (!result.gold21Sell) {
     const sellMatch = text.match(/عيار 21: بيع: ([0-9,]+)/);
     if (sellMatch) {
@@ -63,7 +134,7 @@ function extractPricesFromText(text: string): {
     }
   }
 
-  // Also try the snippet format without colons: "عيار 21 بيع 6130 جنيه شراء 6100 جنيه"
+  // Strategy 3: Snippet format "عيار 21 بيع 6130 جنيه شراء 6100 جنيه"
   if (!result.gold21Sell || !result.gold21Buy) {
     const snippetMatch = text.match(/عيار 21\s*بيع\s*([0-9,]+)\s*جنيه\s*شراء\s*([0-9,]+)/);
     if (snippetMatch) {
@@ -74,11 +145,53 @@ function extractPricesFromText(text: string): {
     }
   }
 
-  // Strategy 3: USD/EGP
+  // Strategy 4: "بيع: 6110 جنيه شراء: 6080 جنيه" or "بيع 6949 شراء 6915"
+  if (!result.gold21Sell || !result.gold21Buy) {
+    const generalMatch = text.match(/الذهب عيار 21[^0-9]*?بيع[^0-9]*?([0-9,]+)[^0-9]*?شراء[^0-9]*?([0-9,]+)/);
+    if (generalMatch) {
+      const sell = parseFloat(generalMatch[1].replace(/,/g, ""));
+      const buy = parseFloat(generalMatch[2].replace(/,/g, ""));
+      if (!result.gold21Sell && sell >= 3000 && sell <= 15000) result.gold21Sell = sell;
+      if (!result.gold21Buy && buy >= 3000 && buy <= 15000) result.gold21Buy = buy;
+    }
+  }
+
+  // Strategy 5: goldbullioneg format "جرام عيار 21 120 ج, 6130, 6100"
+  if (!result.gold21Sell || !result.gold21Buy) {
+    const gbMatch = text.match(/عيار 21[^0-9]*?([0-9,]+)\s*ج[^0-9]*?([0-9,]+)\s*,\s*([0-9,]+)/);
+    if (gbMatch) {
+      // Format: عيار 21 [workmanship] [sell], [buy]
+      const sell = parseFloat(gbMatch[2].replace(/,/g, ""));
+      const buy = parseFloat(gbMatch[3].replace(/,/g, ""));
+      if (!result.gold21Sell && sell >= 3000 && sell <= 15000) result.gold21Sell = sell;
+      if (!result.gold21Buy && buy >= 3000 && buy <= 15000) result.gold21Buy = buy;
+    }
+  }
+
+  // Strategy 6: banklive search snippet "عيار 21, 6,110" or "6110 ج.م"
+  if (!result.gold21Sell) {
+    const bankliveMatch = text.match(/عيار 21[,\s]+([0-9,]+(?:\.[0-9]+)?)/);
+    if (bankliveMatch) {
+      const val = parseFloat(bankliveMatch[1].replace(/,/g, ""));
+      if (val >= 3000 && val <= 15000) result.gold21Sell = val;
+    }
+  }
+
+  // USD/EGP extraction strategies
   if (!result.usdEgpRate) {
+    // "الدولار[^0-9]*?([0-9]+\.[0-9]+)"
     const usdMatch = text.match(/الدولار[^0-9]*?([0-9]+\.[0-9]+)/);
     if (usdMatch) {
       const val = parseFloat(usdMatch[1]);
+      if (val > 0 && val < 200) result.usdEgpRate = val;
+    }
+  }
+
+  if (!result.usdEgpRate) {
+    // "51.77 جنيه لكل دولار" or "USD/EGP 51.77"
+    const usdMatch2 = text.match(/(?:USD\/EGP|دولار)[^0-9]*?([0-9]+\.[0-9]+)/i);
+    if (usdMatch2) {
+      const val = parseFloat(usdMatch2[1]);
       if (val > 0 && val < 200) result.usdEgpRate = val;
     }
   }
@@ -88,7 +201,11 @@ function extractPricesFromText(text: string): {
 
 /**
  * Fetch BOTH gold price and USD/EGP rate efficiently.
- * Uses web_search (lightweight) as primary, page_reader as fallback.
+ * Multi-strategy approach:
+ * 1. banklive.net page_reader (most structured + reliable, minute-by-minute updates)
+ * 2. edahabapp.com web_search (fast, gets snippets with buy/sell prices)
+ * 3. Broader web_search for Egyptian gold prices
+ * 4. LLM extraction fallback
  */
 export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   const zai = await ZAI.create();
@@ -97,73 +214,116 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
     usdEgp: null,
   };
 
-  // Strategy 1: web_search for edahabapp.com (lightweight, gets snippets with prices)
+  // Strategy 1: banklive.net page_reader (best structured source, minute-by-minute updates)
   try {
-    console.log("[price-fetcher] Searching edahabapp.com via web_search...");
+    console.log("[price-fetcher] Fetching from banklive.net via page_reader...");
 
-    // Search for gold and USD/EGP separately in parallel for best results
-    const [goldSearch, usdSearch] = await Promise.all([
-      zai.functions.invoke("web_search", {
-        query: "site:edahabapp.com سعر الذهب عيار 21 في مصر اليوم",
-        num: 3,
-      }),
-      zai.functions.invoke("web_search", {
-        query: "site:edahabapp.com سعر الدولار مقابل الجنيه المصري اليوم",
-        num: 3,
-      }),
-    ]);
+    const bankliveResult = await zai.functions.invoke("page_reader", {
+      url: "https://banklive.net/ar/gold-price-today-in-egypt",
+    });
 
-    // Extract gold prices from search results
-    const goldSearchText = typeof goldSearch === "string"
-      ? goldSearch : JSON.stringify(goldSearch);
-    const goldExtracted = extractPricesFromText(goldSearchText);
+    const html = bankliveResult?.data?.html || "";
+    if (html) {
+      const banklivePrices = extractFromBankliveHtml(html);
 
-    if (goldExtracted.gold21Sell && goldExtracted.gold21Sell > 0) {
-      combinedResult.gold = {
-        price: goldExtracted.gold21Sell,
-        source: "edahabapp.com",
-        buyPrice: goldExtracted.gold21Buy || undefined,
-        sellPrice: goldExtracted.gold21Sell,
-      };
-    }
-
-    // Extract USD/EGP rate from search results
-    const usdSearchText = typeof usdSearch === "string"
-      ? usdSearch : JSON.stringify(usdSearch);
-
-    // Parse USD/EGP from edahabapp snippet format:
-    // "51.65 جنيه لكل دولار للشراء، مقابل 51.79 جنيه لكل دولار للبيع"
-    const usdBuyMatch = usdSearchText.match(/([0-9]+\.[0-9]+)\s*جنيه\s*لكل\s*دولار\s*للشراء/);
-    const usdSellMatch = usdSearchText.match(/مقابل\s*([0-9]+\.[0-9]+)\s*جنيه\s*لكل\s*دولار\s*للبيع/);
-
-    if (usdBuyMatch) {
-      const buyRate = parseFloat(usdBuyMatch[1]);
-      if (buyRate > 0 && buyRate < 200) {
-        combinedResult.usdEgp = {
-          price: buyRate,
-          source: "edahabapp.com",
+      if (banklivePrices.gold21Sell && banklivePrices.gold21Sell > 0) {
+        combinedResult.gold = {
+          price: banklivePrices.gold21Sell,
+          source: "banklive.net",
+          buyPrice: banklivePrices.gold21Buy || undefined,
+          sellPrice: banklivePrices.gold21Sell,
         };
+        console.log(`[price-fetcher] Got gold from banklive.net: sell=${banklivePrices.gold21Sell}, buy=${banklivePrices.gold21Buy}`);
       }
-    } else {
-      // Fallback: try the generic extraction
-      const usdExtracted = extractPricesFromText(usdSearchText);
-      if (usdExtracted.usdEgpRate && usdExtracted.usdEgpRate > 0) {
+
+      if (banklivePrices.usdEgpSell && banklivePrices.usdEgpSell > 0) {
         combinedResult.usdEgp = {
-          price: usdExtracted.usdEgpRate,
-          source: "edahabapp.com",
+          price: banklivePrices.usdEgpSell,
+          source: "banklive.net",
         };
+        console.log(`[price-fetcher] Got USD/EGP from banklive.net: ${banklivePrices.usdEgpSell}`);
       }
     }
 
     if (combinedResult.gold && combinedResult.usdEgp) {
-      console.log("[price-fetcher] Got both prices from edahabapp.com search");
+      console.log("[price-fetcher] Got both prices from banklive.net");
       return combinedResult;
     }
-  } catch (searchError) {
-    console.error("[price-fetcher] edahabapp.com web_search failed:", searchError);
+  } catch (pageError) {
+    console.error("[price-fetcher] banklive.net page_reader failed:", pageError);
   }
 
-  // Strategy 2: Broader web search for Egyptian gold prices
+  // Strategy 2: edahabapp.com web_search (lightweight, gets snippets with buy/sell)
+  if (!combinedResult.gold || !combinedResult.usdEgp) {
+    try {
+      console.log("[price-fetcher] Searching edahabapp.com via web_search...");
+
+      const [goldSearch, usdSearch] = await Promise.all([
+        zai.functions.invoke("web_search", {
+          query: "site:edahabapp.com سعر الذهب عيار 21 في مصر اليوم",
+          num: 3,
+        }),
+        zai.functions.invoke("web_search", {
+          query: "site:edahabapp.com سعر الدولار مقابل الجنيه المصري اليوم",
+          num: 3,
+        }),
+      ]);
+
+      // Extract gold prices from search results
+      const goldSearchText =
+        typeof goldSearch === "string" ? goldSearch : JSON.stringify(goldSearch);
+      const goldExtracted = extractPricesFromText(goldSearchText);
+
+      if (!combinedResult.gold && goldExtracted.gold21Sell && goldExtracted.gold21Sell > 0) {
+        combinedResult.gold = {
+          price: goldExtracted.gold21Sell,
+          source: "edahabapp.com",
+          buyPrice: goldExtracted.gold21Buy || undefined,
+          sellPrice: goldExtracted.gold21Sell,
+        };
+      }
+
+      // Extract USD/EGP rate from search results
+      const usdSearchText =
+        typeof usdSearch === "string" ? usdSearch : JSON.stringify(usdSearch);
+
+      // Parse USD/EGP from edahabapp snippet format:
+      // "51.65 جنيه لكل دولار للشراء، مقابل 51.79 جنيه لكل دولار للبيع"
+      const usdBuyMatch = usdSearchText.match(
+        /([0-9]+\.[0-9]+)\s*جنيه\s*لكل\s*دولار\s*للشراء/
+      );
+      const usdSellMatch = usdSearchText.match(
+        /مقابل\s*([0-9]+\.[0-9]+)\s*جنيه\s*لكل\s*دولار\s*للبيع/
+      );
+
+      if (!combinedResult.usdEgp && usdBuyMatch) {
+        const buyRate = parseFloat(usdBuyMatch[1]);
+        if (buyRate > 0 && buyRate < 200) {
+          combinedResult.usdEgp = {
+            price: buyRate,
+            source: "edahabapp.com",
+          };
+        }
+      } else if (!combinedResult.usdEgp) {
+        const usdExtracted = extractPricesFromText(usdSearchText);
+        if (usdExtracted.usdEgpRate && usdExtracted.usdEgpRate > 0) {
+          combinedResult.usdEgp = {
+            price: usdExtracted.usdEgpRate,
+            source: "edahabapp.com",
+          };
+        }
+      }
+
+      if (combinedResult.gold && combinedResult.usdEgp) {
+        console.log("[price-fetcher] Got both prices from edahabapp.com search");
+        return combinedResult;
+      }
+    } catch (searchError) {
+      console.error("[price-fetcher] edahabapp.com web_search failed:", searchError);
+    }
+  }
+
+  // Strategy 3: Broader web search for Egyptian gold prices (multiple sites)
   if (!combinedResult.gold || !combinedResult.usdEgp) {
     try {
       console.log("[price-fetcher] Broader web search for prices...");
@@ -172,9 +332,10 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
         num: 5,
       });
 
-      const searchText = typeof searchResults === "string"
-        ? searchResults
-        : JSON.stringify(searchResults);
+      const searchText =
+        typeof searchResults === "string"
+          ? searchResults
+          : JSON.stringify(searchResults);
 
       const extracted = extractPricesFromText(searchText);
 
@@ -198,7 +359,46 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
     }
   }
 
-  // Strategy 3: LLM extraction from search results (most robust for complex formats)
+  // Strategy 4: Google Finance for USD/EGP (user specifically requested this source)
+  if (!combinedResult.usdEgp) {
+    try {
+      console.log("[price-fetcher] Trying Google Finance for USD/EGP...");
+      const gfResult = await zai.functions.invoke("page_reader", {
+        url: "https://www.google.com/finance/quote/USD-EGP",
+      });
+
+      const gfHtml = gfResult?.data?.html || "";
+      // Google Finance shows the rate in a specific format
+      const gfRateMatch = gfHtml.match(/data-last-price="([0-9.]+)"/);
+      if (gfRateMatch) {
+        const rate = parseFloat(gfRateMatch[1]);
+        if (rate > 0 && rate < 200) {
+          combinedResult.usdEgp = {
+            price: rate,
+            source: "Google Finance",
+          };
+        }
+      }
+
+      // Fallback: try to find the rate in the page content
+      if (!combinedResult.usdEgp) {
+        const gfTextMatch = gfHtml.match(/(\d{2}\.\d{2,4})\s*EGP/);
+        if (gfTextMatch) {
+          const rate = parseFloat(gfTextMatch[1]);
+          if (rate > 0 && rate < 200) {
+            combinedResult.usdEgp = {
+              price: rate,
+              source: "Google Finance",
+            };
+          }
+        }
+      }
+    } catch (gfError) {
+      console.error("[price-fetcher] Google Finance failed:", gfError);
+    }
+  }
+
+  // Strategy 5: LLM extraction from search results (most robust for complex formats)
   if (!combinedResult.gold || !combinedResult.usdEgp) {
     try {
       console.log("[price-fetcher] LLM extraction fallback...");
@@ -207,11 +407,11 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
         num: 5,
       });
 
-      const searchText = typeof searchResults === "string"
-        ? searchResults
-        : JSON.stringify(searchResults);
+      const searchText =
+        typeof searchResults === "string"
+          ? searchResults
+          : JSON.stringify(searchResults);
 
-      // Truncate to avoid memory issues
       const truncatedSearch = searchText.substring(0, 3000);
 
       const completion = await zai.chat.completions.create({
@@ -232,15 +432,26 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
       const content = completion.choices?.[0]?.message?.content || "";
       const parsed = extractJsonFromText(content);
       if (parsed) {
-        if (!combinedResult.gold && typeof parsed.gold21Sell === "number" && parsed.gold21Sell > 0) {
+        if (
+          !combinedResult.gold &&
+          typeof parsed.gold21Sell === "number" &&
+          parsed.gold21Sell > 0
+        ) {
           combinedResult.gold = {
             price: parsed.gold21Sell,
             source: parsed.source || "web_search+LLM",
-            buyPrice: typeof parsed.gold21Buy === "number" ? parsed.gold21Buy : undefined,
+            buyPrice:
+              typeof parsed.gold21Buy === "number"
+                ? parsed.gold21Buy
+                : undefined,
             sellPrice: parsed.gold21Sell,
           };
         }
-        if (!combinedResult.usdEgp && typeof parsed.usdEgpRate === "number" && parsed.usdEgpRate > 0) {
+        if (
+          !combinedResult.usdEgp &&
+          typeof parsed.usdEgpRate === "number" &&
+          parsed.usdEgpRate > 0
+        ) {
           combinedResult.usdEgp = {
             price: parsed.usdEgpRate,
             source: parsed.source || "web_search+LLM",
@@ -288,7 +499,9 @@ export async function savePriceRecord(
     orderBy: { createdAt: "desc" },
   });
 
-  const change = previous ? ((price - previous.price) / previous.price) * 100 : 0;
+  const change = previous
+    ? ((price - previous.price) / previous.price) * 100
+    : 0;
 
   return db.priceRecord.create({
     data: {

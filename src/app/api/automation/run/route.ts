@@ -112,13 +112,15 @@ export async function POST() {
       const goldBuySell = goldRecord.buyPrice && goldRecord.sellPrice
         ? `\n   بيع: ${goldRecord.sellPrice.toLocaleString()} | شراء: ${goldRecord.buyPrice.toLocaleString()}`
         : "";
+      const goldSource = goldRecord.source || "multi-source";
+      const usdSource = usdEgpRecord.source || "multi-source";
       const dailyReport = "📊 <b>التقرير اليومي - أسعار الذهب والعملات</b>\n\n" +
         `🥇 <b>ذهب عيار 21:</b> ${goldRecord.price.toLocaleString()} EGP/جرام` +
         `${goldBuySell}` +
         `${goldRecord.change ? (goldRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(goldRecord.change).toFixed(2) + "%" : ""}\n` +
         `💱 <b>USD/EGP:</b> ${usdEgpRecord.price.toFixed(2)} EGP` +
         `${usdEgpRecord.change ? (usdEgpRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(usdEgpRecord.change).toFixed(2) + "%" : ""}\n\n` +
-        `📌 المصدر: edahabapp.com`;
+        `📌 المصدر: ${goldSource}`;
 
       const dailyResult = await sendTelegramMessage(botToken, chatId, dailyReport);
       results.notifications?.push({
@@ -172,7 +174,7 @@ export async function POST() {
           `📉 السابق: ${previousUsdEgp?.price.toFixed(2)} EGP\n` +
           `📊 التغيير: ${usdEgpRecord.change?.toFixed(2)}%\n` +
           `🎯 الحد: ${threshold}%\n` +
-          `📌 المصدر: edahabapp.com`;
+          `📌 المصدر: ${usdSource}`;
 
         const sendResult = await sendTelegramMessage(botToken, chatId, dropMessage);
         results.notifications?.push({

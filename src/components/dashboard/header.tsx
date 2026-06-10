@@ -47,10 +47,10 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
-                AI Workflow Automation Platform
+                منصة متابعة الذهب والعملات
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground" dir="rtl">
-                منصة أتمتة سير العمل الذكية
+                AI Workflow Automation — Gold & Currency Monitor
               </p>
             </div>
           </div>

@@ -16,14 +16,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AI Workflow Automation Platform",
   description:
-    "Smart automation platform for stock price monitoring and Telegram notifications",
+    "Smart automation platform for gold price monitoring in Egypt and Telegram notifications",
   keywords: [
     "Z.ai",
     "Automation",
-    "Stock",
-    "Aramco",
+    "Gold",
+    "Egypt",
     "Telegram",
     "AI",
+    "USD/EGP",
   ],
   authors: [{ name: "Z.ai Team" }],
   icons: {
@@ -37,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ar" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

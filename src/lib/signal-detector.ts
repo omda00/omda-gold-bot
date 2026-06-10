@@ -6,11 +6,11 @@ export interface SignalResult {
 }
 
 /**
- * Detect which investment plan action matches the current Aramco price.
+ * Detect which investment plan action matches the current gold price in EGP.
  * Returns the matching plan or null if no active plan matches.
  */
 export function detectSignal(
-  aramcoPrice: number,
+  goldPrice: number,
   plan: InvestmentPlan[]
 ): SignalResult | null {
   // Filter to active plans and sort by order
@@ -19,8 +19,8 @@ export function detectSignal(
     .sort((a, b) => a.order - b.order);
 
   for (const p of activePlans) {
-    const minOk = aramcoPrice >= p.priceRangeMin;
-    const maxOk = p.priceRangeMax === null || aramcoPrice <= p.priceRangeMax;
+    const minOk = goldPrice >= p.priceRangeMin;
+    const maxOk = p.priceRangeMax === null || goldPrice <= p.priceRangeMax;
 
     if (minOk && maxOk) {
       return { action: p.action, plan: p };

@@ -2,40 +2,41 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 // Investment plan based on gold price per gram (21 karat) in EGP
+// As specified by the user's investment strategy
 const DEFAULT_PLANS = [
   {
-    priceRangeMin: 4000,
-    priceRangeMax: 5000,
+    priceRangeMin: 5700,
+    priceRangeMax: 5900,
     action: "شراء قوي",
     expectedReturn: 40,
-    label: "شراء قوي - ذهب أقل من 5,000 ج.م/جرام",
+    label: "شراء قوي - ذهب 5,700-5,900 ج.م/جرام",
     order: 1,
     active: true,
   },
   {
-    priceRangeMin: 5000,
-    priceRangeMax: 5500,
+    priceRangeMin: 6100,
+    priceRangeMax: 6300,
     action: "شراء",
     expectedReturn: 30,
-    label: "شراء - ذهب 5,000-5,500 ج.م/جرام",
+    label: "شراء - ذهب 6,100-6,300 ج.م/جرام",
     order: 2,
     active: true,
   },
   {
-    priceRangeMin: 5500,
-    priceRangeMax: 6500,
+    priceRangeMin: 6300,
+    priceRangeMax: 6800,
     action: "انتظار",
     expectedReturn: 0,
-    label: "انتظار - ذهب 5,500-6,500 ج.م/جرام",
+    label: "انتظار - ذهب 6,300-6,800 ج.م/جرام",
     order: 3,
     active: true,
   },
   {
-    priceRangeMin: 6500,
-    priceRangeMax: 7500,
+    priceRangeMin: 7000,
+    priceRangeMax: 7200,
     action: "بيع 70%",
     expectedReturn: -30,
-    label: "بيع 70% - ذهب 6,500-7,500 ج.م/جرام",
+    label: "بيع 70% - ذهب 7,000-7,200 ج.م/جرام",
     order: 4,
     active: true,
   },
