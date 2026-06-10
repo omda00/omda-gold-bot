@@ -9,7 +9,7 @@ import {
   Gem,
   ArrowRightLeft,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PriceRecord } from "@/lib/dashboard-types";
@@ -41,13 +41,11 @@ function PriceCard({
 
   if (loading) {
     return (
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-2">
-          <Skeleton className="h-4 w-24" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-10 w-32 mb-2" />
-          <Skeleton className="h-4 w-20" />
+      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
+        <CardContent className="p-5 space-y-3">
+          <Skeleton className="h-4 w-24 rounded-lg" />
+          <Skeleton className="h-10 w-32 rounded-lg" />
+          <Skeleton className="h-4 w-20 rounded-lg" />
         </CardContent>
       </Card>
     );
@@ -55,37 +53,39 @@ function PriceCard({
 
   return (
     <motion.div
-      whileHover={{ y: -2, scale: 1.01 }}
+      whileHover={{ y: -3 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
-      <Card className="border-border/50 shadow-sm overflow-hidden">
+      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden group hover:shadow-lg transition-all duration-300">
+        {/* Top accent bar */}
         <div
           className={`h-1 ${
             price
               ? isPositive
-                ? "bg-emerald-500"
-                : "bg-red-500"
+                ? "bg-gradient-to-r from-emerald-400 to-emerald-500"
+                : "bg-gradient-to-r from-red-400 to-red-500"
               : "bg-muted"
           }`}
         />
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              {icon}
-              <div>
-                <div>{title}</div>
-                <div className="text-xs text-muted-foreground/70" dir="rtl">
-                  {subtitle}
-                </div>
+        <CardContent className="p-5">
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 flex items-center justify-center">
+                {icon}
               </div>
-            </CardTitle>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">{title}</h3>
+                <p className="text-[11px] text-muted-foreground" dir="rtl">{subtitle}</p>
+              </div>
+            </div>
             {showFetchButton && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onFetch}
                 disabled={fetching}
-                className="h-7 gap-1 text-xs"
+                className="h-8 gap-1 text-xs rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/30"
               >
                 <RefreshCw
                   className={`w-3 h-3 ${fetching ? "animate-spin" : ""}`}
@@ -94,44 +94,41 @@ function PriceCard({
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+
           {price ? (
             <>
               {hasBuySell ? (
-                /* Show buy/sell prices for gold */
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="text-xs text-muted-foreground flex items-center gap-1" dir="rtl">
-                        <ArrowRightLeft className="w-3 h-3" />
-                        بيع (سعر التاجر)
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-emerald-50/80 dark:bg-emerald-950/20 rounded-xl p-3">
+                      <div className="flex items-center gap-1 mb-1">
+                        <ArrowRightLeft className="w-3 h-3 text-emerald-600" />
+                        <span className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-semibold">بيع</span>
                       </div>
-                      <div className="text-2xl font-bold text-foreground tracking-tight">
+                      <p className="text-2xl font-black tracking-tight text-foreground tabular-nums">
                         {price.sellPrice?.toLocaleString("en-US", {
                           minimumFractionDigits: 0,
                           maximumFractionDigits: 0,
                         })}
-                      </div>
+                      </p>
                     </div>
-                    <div className="w-px h-10 bg-border" />
-                    <div className="flex-1">
-                      <div className="text-xs text-muted-foreground flex items-center gap-1" dir="rtl">
-                        <ArrowRightLeft className="w-3 h-3" />
-                        شراء (سعر التاجر)
+                    <div className="bg-blue-50/80 dark:bg-blue-950/20 rounded-xl p-3">
+                      <div className="flex items-center gap-1 mb-1">
+                        <ArrowRightLeft className="w-3 h-3 text-blue-600" />
+                        <span className="text-[10px] uppercase tracking-wider text-blue-700 dark:text-blue-400 font-semibold">شراء</span>
                       </div>
-                      <div className="text-2xl font-bold text-foreground tracking-tight">
+                      <p className="text-2xl font-black tracking-tight text-foreground tabular-nums">
                         {price.buyPrice?.toLocaleString("en-US", {
                           minimumFractionDigits: 0,
                           maximumFractionDigits: 0,
                         })}
-                      </div>
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">EGP/جرام</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">EGP/جرام</span>
                     <div
-                      className={`flex items-center gap-0.5 text-sm font-medium ${
+                      className={`flex items-center gap-1 text-sm font-bold ${
                         isPositive ? "text-emerald-600" : "text-red-600"
                       }`}
                     >
@@ -140,7 +137,7 @@ function PriceCard({
                       ) : (
                         <TrendingDown className="w-3.5 h-3.5" />
                       )}
-                      <span>
+                      <span className="tabular-nums">
                         {isPositive ? "+" : ""}
                         {change.toFixed(2)}%
                       </span>
@@ -148,22 +145,21 @@ function PriceCard({
                   </div>
                 </div>
               ) : (
-                /* Standard price display for non-gold items (USD/EGP) */
                 <>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-foreground tracking-tight">
+                    <span className="text-3xl font-black tracking-tight text-foreground tabular-nums">
                       {price.price.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </span>
-                    <span className="text-sm font-medium text-muted-foreground">
+                    <span className="text-sm font-semibold text-muted-foreground">
                       {price.currency}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <div
-                      className={`flex items-center gap-0.5 text-sm font-medium ${
+                      className={`flex items-center gap-1 text-sm font-bold ${
                         isPositive ? "text-emerald-600" : "text-red-600"
                       }`}
                     >
@@ -172,20 +168,20 @@ function PriceCard({
                       ) : (
                         <TrendingDown className="w-3.5 h-3.5" />
                       )}
-                      <span>
+                      <span className="tabular-nums">
                         {isPositive ? "+" : ""}
                         {change.toFixed(2)}%
                       </span>
                     </div>
                     {price.source && (
-                      <span className="text-xs text-muted-foreground">
-                        via {price.source}
+                      <span className="text-[10px] text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded-md">
+                        {price.source}
                       </span>
                     )}
                   </div>
                 </>
               )}
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-[10px] text-muted-foreground mt-3 pt-2 border-t border-border/30">
                 Updated:{" "}
                 {new Date(price.createdAt).toLocaleString("en-US", {
                   month: "short",
@@ -193,16 +189,13 @@ function PriceCard({
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
-                {price.source && !hasBuySell && (
-                  <span className="ml-1">• {price.source}</span>
-                )}
-                {hasBuySell && (
+                {price.source && hasBuySell && (
                   <span className="ml-1">• {price.source}</span>
                 )}
               </p>
             </>
           ) : (
-            <div className="py-4">
+            <div className="py-6 text-center">
               <p className="text-muted-foreground text-sm">No data available</p>
               {showFetchButton && (
                 <Button
@@ -210,7 +203,7 @@ function PriceCard({
                   size="sm"
                   onClick={onFetch}
                   disabled={fetching}
-                  className="mt-2 gap-1"
+                  className="mt-2 gap-1 rounded-xl"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${fetching ? "animate-spin" : ""}`}
@@ -244,7 +237,7 @@ export function PriceCards({
       <PriceCard
         title="Gold 21K"
         subtitle="ذهب عيار ٢١ في مصر"
-        icon={<Gem className="w-4 h-4 text-amber-500" />}
+        icon={<Gem className="w-4 h-4 text-amber-600" />}
         price={prices.gold}
         loading={loading}
         fetching={fetching}
@@ -254,7 +247,7 @@ export function PriceCards({
       <PriceCard
         title="USD/EGP Rate"
         subtitle="سعر الدولار مقابل الجنيه"
-        icon={<DollarSign className="w-4 h-4" />}
+        icon={<DollarSign className="w-4 h-4 text-emerald-600" />}
         price={prices.usdEgp}
         loading={loading}
         fetching={fetching}

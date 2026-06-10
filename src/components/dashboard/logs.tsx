@@ -7,8 +7,13 @@ import {
   CheckCircle2,
   XCircle,
   Filter,
+  Clock,
+  MessageSquare,
+  TrendingUp,
+  AlertTriangle,
+  TestTube,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,33 +23,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { NotificationLog } from "@/lib/dashboard-types";
 
-const LOG_TYPE_LABELS: Record<string, string> = {
-  daily_report: "Daily Report",
-  buy_signal: "Buy Signal",
-  sell_signal: "Sell Signal",
-  usd_drop_alert: "USD Drop",
-  test: "Test",
-  custom: "Custom",
-};
-
-const LOG_TYPE_COLORS: Record<string, string> = {
-  daily_report: "bg-blue-600 text-white",
-  buy_signal: "bg-emerald-600 text-white",
-  sell_signal: "bg-red-600 text-white",
-  usd_drop_alert: "bg-amber-600 text-white",
-  test: "bg-purple-600 text-white",
-  custom: "bg-gray-600 text-white",
+const LOG_TYPE_CONFIG: Record<string, { label: string; gradient: string; icon: React.ReactNode }> = {
+  daily_report: {
+    label: "Daily Report",
+    gradient: "from-sky-400 to-blue-500",
+    icon: <MessageSquare className="w-3 h-3" />,
+  },
+  buy_signal: {
+    label: "Buy Signal",
+    gradient: "from-emerald-400 to-green-500",
+    icon: <TrendingUp className="w-3 h-3" />,
+  },
+  sell_signal: {
+    label: "Sell Signal",
+    gradient: "from-red-400 to-rose-500",
+    icon: <AlertTriangle className="w-3 h-3" />,
+  },
+  usd_drop_alert: {
+    label: "USD Drop",
+    gradient: "from-amber-400 to-yellow-500",
+    icon: <AlertTriangle className="w-3 h-3" />,
+  },
+  test: {
+    label: "Test",
+    gradient: "from-purple-400 to-violet-500",
+    icon: <TestTube className="w-3 h-3" />,
+  },
+  custom: {
+    label: "Custom",
+    gradient: "from-gray-400 to-slate-500",
+    icon: <Bell className="w-3 h-3" />,
+  },
 };
 
 interface LogsTabProps {
@@ -79,11 +91,11 @@ export function LogsTab({ logs, onFetchLogs }: LogsTabProps) {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 bg-muted/30 rounded-2xl p-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-44 rounded-xl h-9">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
@@ -102,7 +114,7 @@ export function LogsTab({ logs, onFetchLogs }: LogsTabProps) {
           size="sm"
           onClick={refreshLogs}
           disabled={refreshing}
-          className="gap-1.5"
+          className="gap-1.5 rounded-xl"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
@@ -111,83 +123,81 @@ export function LogsTab({ logs, onFetchLogs }: LogsTabProps) {
         </Button>
       </div>
 
-      {/* Logs Table */}
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Bell className="w-4 h-4 text-emerald-600" />
-            Notification Logs
-            <Badge variant="outline" className="ml-1">
-              {logs.length}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Logs Timeline */}
+      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20 px-5 py-3 flex items-center justify-between border-b border-border/30">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-400 to-violet-500 flex items-center justify-center shadow-md shadow-purple-400/20">
+              <Bell className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">Notification Logs</h3>
+              <p className="text-[10px] text-muted-foreground" dir="rtl">سجل الإشعارات</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="rounded-lg text-[10px]">
+            {logs.length}
+          </Badge>
+        </div>
+        <CardContent className="p-0">
           <ScrollArea className="max-h-96">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead className="hidden sm:table-cell">Message</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-muted-foreground py-8"
+            {logs.length === 0 ? (
+              <div className="text-center py-12">
+                <Bell className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground text-sm">No notification logs found</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/20">
+                {logs.map((log) => {
+                  const typeConfig = LOG_TYPE_CONFIG[log.type] || LOG_TYPE_CONFIG.custom;
+                  return (
+                    <div
+                      key={log.id}
+                      className="px-5 py-3.5 hover:bg-muted/30 transition-colors group"
                     >
-                      No notification logs found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="text-xs whitespace-nowrap">
-                        {new Date(log.sentAt).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={`text-xs ${
-                            LOG_TYPE_COLORS[log.type] || "bg-gray-600 text-white"
-                          }`}
-                        >
-                          {LOG_TYPE_LABELS[log.type] || log.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {log.success ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-red-500" />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-32 truncate">
-                        {log.title}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-48 truncate hidden sm:table-cell">
-                        {log.error ? (
-                          <span className="text-red-500">{log.error}</span>
-                        ) : (
-                          <span className="line-clamp-1">
-                            {log.message.replace(/<[^>]*>/g, "")}
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      <div className="flex items-start gap-3">
+                        {/* Type icon */}
+                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${typeConfig.gradient} flex items-center justify-center text-white shadow-sm shrink-0 mt-0.5`}>
+                          {typeConfig.icon}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={`bg-gradient-to-r ${typeConfig.gradient} text-white text-[10px] px-2 py-0.5 rounded-lg border-0`}>
+                              {typeConfig.label}
+                            </Badge>
+                            {log.success ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5 text-red-500" />
+                            )}
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(log.sentAt).toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium text-foreground mt-1 truncate">
+                            {log.title}
+                          </p>
+                          {log.error ? (
+                            <p className="text-xs text-red-500 mt-0.5">{log.error}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                              {log.message.replace(/<[^>]*>/g, "")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </ScrollArea>
         </CardContent>
       </Card>

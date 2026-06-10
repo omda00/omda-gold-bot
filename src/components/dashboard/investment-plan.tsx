@@ -9,53 +9,54 @@ import {
   Clock,
   AlertTriangle,
   Gem,
+  Target,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { InvestmentPlan, SignalResult } from "@/lib/dashboard-types";
 
 function getActionConfig(action: string) {
   if (action.includes("شراء قوي")) {
     return {
       bg: "bg-emerald-50 dark:bg-emerald-950/30",
-      badge: "bg-emerald-600 hover:bg-emerald-700 text-white",
-      border: "border-emerald-200 dark:border-emerald-800",
+      gradient: "from-emerald-400 to-emerald-500",
+      iconBg: "bg-emerald-500",
+      border: "ring-emerald-400/40",
       icon: <ShoppingCart className="w-3.5 h-3.5" />,
       label: "Strong Buy",
+      textColor: "text-emerald-700 dark:text-emerald-400",
     };
   }
   if (action.includes("شراء")) {
     return {
       bg: "bg-green-50 dark:bg-green-950/30",
-      badge: "bg-green-600 hover:bg-green-700 text-white",
-      border: "border-green-200 dark:border-green-800",
+      gradient: "from-green-400 to-green-500",
+      iconBg: "bg-green-500",
+      border: "ring-green-400/40",
       icon: <TrendingUp className="w-3.5 h-3.5" />,
       label: "Buy",
+      textColor: "text-green-700 dark:text-green-400",
     };
   }
   if (action.includes("انتظار")) {
     return {
       bg: "bg-amber-50 dark:bg-amber-950/30",
-      badge: "bg-amber-600 hover:bg-amber-700 text-white",
-      border: "border-amber-200 dark:border-amber-800",
+      gradient: "from-amber-400 to-amber-500",
+      iconBg: "bg-amber-500",
+      border: "ring-amber-400/40",
       icon: <Clock className="w-3.5 h-3.5" />,
       label: "Wait",
+      textColor: "text-amber-700 dark:text-amber-400",
     };
   }
   return {
     bg: "bg-red-50 dark:bg-red-950/30",
-    badge: "bg-red-600 hover:bg-red-700 text-white",
-    border: "border-red-200 dark:border-red-800",
+    gradient: "from-red-400 to-red-500",
+    iconBg: "bg-red-500",
+    border: "ring-red-400/40",
     icon: <AlertTriangle className="w-3.5 h-3.5" />,
     label: "Sell",
+    textColor: "text-red-700 dark:text-red-400",
   };
 }
 
@@ -73,98 +74,85 @@ export function InvestmentPlanTable({
   const activePlans = plans.filter((p) => p.active).sort((a, b) => a.order - b.order);
 
   return (
-    <Card className="border-border/50 shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Gem className="w-4 h-4 text-amber-500" />
-          Investment Plan
-          <span className="text-muted-foreground font-normal text-xs" dir="rtl">
-            خطة الاستثمار - الذهب
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12 text-center">#</TableHead>
-                <TableHead>Price Range (EGP/g)</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead className="text-center">Return</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {activePlans.map((plan, index) => {
-                const config = getActionConfig(plan.action);
-                const isActive =
-                  signal &&
-                  signal.action === plan.action &&
-                  signal.priceRangeMin === plan.priceRangeMin;
+    <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
+      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-3 flex items-center gap-2 border-b border-border/30">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md shadow-amber-400/20">
+          <Gem className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <h3 className="font-bold text-sm">Investment Plan</h3>
+          <p className="text-[10px] text-muted-foreground" dir="rtl">خطة الاستثمار - الذهب</p>
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <div className="space-y-2.5">
+          {activePlans.map((plan, index) => {
+            const config = getActionConfig(plan.action);
+            const isActive =
+              signal &&
+              signal.action === plan.action &&
+              signal.priceRangeMin === plan.priceRangeMin;
 
-                return (
-                  <TableRow
-                    key={plan.id}
-                    className={`${config.bg} ${config.border} ${
-                      isActive ? "ring-2 ring-emerald-500 ring-offset-1" : ""
-                    } transition-all`}
-                  >
-                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
-                      {index + 1}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {plan.priceRangeMin.toLocaleString()} -{" "}
-                      {plan.priceRangeMax
-                        ? plan.priceRangeMax.toLocaleString()
-                        : "∞"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`${config.badge} gap-1 text-xs`}
-                      >
-                        {config.icon}
-                        <span dir="rtl">{plan.action}</span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span
-                        className={`inline-flex items-center gap-0.5 text-sm font-semibold ${
-                          plan.expectedReturn > 0
-                            ? "text-emerald-600"
-                            : plan.expectedReturn < 0
-                            ? "text-red-600"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {plan.expectedReturn > 0 ? (
-                          <TrendingUp className="w-3 h-3" />
-                        ) : plan.expectedReturn < 0 ? (
-                          <TrendingDown className="w-3 h-3" />
-                        ) : (
-                          <Minus className="w-3 h-3" />
-                        )}
-                        {plan.expectedReturn > 0 ? "+" : ""}
-                        {plan.expectedReturn}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {isActive ? (
-                        <Badge
-                          variant="outline"
-                          className="border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 text-xs"
-                        >
-                          Active
+            return (
+              <motion.div
+                key={plan.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={`rounded-xl p-3 ring-1 ${config.border} ${config.bg} ${
+                  isActive ? "ring-2 shadow-md" : ""
+                } transition-all hover:shadow-sm`}
+              >
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  {/* Left: Range + Action */}
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${config.iconBg} flex items-center justify-center text-white`}>
+                      {config.icon}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${config.iconBg} hover:${config.iconBg} text-white gap-1 text-[10px] px-2 py-0.5 rounded-lg`}>
+                          <span dir="rtl">{plan.action}</span>
                         </Badge>
+                        {isActive && (
+                          <Badge variant="outline" className="border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 text-[10px] px-2 py-0.5 rounded-lg">
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 font-mono tabular-nums">
+                        {plan.priceRangeMin.toLocaleString()} - {plan.priceRangeMax ? plan.priceRangeMax.toLocaleString() : "∞"} EGP
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right: Return */}
+                  <div className="text-left">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Expected</p>
+                    <span
+                      className={`inline-flex items-center gap-0.5 text-sm font-bold tabular-nums ${
+                        plan.expectedReturn > 0
+                          ? "text-emerald-600"
+                          : plan.expectedReturn < 0
+                          ? "text-red-600"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {plan.expectedReturn > 0 ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : plan.expectedReturn < 0 ? (
+                        <TrendingDown className="w-3 h-3" />
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <Minus className="w-3 h-3" />
                       )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      {plan.expectedReturn > 0 ? "+" : ""}
+                      {plan.expectedReturn}%
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -179,19 +167,22 @@ interface CurrentSignalCardProps {
 export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardProps) {
   if (!signal) {
     return (
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
+      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
+        <div className="bg-gradient-to-r from-muted/50 to-muted/30 px-5 py-3 flex items-center gap-2 border-b border-border/30">
+          <div className="w-8 h-8 rounded-xl bg-muted/50 flex items-center justify-center">
             <Minus className="w-4 h-4 text-muted-foreground" />
-            Current Signal
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6">
+          </div>
+          <h3 className="font-bold text-sm">Current Signal</h3>
+        </div>
+        <CardContent className="p-5">
+          <div className="text-center py-4">
             {currentPrice ? (
               <>
                 <p className="text-muted-foreground text-sm">
-                  Current price: <span className="font-mono font-semibold text-foreground">{currentPrice.toLocaleString()} EGP/g</span>
+                  Current price:{" "}
+                  <span className="font-mono font-bold text-foreground text-lg tabular-nums">
+                    {currentPrice.toLocaleString()} EGP/g
+                  </span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   No matching plan tier found
@@ -216,20 +207,22 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: "spring", stiffness: 200, damping: 15 }}
     >
-      <Card className={`border-2 ${config.border} shadow-md overflow-hidden`}>
-        <div className={`h-1.5 ${config.badge}`} />
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            Current Signal
-            <span className="text-muted-foreground font-normal text-xs" dir="rtl">
-              الإشارة الحالية
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card className={`rounded-2xl border-0 shadow-lg ring-2 ${config.border} overflow-hidden`}>
+        {/* Top gradient bar */}
+        <div className={`h-1.5 bg-gradient-to-r ${config.gradient}`} />
+        <div className="bg-gradient-to-r from-muted/30 to-transparent px-5 py-3 flex items-center gap-2 border-b border-border/30">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md shadow-amber-400/20">
+            <Target className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm">Current Signal</h3>
+            <p className="text-[10px] text-muted-foreground" dir="rtl">الإشارة الحالية</p>
+          </div>
+        </div>
+        <CardContent className="p-5">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <Badge className={`${config.badge} gap-1.5 text-sm px-3 py-1`}>
+              <Badge className={`${config.iconBg} hover:${config.iconBg} text-white gap-1.5 text-sm px-3 py-1 rounded-xl`}>
                 {config.icon}
                 <span dir="rtl">{signal.action}</span>
               </Badge>
@@ -238,11 +231,12 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
               </p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold font-mono text-foreground">
-                {currentPrice?.toLocaleString()} <span className="text-sm text-muted-foreground">EGP/g</span>
+              <p className="text-3xl font-black font-mono text-foreground tabular-nums">
+                {currentPrice?.toLocaleString()}
+                <span className="text-sm text-muted-foreground font-medium ml-1">EGP/g</span>
               </p>
               <p
-                className={`text-sm font-semibold ${
+                className={`text-sm font-bold mt-1 ${
                   signal.expectedReturn > 0
                     ? "text-emerald-600"
                     : signal.expectedReturn < 0

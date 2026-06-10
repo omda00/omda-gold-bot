@@ -38,31 +38,34 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
   }, []);
 
   return (
-    <header className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+    <header className="sticky top-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-xl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-600/10 border border-emerald-600/20">
-              <Bot className="w-5 h-5 text-emerald-600" />
+            <div className="relative">
+              <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg shadow-amber-400/25">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+              <h1 className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight">
                 منصة متابعة الذهب والعملات
               </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground" dir="rtl">
+              <p className="text-[11px] text-muted-foreground font-medium" dir="rtl">
                 AI Workflow Automation — Gold & Currency Monitor
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-muted-foreground" />
+              <Activity className="w-3.5 h-3.5 text-muted-foreground" />
               <Badge
                 variant={automationEnabled ? "default" : "destructive"}
                 className={
                   automationEnabled
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
-                    : "gap-1"
+                    ? "bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 rounded-lg px-3 py-0.5 text-xs font-semibold"
+                    : "gap-1.5 rounded-lg px-3 py-0.5 text-xs font-semibold"
                 }
               >
                 <span
@@ -73,9 +76,9 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
                 {automationEnabled ? "Active" : "Inactive"}
               </Badge>
             </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-muted-foreground">{currentDate}</p>
-              <p className="text-sm font-mono font-medium text-foreground">
+            <div className="text-right hidden sm:block bg-muted/40 rounded-xl px-3 py-1.5">
+              <p className="text-[10px] text-muted-foreground font-medium">{currentDate}</p>
+              <p className="text-sm font-mono font-bold text-foreground tabular-nums">
                 {currentTime}
               </p>
             </div>

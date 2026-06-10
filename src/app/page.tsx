@@ -72,7 +72,7 @@ export default function Home() {
   const automationEnabled = config?.AUTOMATION_ENABLED === "true";
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-amber-50/10 dark:to-amber-950/5">
       <DashboardHeader automationEnabled={automationEnabled} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-6">
@@ -82,24 +82,39 @@ export default function Home() {
           className="space-y-4"
         >
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <TabsList className="w-full sm:w-auto flex-wrap">
-              <TabsTrigger value="dashboard" className="gap-1.5">
+            <TabsList className="bg-muted/40 backdrop-blur-sm rounded-2xl p-1 h-auto flex-wrap">
+              <TabsTrigger
+                value="dashboard"
+                className="gap-1.5 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-400/20 px-3 py-1.5 text-xs font-semibold transition-all"
+              >
                 <LayoutDashboard className="w-3.5 h-3.5" />
                 <span>Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="calculator" className="gap-1.5">
+              <TabsTrigger
+                value="calculator"
+                className="gap-1.5 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-400/20 px-3 py-1.5 text-xs font-semibold transition-all"
+              >
                 <Calculator className="w-3.5 h-3.5" />
                 <span>حاسبة الذهب</span>
               </TabsTrigger>
-              <TabsTrigger value="prices" className="gap-1.5">
+              <TabsTrigger
+                value="prices"
+                className="gap-1.5 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-400 data-[state=active]:to-green-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-400/20 px-3 py-1.5 text-xs font-semibold transition-all"
+              >
                 <BarChart3 className="w-3.5 h-3.5" />
                 <span>Prices</span>
               </TabsTrigger>
-              <TabsTrigger value="settings" className="gap-1.5">
+              <TabsTrigger
+                value="settings"
+                className="gap-1.5 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-400 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sky-400/20 px-3 py-1.5 text-xs font-semibold transition-all"
+              >
                 <Settings className="w-3.5 h-3.5" />
                 <span>Settings</span>
               </TabsTrigger>
-              <TabsTrigger value="logs" className="gap-1.5">
+              <TabsTrigger
+                value="logs"
+                className="gap-1.5 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-400 data-[state=active]:to-violet-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-400/20 px-3 py-1.5 text-xs font-semibold transition-all"
+              >
                 <Bell className="w-3.5 h-3.5" />
                 <span>Logs</span>
               </TabsTrigger>
@@ -111,10 +126,10 @@ export default function Home() {
                 size="sm"
                 onClick={handleRunAutomation}
                 disabled={loading.automation}
-                className="gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                className="gap-1.5 rounded-xl border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/30 h-8 text-xs font-semibold"
               >
                 <Play
-                  className={`w-3.5 h-3.5 ${
+                  className={`w-3 h-3 ${
                     loading.automation ? "animate-pulse" : ""
                   }`}
                 />
@@ -148,7 +163,7 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          {/* TAB 2: Gold & Silver Calculator */}
+          {/* TAB 2: Gold Calculator */}
           <TabsContent value="calculator">
             <GoldCalculator
               calculatorData={calculatorData}

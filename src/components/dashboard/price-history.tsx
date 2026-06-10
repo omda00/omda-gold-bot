@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Gem, DollarSign } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Gem, DollarSign, Calendar } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -13,22 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import type { PriceRecord, PriceHistoryResponse } from "@/lib/dashboard-types";
 
 const chartConfig: ChartConfig = {
   price: {
     label: "Price",
-    color: "#10b981",
+    color: "#f59e0b",
   },
 };
 
@@ -67,23 +61,23 @@ export function PriceHistoryTab({
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 bg-muted/30 rounded-2xl p-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Symbol:</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Symbol</span>
           <Select value={symbol} onValueChange={setSymbol}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 rounded-xl h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="GOLD_EGP">
                 <span className="flex items-center gap-2">
-                  <Gem className="w-3.5 h-3.5" />
+                  <Gem className="w-3.5 h-3.5 text-amber-500" />
                   Gold 21K
                 </span>
               </SelectItem>
               <SelectItem value="USD_EGP">
                 <span className="flex items-center gap-2">
-                  <DollarSign className="w-3.5 h-3.5" />
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
                   USD/EGP
                 </span>
               </SelectItem>
@@ -91,7 +85,8 @@ export function PriceHistoryTab({
           </Select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Period:</span>
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Period</span>
           <div className="flex gap-1">
             {[7, 30, 90].map((d) => (
               <Button
@@ -99,7 +94,11 @@ export function PriceHistoryTab({
                 variant={days === d ? "default" : "outline"}
                 size="sm"
                 onClick={() => setDays(d)}
-                className={days === d ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                className={`rounded-xl h-8 text-xs font-bold ${
+                  days === d
+                    ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20"
+                    : "hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                }`}
               >
                 {d}d
               </Button>
@@ -109,15 +108,16 @@ export function PriceHistoryTab({
       </div>
 
       {/* Chart */}
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">
-            Price History — {symbol}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-3 flex items-center gap-2 border-b border-border/30">
+          <Gem className="w-4 h-4 text-amber-600" />
+          <h3 className="font-bold text-sm">
+            Price History — {symbol === "GOLD_EGP" ? "Gold 21K" : "USD/EGP"}
+          </h3>
+        </div>
+        <CardContent className="p-4">
           {loading ? (
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full rounded-xl" />
           ) : chartData.length === 0 ? (
             <div className="h-64 flex items-center justify-center">
               <p className="text-muted-foreground text-sm">
@@ -127,7 +127,7 @@ export function PriceHistoryTab({
           ) : (
             <ChartContainer config={chartConfig} className="h-64 w-full">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis
                   dataKey="date"
                   tickLine={false}
@@ -145,9 +145,9 @@ export function PriceHistoryTab({
                   type="monotone"
                   dataKey="price"
                   stroke="var(--color-price)"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   dot={false}
-                  activeDot={{ r: 4 }}
+                  activeDot={{ r: 5, fill: "#f59e0b" }}
                 />
               </LineChart>
             </ChartContainer>
@@ -155,81 +155,74 @@ export function PriceHistoryTab({
         </CardContent>
       </Card>
 
-      {/* Recent Records Table */}
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">
-            Recent Records
-            <span className="text-muted-foreground font-normal text-xs ml-2">
-              ({priceHistory.count} total)
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Recent Records */}
+      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
+        <div className="bg-gradient-to-r from-muted/50 to-muted/30 px-5 py-3 flex items-center justify-between border-b border-border/30">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <h3 className="font-bold text-sm">Recent Records</h3>
+          </div>
+          <Badge variant="outline" className="rounded-lg text-[10px]">
+            {priceHistory.count} total
+          </Badge>
+        </div>
+        <CardContent className="p-0">
           <ScrollArea className="max-h-72">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Buy / Sell</TableHead>
-                  <TableHead>Change</TableHead>
-                  <TableHead>Source</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {priceHistory.records.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-muted-foreground py-6"
+            <div className="divide-y divide-border/30">
+              {priceHistory.records.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No records found
+                </div>
+              ) : (
+                priceHistory.records.map((record: PriceRecord) => {
+                  const change = record.change ?? 0;
+                  const isPositive = change >= 0;
+                  return (
+                    <div
+                      key={record.id}
+                      className="flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors"
                     >
-                      No records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  priceHistory.records.map((record: PriceRecord) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="text-xs">
-                        {new Date(record.createdAt).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {record.price.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        {record.currency}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {record.buyPrice && record.sellPrice
-                          ? `${record.buyPrice.toLocaleString()} / ${record.sellPrice.toLocaleString()}`
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${isPositive ? "bg-emerald-500" : "bg-red-500"}`} />
+                        <div>
+                          <p className="text-sm font-semibold tabular-nums">
+                            {record.price.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}{" "}
+                            <span className="text-xs text-muted-foreground">{record.currency}</span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(record.createdAt).toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {record.source && ` • ${record.source}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {record.buyPrice && record.sellPrice && (
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {record.buyPrice.toLocaleString()}/{record.sellPrice.toLocaleString()}
+                          </span>
+                        )}
                         <span
-                          className={`text-xs font-medium ${
-                            (record.change ?? 0) >= 0
-                              ? "text-emerald-600"
-                              : "text-red-600"
+                          className={`flex items-center gap-0.5 text-xs font-bold tabular-nums ${
+                            isPositive ? "text-emerald-600" : "text-red-600"
                           }`}
                         >
-                          {(record.change ?? 0) >= 0 ? "+" : ""}
-                          {(record.change ?? 0).toFixed(2)}%
+                          {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                          {isPositive ? "+" : ""}{change.toFixed(2)}%
                         </span>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {record.source || "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>
