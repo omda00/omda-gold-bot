@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model PriceRecord {
+  id        String   @id @default(cuid())
+  symbol    String   // "ARAMCO" or "USD_EGP"
+  price     Float
+  currency  String   // "SAR" or "EGP"
+  change    Float?   // percentage change from previous
+  source    String?  // Where the price was fetched from
+  createdAt DateTime @default(now())
+}
+
+model AppConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model InvestmentPlan {
+  id             String  @id @default(cuid())
+  priceRangeMin  Float
+  priceRangeMax  Float?  // null means > priceRangeMin (e.g., > 7500)
+  action         String  // "شراء" (Buy), "بيع 70%" (Sell 70%), "لا شراء" (No Buy), etc.
+  expectedReturn Float   // percentage (e.g., 40, 30, 0, -30, -50)
+  label          String  // description in Arabic
+  order          Int     // display order
+  active         Boolean @default(true)
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  type      String   // "daily_report", "buy_signal", "usd_drop_alert", "test"
+  title     String
+  message   String
+  sentAt    DateTime @default(now())
+  success   Boolean
+  error     String?
+}
