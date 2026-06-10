@@ -95,6 +95,31 @@ export async function POST() {
     const canSendTelegram = botToken && chatId;
 
     if (canSendTelegram) {
+      // Always send daily report with both prices
+      const dailyReport = "📊 <b>التقرير اليومي - أسعار العملات</b>\n\n" +
+        `🛢️ <b>أرامكو:</b> ${aramcoRecord.price.toFixed(2)} SAR` +
+        `${aramcoRecord.change ? (aramcoRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(aramcoRecord.change).toFixed(2) + "%" : ""}\n` +
+        `💱 <b>USD/EGP:</b> ${usdEgpRecord.price.toFixed(2)} EGP` +
+        `${usdEgpRecord.change ? (usdEgpRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(usdEgpRecord.change).toFixed(2) + "%" : ""}\n\n` +
+        `📌 المصدر: Google Finance`;
+
+      const dailyResult = await sendTelegramMessage(botToken, chatId, dailyReport);
+      results.notifications?.push({
+        type: "daily_report",
+        sent: dailyResult.ok,
+        error: dailyResult.error,
+      });
+
+      await db.notificationLog.create({
+        data: {
+          type: "daily_report",
+          title: "Daily Price Report",
+          message: dailyReport,
+          success: dailyResult.ok,
+          error: dailyResult.error,
+        },
+      });
+
       // Send signal notification if there's a buy/sell signal
       if (signal && (signal.action.includes("شراء") || signal.action.includes("بيع"))) {
         const isBuy = signal.action.includes("شراء");
@@ -103,11 +128,12 @@ export async function POST() {
           `📊 أرامكو: ${aramcoRecord.price.toFixed(2)} SAR\n` +
           `📋 الخطة: ${signal.plan.label}\n` +
           `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n` +
-          `📈 التغيير: ${aramcoRecord.change > 0 ? "+" : ""}${aramcoRecord.change?.toFixed(2)}%`;
+          `📈 التغيير: ${aramcoRecord.change > 0 ? "+" : ""}${aramcoRecord.change?.toFixed(2)}%\n` +
+          `📌 المصدر: Google Finance`;
 
         const sendResult = await sendTelegramMessage(botToken, chatId, signalMessage);
         results.notifications?.push({
-          type: "buy_signal",
+          type: isBuy ? "buy_signal" : "sell_signal",
           sent: sendResult.ok,
           error: sendResult.error,
         });
@@ -125,11 +151,12 @@ export async function POST() {
 
       // Send USD drop alert
       if (usdDropDetected) {
-        const dropMessage = "⚠️ <b>تنبيه انخفاض الدولار</b>\n\n" +
+        const dropMessage = "⚠️ <b>تنبيه نزول قوي لسعر الدولار</b>\n\n" +
           `💱 USD/EGP: ${usdEgpRecord.price.toFixed(2)} EGP\n` +
           `📉 السابق: ${previousUsdEgp?.price.toFixed(2)} EGP\n` +
           `📊 التغيير: ${usdEgpRecord.change?.toFixed(2)}%\n` +
-          `🎯 الحد: ${threshold}%`;
+          `🎯 الحد: ${threshold}%\n` +
+          `📌 المصدر: Google Finance`;
 
         const sendResult = await sendTelegramMessage(botToken, chatId, dropMessage);
         results.notifications?.push({

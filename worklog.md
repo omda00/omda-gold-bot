@@ -81,3 +81,23 @@ Stage Summary:
 - Periodic job: every 4 hours
 - Manual trigger available via POST /trigger
 - Checks AUTOMATION_ENABLED config before running
+
+---
+Task ID: 4-update
+Agent: Main Coordinator
+Task: Update price fetcher to use Google Finance as primary source
+
+Work Log:
+- Updated fetchUsdEgpRate() to use page_reader on Google Finance URL (https://www.google.com/finance/quote/USD-EGP)
+- Updated fetchAramcoPrice() to use page_reader on Google Finance URL (https://www.google.com/finance/quote/2222:TADAWUL)
+- Added regex extraction for both prices from Google Finance HTML
+- Added fallback to web_search + LLM if page_reader fails
+- Updated automation/run to always send daily report with both prices
+- Added Arabic source label in Telegram messages
+- Improved USD drop alert message with "تنبيه نزول قوي لسعر الدولار"
+
+Stage Summary:
+- Both prices now come from Google Finance as primary source
+- USD/EGP: 51.82 EGP from Google Finance
+- Aramco: 27.06 SAR from Google Finance
+- Fallback to web_search still works if Google Finance is unavailable
