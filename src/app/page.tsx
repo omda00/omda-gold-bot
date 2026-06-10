@@ -44,11 +44,11 @@ export default function Home() {
     try {
       const result = await triggerFetchPrices();
       if (result) {
-        toast.success("Prices fetched successfully");
+        toast.success("تم جلب الأسعار بنجاح");
       }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to fetch prices"
+        err instanceof Error ? err.message : "فشل في جلب الأسعار"
       );
     }
   }, [triggerFetchPrices]);
@@ -57,11 +57,11 @@ export default function Home() {
     try {
       const result = await runAutomation();
       if (result) {
-        toast.success("Automation cycle completed");
+        toast.success("تم تشغيل الأتمتة بنجاح");
       }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Automation failed"
+        err instanceof Error ? err.message : "فشل تشغيل الأتمتة"
       );
     }
   }, [runAutomation]);
@@ -129,13 +129,13 @@ export default function Home() {
                 <InvestmentPlanTable
                   plans={plans}
                   signal={signal}
-                  currentPrice={prices.aramco?.price ?? null}
+                  currentPrice={prices.gold?.price ?? null}
                 />
               </div>
               <div>
                 <CurrentSignalCard
                   signal={signal}
-                  currentPrice={prices.aramco?.price ?? null}
+                  currentPrice={prices.gold?.price ?? null}
                 />
               </div>
             </div>

@@ -1,18 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fetchAramcoPrice, fetchUsdEgpRate, savePriceRecord } from "@/lib/price-fetcher";
+import { fetchGoldEgpPrice, fetchUsdEgpRate, savePriceRecord } from "@/lib/price-fetcher";
 import { seedDefaultConfig } from "@/lib/config-seeder";
 
 /**
- * GET /api/prices - Return the latest Aramco and USD/EGP prices
+ * GET /api/prices - Return the latest Gold and USD/EGP prices
  */
 export async function GET() {
   try {
-    // Ensure defaults are seeded
     await seedDefaultConfig();
 
-    const aramcoPrice = await db.priceRecord.findFirst({
-      where: { symbol: "ARAMCO" },
+    const goldPrice = await db.priceRecord.findFirst({
+      where: { symbol: "GOLD_EGP" },
       orderBy: { createdAt: "desc" },
     });
 
@@ -22,7 +21,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      aramco: aramcoPrice,
+      gold: goldPrice,
       usdEgp: usdEgpRate,
     });
   } catch (error) {
@@ -35,29 +34,27 @@ export async function GET() {
 }
 
 /**
- * POST /api/prices - Trigger a manual price fetch using web search
+ * POST /api/prices - Trigger a manual price fetch
  */
 export async function POST() {
   try {
-    // Fetch both prices in parallel
-    const [aramcoResult, usdEgpResult] = await Promise.all([
-      fetchAramcoPrice(),
+    const [goldResult, usdEgpResult] = await Promise.all([
+      fetchGoldEgpPrice(),
       fetchUsdEgpRate(),
     ]);
 
-    // Save to database
-    const [aramcoRecord, usdEgpRecord] = await Promise.all([
-      savePriceRecord("ARAMCO", aramcoResult.price, "SAR", aramcoResult.source),
+    const [goldRecord, usdEgpRecord] = await Promise.all([
+      savePriceRecord("GOLD_EGP", goldResult.price, "EGP", goldResult.source),
       savePriceRecord("USD_EGP", usdEgpResult.price, "EGP", usdEgpResult.source),
     ]);
 
     return NextResponse.json({
-      aramco: aramcoRecord,
+      gold: goldRecord,
       usdEgp: usdEgpRecord,
       message: "Prices fetched and saved successfully",
     });
   } catch (error) {
-    console.error("Error fetching prices via web search:", error);
+    console.error("Error fetching prices:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       { error: `Failed to fetch prices: ${message}` },

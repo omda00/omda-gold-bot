@@ -6,7 +6,7 @@ import {
   TrendingDown,
   RefreshCw,
   DollarSign,
-  BarChart3,
+  Gem,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import type { PriceRecord } from "@/lib/dashboard-types";
 
 interface PriceCardProps {
   title: string;
+  subtitle: string;
   icon: React.ReactNode;
   price: PriceRecord | null;
   loading: boolean;
@@ -25,6 +26,7 @@ interface PriceCardProps {
 
 function PriceCard({
   title,
+  subtitle,
   icon,
   price,
   loading,
@@ -68,7 +70,12 @@ function PriceCard({
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               {icon}
-              {title}
+              <div>
+                <div>{title}</div>
+                <div className="text-xs text-muted-foreground/70" dir="rtl">
+                  {subtitle}
+                </div>
+              </div>
             </CardTitle>
             {showFetchButton && (
               <Button
@@ -158,7 +165,7 @@ function PriceCard({
 }
 
 interface PriceCardsProps {
-  prices: { aramco: PriceRecord | null; usdEgp: PriceRecord | null };
+  prices: { gold: PriceRecord | null; usdEgp: PriceRecord | null };
   loading: boolean;
   fetching: boolean;
   onFetchPrices: () => void;
@@ -173,9 +180,10 @@ export function PriceCards({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <PriceCard
-        title="Aramco Stock"
-        icon={<BarChart3 className="w-4 h-4" />}
-        price={prices.aramco}
+        title="Gold 21K"
+        subtitle="ذهب عيار ٢١ في مصر"
+        icon={<Gem className="w-4 h-4 text-amber-500" />}
+        price={prices.gold}
         loading={loading}
         fetching={fetching}
         onFetch={onFetchPrices}
@@ -183,6 +191,7 @@ export function PriceCards({
       />
       <PriceCard
         title="USD/EGP Rate"
+        subtitle="سعر الدولار مقابل الجنيه"
         icon={<DollarSign className="w-4 h-4" />}
         price={prices.usdEgp}
         loading={loading}

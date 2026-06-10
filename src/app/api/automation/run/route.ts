@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fetchAramcoPrice, fetchUsdEgpRate, savePriceRecord } from "@/lib/price-fetcher";
+import { fetchGoldEgpPrice, fetchUsdEgpRate, savePriceRecord } from "@/lib/price-fetcher";
 import { detectSignal, detectUsdDrop } from "@/lib/signal-detector";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { getConfig } from "@/lib/config-seeder";
 
 /**
  * POST /api/automation/run - Run the full automation cycle:
- * 1. Fetch current prices (Aramco + USD/EGP)
+ * 1. Fetch current prices (Gold EGP + USD/EGP)
  * 2. Check if any buy/sell signals are triggered based on the investment plan
  * 3. Check if USD/EGP has a significant drop
  * 4. Send Telegram notifications for any alerts
@@ -15,7 +15,7 @@ import { getConfig } from "@/lib/config-seeder";
  */
 export async function POST() {
   const results: {
-    prices?: { aramco?: { price: number; change: number }; usdEgp?: { price: number; change: number } };
+    prices?: { gold?: { price: number; change: number }; usdEgp?: { price: number; change: number } };
     signals?: { action: string; label: string } | null;
     usdDrop?: boolean;
     notifications?: { type: string; sent: boolean; error?: string }[];
@@ -26,7 +26,6 @@ export async function POST() {
   };
 
   try {
-    // Check if automation is enabled
     const automationEnabled = await getConfig("AUTOMATION_ENABLED");
     if (automationEnabled !== "true") {
       return NextResponse.json(
@@ -36,22 +35,22 @@ export async function POST() {
     }
 
     // Step 1: Fetch current prices
-    let aramcoRecord;
+    let goldRecord;
     let usdEgpRecord;
 
     try {
-      const [aramcoResult, usdEgpResult] = await Promise.all([
-        fetchAramcoPrice(),
+      const [goldResult, usdEgpResult] = await Promise.all([
+        fetchGoldEgpPrice(),
         fetchUsdEgpRate(),
       ]);
 
-      [aramcoRecord, usdEgpRecord] = await Promise.all([
-        savePriceRecord("ARAMCO", aramcoResult.price, "SAR", aramcoResult.source),
+      [goldRecord, usdEgpRecord] = await Promise.all([
+        savePriceRecord("GOLD_EGP", goldResult.price, "EGP", goldResult.source),
         savePriceRecord("USD_EGP", usdEgpResult.price, "EGP", usdEgpResult.source),
       ]);
 
       results.prices = {
-        aramco: { price: aramcoRecord.price, change: aramcoRecord.change ?? 0 },
+        gold: { price: goldRecord.price, change: goldRecord.change ?? 0 },
         usdEgp: { price: usdEgpRecord.price, change: usdEgpRecord.change ?? 0 },
       };
     } catch (error) {
@@ -60,20 +59,19 @@ export async function POST() {
       return NextResponse.json({ ...results, error: "Price fetch failed" }, { status: 500 });
     }
 
-    // Step 2: Check investment plan signals
+    // Step 2: Check investment plan signals (now based on gold price)
     const plans = await db.investmentPlan.findMany({
       where: { active: true },
       orderBy: { order: "asc" },
     });
 
-    const signal = detectSignal(aramcoRecord.price, plans);
+    const signal = detectSignal(goldRecord.price, plans);
     results.signals = signal ? { action: signal.action, label: signal.plan.label } : null;
 
     // Step 3: Check USD/EGP drop
     const thresholdStr = await getConfig("USD_DROP_THRESHOLD");
     const threshold = thresholdStr ? parseFloat(thresholdStr) : 2;
 
-    // Get previous USD/EGP record
     const previousUsdEgp = await db.priceRecord.findFirst({
       where: {
         symbol: "USD_EGP",
@@ -96,12 +94,12 @@ export async function POST() {
 
     if (canSendTelegram) {
       // Always send daily report with both prices
-      const dailyReport = "📊 <b>التقرير اليومي - أسعار العملات</b>\n\n" +
-        `🛢️ <b>أرامكو:</b> ${aramcoRecord.price.toFixed(2)} SAR` +
-        `${aramcoRecord.change ? (aramcoRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(aramcoRecord.change).toFixed(2) + "%" : ""}\n` +
+      const dailyReport = "📊 <b>التقرير اليومي - أسعار الذهب والعملات</b>\n\n" +
+        `🥇 <b>ذهب عيار 21:</b> ${goldRecord.price.toLocaleString()} EGP/جرام` +
+        `${goldRecord.change ? (goldRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(goldRecord.change).toFixed(2) + "%" : ""}\n` +
         `💱 <b>USD/EGP:</b> ${usdEgpRecord.price.toFixed(2)} EGP` +
         `${usdEgpRecord.change ? (usdEgpRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(usdEgpRecord.change).toFixed(2) + "%" : ""}\n\n` +
-        `📌 المصدر: Google Finance`;
+        `📌 المصدر: gold-price-live.com & Google Finance`;
 
       const dailyResult = await sendTelegramMessage(botToken, chatId, dailyReport);
       results.notifications?.push({
@@ -125,11 +123,10 @@ export async function POST() {
         const isBuy = signal.action.includes("شراء");
         const emoji = isBuy ? "🟢" : "🔴";
         const signalMessage = `${emoji} <b>${signal.action}</b>\n\n` +
-          `📊 أرامكو: ${aramcoRecord.price.toFixed(2)} SAR\n` +
+          `🥇 ذهب عيار 21: ${goldRecord.price.toLocaleString()} EGP/جرام\n` +
           `📋 الخطة: ${signal.plan.label}\n` +
           `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n` +
-          `📈 التغيير: ${aramcoRecord.change > 0 ? "+" : ""}${aramcoRecord.change?.toFixed(2)}%\n` +
-          `📌 المصدر: Google Finance`;
+          `📈 التغيير: ${goldRecord.change > 0 ? "+" : ""}${goldRecord.change?.toFixed(2)}%`;
 
         const sendResult = await sendTelegramMessage(botToken, chatId, signalMessage);
         results.notifications?.push({

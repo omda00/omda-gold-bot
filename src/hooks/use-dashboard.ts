@@ -11,7 +11,7 @@ import type {
 } from "@/lib/dashboard-types";
 
 export function useDashboardData() {
-  const [prices, setPrices] = useState<PricesResponse>({ aramco: null, usdEgp: null });
+  const [prices, setPrices] = useState<PricesResponse>({ gold: null, usdEgp: null });
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -114,7 +114,7 @@ export function useDashboardData() {
   }, []);
 
   // Fetch price history
-  const fetchPriceHistory = useCallback(async (symbol = "ARAMCO", days = 30) => {
+  const fetchPriceHistory = useCallback(async (symbol = "GOLD_EGP", days = 30) => {
     setLoading((prev) => ({ ...prev, history: true }));
     try {
       const params = new URLSearchParams({ symbol, days: String(days) });
@@ -139,7 +139,7 @@ export function useDashboardData() {
       const res = await fetch("/api/prices", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        setPrices({ aramco: data.aramco, usdEgp: data.usdEgp });
+        setPrices({ gold: data.gold, usdEgp: data.usdEgp });
         return data;
       } else {
         const errorData = await res.json();
@@ -249,15 +249,15 @@ export function useDashboardData() {
 
   // Detect current signal
   const detectCurrentSignal = useCallback(
-    (aramcoPrice: number | null) => {
-      if (aramcoPrice === null || !plans.length) {
+    (goldPrice: number | null) => {
+      if (goldPrice === null || !plans.length) {
         setSignal(null);
         return;
       }
       const activePlans = plans.filter((p) => p.active).sort((a, b) => a.order - b.order);
       for (const p of activePlans) {
-        const minOk = aramcoPrice >= p.priceRangeMin;
-        const maxOk = p.priceRangeMax === null || aramcoPrice <= p.priceRangeMax;
+        const minOk = goldPrice >= p.priceRangeMin;
+        const maxOk = p.priceRangeMax === null || goldPrice <= p.priceRangeMax;
         if (minOk && maxOk) {
           setSignal({
             action: p.action,
@@ -297,8 +297,8 @@ export function useDashboardData() {
 
   // Update signal when prices or plans change
   useEffect(() => {
-    detectCurrentSignal(prices.aramco?.price ?? null);
-  }, [prices.aramco?.price, plans, detectCurrentSignal]);
+    detectCurrentSignal(prices.gold?.price ?? null);
+  }, [prices.gold?.price, plans, detectCurrentSignal]);
 
   // Poll for prices every 60 seconds
   const startPolling = useCallback(() => {

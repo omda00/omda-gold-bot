@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { BarChart3, DollarSign } from "lucide-react";
+import { Gem, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,10 +75,10 @@ export function PriceHistoryTab({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ARAMCO">
+              <SelectItem value="GOLD_EGP">
                 <span className="flex items-center gap-2">
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  ARAMCO
+                  <Gem className="w-3.5 h-3.5" />
+                  Gold 21K
                 </span>
               </SelectItem>
               <SelectItem value="USD_EGP">

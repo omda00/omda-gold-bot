@@ -11,7 +11,7 @@ export interface PriceRecord {
 }
 
 export interface PricesResponse {
-  aramco: PriceRecord | null;
+  gold: PriceRecord | null;
   usdEgp: PriceRecord | null;
 }
 
@@ -60,7 +60,7 @@ export interface SignalResult {
 
 export interface AutomationResult {
   prices?: {
-    aramco?: { price: number; change: number };
+    gold?: { price: number; change: number };
     usdEgp?: { price: number; change: number };
   };
   signals?: { action: string; label: string } | null;

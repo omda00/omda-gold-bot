@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Clock,
   AlertTriangle,
+  Gem,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,10 +76,10 @@ export function InvestmentPlanTable({
     <Card className="border-border/50 shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-600" />
+          <Gem className="w-4 h-4 text-amber-500" />
           Investment Plan
           <span className="text-muted-foreground font-normal text-xs" dir="rtl">
-            خطة الاستثمار
+            خطة الاستثمار - الذهب
           </span>
         </CardTitle>
       </CardHeader>
@@ -88,7 +89,7 @@ export function InvestmentPlanTable({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12 text-center">#</TableHead>
-                <TableHead>Price Range (SAR)</TableHead>
+                <TableHead>Price Range (EGP/g)</TableHead>
                 <TableHead>Action</TableHead>
                 <TableHead className="text-center">Return</TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -190,7 +191,7 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
             {currentPrice ? (
               <>
                 <p className="text-muted-foreground text-sm">
-                  Current price: <span className="font-mono font-semibold text-foreground">{currentPrice.toLocaleString()} SAR</span>
+                  Current price: <span className="font-mono font-semibold text-foreground">{currentPrice.toLocaleString()} EGP/g</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   No matching plan tier found
@@ -238,7 +239,7 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold font-mono text-foreground">
-                {currentPrice?.toLocaleString()} <span className="text-sm text-muted-foreground">SAR</span>
+                {currentPrice?.toLocaleString()} <span className="text-sm text-muted-foreground">EGP/g</span>
               </p>
               <p
                 className={`text-sm font-semibold ${
