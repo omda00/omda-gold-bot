@@ -13,6 +13,63 @@ export interface CombinedPriceResult {
   usdEgp: PriceFetchResult | null;
 }
 
+export interface KaratPrice {
+  karat: number;
+  sellPrice: number | null;
+  buyPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+}
+
+export interface GoldPoundPrice {
+  sellPrice: number | null;
+  buyPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+}
+
+export interface SilverPrice {
+  sellPrice: number | null;
+  buyPrice: number | null;
+}
+
+export interface CalculatorPriceResult {
+  karats: KaratPrice[];
+  goldPound: GoldPoundPrice;
+  silver: SilverPrice;
+  source: string;
+  fetchedAt: string;
+}
+
+/**
+ * Full extraction result from iSagha HTML
+ */
+interface IsaghaExtractionResult {
+  gold24Sell: number | null;
+  gold24Buy: number | null;
+  gold22Sell: number | null;
+  gold22Buy: number | null;
+  gold21Sell: number | null;
+  gold21Buy: number | null;
+  gold18Sell: number | null;
+  gold18Buy: number | null;
+  gold24SellWorkmanship: number | null;
+  gold24BuyWorkmanship: number | null;
+  gold22SellWorkmanship: number | null;
+  gold22BuyWorkmanship: number | null;
+  gold21SellWorkmanship: number | null;
+  gold21BuyWorkmanship: number | null;
+  gold18SellWorkmanship: number | null;
+  gold18BuyWorkmanship: number | null;
+  goldPoundSell: number | null;
+  goldPoundBuy: number | null;
+  goldPoundSellWorkmanship: number | null;
+  goldPoundBuyWorkmanship: number | null;
+  silverSell: number | null;
+  silverBuy: number | null;
+  usdEgpRate: number | null;
+}
+
 /**
  * PRIMARY SOURCE: Extract gold prices from iSagha (market.isagha.com) HTML content.
  *
@@ -20,51 +77,54 @@ export interface CombinedPriceResult {
  * It provides real-time, second-by-second updates from Egyptian gold markets.
  *
  * Page structure (as rendered HTML text):
- *   "عيار 21 6100 ج.م 203.25 ج.م 6025 ج.م 141.25 ج.م ‎-15 ج.م ‎-0.25%"
- *   Pattern: عيار 21 [sell_price] ج.م [sell_workmanship] ج.م [buy_price] ج.م [buy_workmanship] ج.م [change] ج.م [change%]
- *
- * Also extracts USD/EGP if available on the page.
+ *   "عيار 24 6971.5 ج.م 199.5 ج.م 6885.75 ج.م 127.5 ج.م -17.14 ج.م -0.25%"
+ *   Pattern: عيار [K] [sell_price] ج.م [sell_workmanship] ج.م [buy_price] ج.م [buy_workmanship] ج.م [change] ج.م [change%]
  */
-function extractFromIsaghaHtml(html: string): {
-  gold21Sell: number | null;
-  gold21Buy: number | null;
-  gold24Sell: number | null;
-  gold24Buy: number | null;
-  gold18Sell: number | null;
-  gold18Buy: number | null;
-  usdEgpRate: number | null;
-} {
-  const result = {
-    gold21Sell: null as number | null,
-    gold21Buy: null as number | null,
-    gold24Sell: null as number | null,
-    gold24Buy: null as number | null,
-    gold18Sell: null as number | null,
-    gold18Buy: null as number | null,
-    usdEgpRate: null as number | null,
+function extractFromIsaghaHtml(html: string): IsaghaExtractionResult {
+  const result: IsaghaExtractionResult = {
+    gold24Sell: null,
+    gold24Buy: null,
+    gold22Sell: null,
+    gold22Buy: null,
+    gold21Sell: null,
+    gold21Buy: null,
+    gold18Sell: null,
+    gold18Buy: null,
+    gold24SellWorkmanship: null,
+    gold24BuyWorkmanship: null,
+    gold22SellWorkmanship: null,
+    gold22BuyWorkmanship: null,
+    gold21SellWorkmanship: null,
+    gold21BuyWorkmanship: null,
+    gold18SellWorkmanship: null,
+    gold18BuyWorkmanship: null,
+    goldPoundSell: null,
+    goldPoundBuy: null,
+    goldPoundSellWorkmanship: null,
+    goldPoundBuyWorkmanship: null,
+    silverSell: null,
+    silverBuy: null,
+    usdEgpRate: null,
   };
 
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
   // === Extract Gold prices by karat ===
-  // iSagha format per row: "عيار 21 6100 ج.م 203.25 ج.م 6025 ج.م 141.25 ج.م -15 ج.م -0.25%"
-  // Each karat section: [sell_price] ج.م [sell_workmanship] ج.م [buy_price] ج.م [buy_workmanship] ج.م [change] ج.م [change%]
-  // We must limit the chunk to only the current karat's data (before the next karat starts)
-
-  const karatSections = [
-    { name: "21", sellField: "gold21Sell" as const, buyField: "gold21Buy" as const, minPrice: 5500, maxPrice: 8000 },
-    { name: "24", sellField: "gold24Sell" as const, buyField: "gold24Buy" as const, minPrice: 6500, maxPrice: 10000 },
-    { name: "18", sellField: "gold18Sell" as const, buyField: "gold18Buy" as const, minPrice: 4500, maxPrice: 7000 },
+  const karatConfigs = [
+    { name: "24", sellField: "gold24Sell" as const, buyField: "gold24Buy" as const, sellWField: "gold24SellWorkmanship" as const, buyWField: "gold24BuyWorkmanship" as const, minPrice: 6500, maxPrice: 10000, minWork: 100, maxWork: 500 },
+    { name: "22", sellField: "gold22Sell" as const, buyField: "gold22Buy" as const, sellWField: "gold22SellWorkmanship" as const, buyWField: "gold22BuyWorkmanship" as const, minPrice: 5500, maxPrice: 8500, minWork: 80, maxWork: 400 },
+    { name: "21", sellField: "gold21Sell" as const, buyField: "gold21Buy" as const, sellWField: "gold21SellWorkmanship" as const, buyWField: "gold21BuyWorkmanship" as const, minPrice: 5500, maxPrice: 8000, minWork: 80, maxWork: 400 },
+    { name: "18", sellField: "gold18Sell" as const, buyField: "gold18Buy" as const, sellWField: "gold18SellWorkmanship" as const, buyWField: "gold18BuyWorkmanship" as const, minPrice: 4500, maxPrice: 7000, minWork: 50, maxWork: 300 },
   ];
 
-  for (const section of karatSections) {
+  for (const section of karatConfigs) {
     const marker = `عيار ${section.name}`;
     const idx = text.indexOf(marker);
     if (idx < 0) continue;
 
     // Find the next karat marker after this one to limit the chunk
-    let endIdx = idx + 300; // default limit
-    for (const otherSection of karatSections) {
+    let endIdx = idx + 300;
+    for (const otherSection of karatConfigs) {
       if (otherSection.name === section.name) continue;
       const otherMarker = `عيار ${otherSection.name}`;
       const otherIdx = text.indexOf(otherMarker, idx + marker.length);
@@ -72,7 +132,7 @@ function extractFromIsaghaHtml(html: string): {
         endIdx = otherIdx;
       }
     }
-    // Also check for "جنيه ذهب" or "أوقية" markers that come after
+    // Also check for markers that come after
     const coinIdx = text.indexOf("جنيه ذهب", idx + marker.length);
     if (coinIdx > idx && coinIdx < endIdx) {
       endIdx = coinIdx;
@@ -84,18 +144,69 @@ function extractFromIsaghaHtml(html: string): {
       .map((n) => parseFloat(n.replace(/,/g, "")))
       .filter((n) => !isNaN(n));
 
-    // First number in range = sell price, second = buy price
+    // Format: [sell_price] [sell_workmanship] [buy_price] [buy_workmanship] [change] [change%]
+    // But karat number is first, so skip the karat number itself
     const goldPrices = parsedNumbers.filter((v) => v >= section.minPrice && v <= section.maxPrice);
+    const workmanshipPrices = parsedNumbers.filter((v) => v >= section.minWork && v <= section.maxWork);
+
     if (goldPrices.length >= 2) {
       result[section.sellField] = goldPrices[0];
       result[section.buyField] = goldPrices[1];
     } else if (goldPrices.length === 1) {
       result[section.sellField] = goldPrices[0];
     }
+
+    if (workmanshipPrices.length >= 2) {
+      result[section.sellWField] = workmanshipPrices[0];
+      result[section.buyWField] = workmanshipPrices[1];
+    } else if (workmanshipPrices.length === 1) {
+      result[section.sellWField] = workmanshipPrices[0];
+    }
+  }
+
+  // === Extract Gold Pound (جنيه الذهب) ===
+  const gpIdx = text.indexOf("جنيه ذهب");
+  if (gpIdx >= 0) {
+    let gpEndIdx = text.indexOf("أوقية", gpIdx);
+    if (gpEndIdx < 0 || gpEndIdx > gpIdx + 400) gpEndIdx = gpIdx + 400;
+    const gpChunk = text.substring(gpIdx, gpEndIdx);
+    const gpNumbers = gpChunk.match(/\d[\d,]*\.?\d*/g) || [];
+    const gpParsed = gpNumbers.map((n) => parseFloat(n.replace(/,/g, ""))).filter((n) => !isNaN(n));
+    const gpPrices = gpParsed.filter((v) => v >= 30000 && v <= 80000);
+    const gpWork = gpParsed.filter((v) => v >= 500 && v <= 3000);
+    if (gpPrices.length >= 2) {
+      result.goldPoundSell = gpPrices[0];
+      result.goldPoundBuy = gpPrices[1];
+    } else if (gpPrices.length === 1) {
+      result.goldPoundSell = gpPrices[0];
+    }
+    if (gpWork.length >= 2) {
+      result.goldPoundSellWorkmanship = gpWork[0];
+      result.goldPoundBuyWorkmanship = gpWork[1];
+    } else if (gpWork.length === 1) {
+      result.goldPoundSellWorkmanship = gpWork[0];
+    }
+  }
+
+  // === Extract Silver price ===
+  // From calculator page: "السعر المحلى للفضة 92 ج.م"
+  // From prices page: may show "عيار 999" or "الفضة" sections
+  const silverPatterns = [
+    /السعر المحلى للفضة\s*([0-9,]+\.?\d*)\s*ج\.?م/,
+    /سعر الفضة[^0-9]*?([0-9,]+\.?\d*)\s*ج\.?م/,
+  ];
+  for (const pattern of silverPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const price = parseFloat(match[1].replace(/,/g, ""));
+      if (price >= 50 && price <= 500) {
+        result.silverSell = price;
+        break;
+      }
+    }
   }
 
   // === Extract USD/EGP rate from iSagha (if available) ===
-  // iSagha may show "دولار أمريكي" or "USD" with exchange rate
   const usdPatterns = [
     /(?:دولار أمريكي|الدولار الأمريكي|USD)[^0-9]*?([0-9]+\.[0-9]+)/i,
     /(?:USD|دولار)[^0-9]*?([5][0-9]\.[0-9]+)/i,
@@ -117,7 +228,6 @@ function extractFromIsaghaHtml(html: string): {
 
 /**
  * Fetch USD/EGP rate from Google Finance via web_search.
- * Google Finance search snippets include the rate directly.
  */
 async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchResult | null> {
   try {
@@ -131,7 +241,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
     const searchText =
       typeof searchResults === "string" ? searchResults : JSON.stringify(searchResults);
 
-    // Google Finance snippet: "United States Dollar / Egyptian Pound. 51.8189. +0.19%"
     const rateMatch = searchText.match(
       /United States Dollar\s*\/\s*Egyptian Pound[^0-9]*?([0-9]+\.[0-9]+)/
     );
@@ -144,7 +253,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       }
     }
 
-    // Fallback: try the beta URL snippet
     const betaMatch = searchText.match(
       /google\.com\/finance\/beta\/quote\/USD-EGP[^0-9]*?([0-9]+\.[0-9]+)/
     );
@@ -155,7 +263,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       }
     }
 
-    // Fallback: try page_reader on the Google Finance page
     const gfResult = await zai.functions.invoke("page_reader", {
       url: "https://www.google.com/finance/quote/USD-EGP",
     });
@@ -180,11 +287,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
  *
  * Gold source: iSagha.com (market.isagha.com/prices) — PRIMARY AND AUTHORITATIVE
  * USD/EGP source: Google Finance — PRIMARY (user requested)
- *
- * Fallback strategy (only if iSagha is temporarily down):
- * 1. iSagha web_search (lighter weight than page_reader)
- * 2. banklive.net page_reader
- * 3. Broader web search + LLM extraction
  */
 export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   const zai = await ZAI.create();
@@ -219,7 +321,6 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
         );
       }
 
-      // Also try to get USD/EGP from iSagha
       if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
         combinedResult.usdEgp = {
           price: isaghaPrices.usdEgpRate,
@@ -253,7 +354,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   }
 
   // ==========================================
-  // FALLBACK 1: iSagha via web_search (if page_reader failed)
+  // FALLBACK 1: iSagha via web_search
   // ==========================================
   if (!combinedResult.gold) {
     try {
@@ -267,7 +368,6 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
       const searchText =
         typeof searchResults === "string" ? searchResults : JSON.stringify(searchResults);
 
-      // Try to extract from search snippets
       const snippetMatch = searchText.match(/عيار 21\s*([0-9,]+)\s*ج\.?م/);
       if (snippetMatch) {
         const sell = parseFloat(snippetMatch[1].replace(/,/g, ""));
@@ -290,7 +390,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   }
 
   // ==========================================
-  // FALLBACK 2: banklive.net (for both gold and USD/EGP)
+  // FALLBACK 2: banklive.net
   // ==========================================
   if (!combinedResult.gold || !combinedResult.usdEgp) {
     try {
@@ -330,7 +430,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   }
 
   // ==========================================
-  // FALLBACK 3: Broader web search + LLM extraction
+  // FALLBACK 3: Broader web search + LLM
   // ==========================================
   if (!combinedResult.gold || !combinedResult.usdEgp) {
     try {
@@ -397,6 +497,101 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   }
 
   return combinedResult;
+}
+
+/**
+ * Fetch calculator prices: all karats, gold pound, and silver from iSagha.
+ * Uses BOTH the prices page and the calculator page for complete data.
+ */
+export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
+  const zai = await ZAI.create();
+
+  const emptyResult: CalculatorPriceResult = {
+    karats: [
+      { karat: 24, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
+      { karat: 22, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
+      { karat: 21, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
+      { karat: 18, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
+    ],
+    goldPound: { sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
+    silver: { sellPrice: null, buyPrice: null },
+    source: "",
+    fetchedAt: new Date().toISOString(),
+  };
+
+  // Fetch from iSagha prices page
+  let isaghaPrices: IsaghaExtractionResult | null = null;
+  try {
+    console.log("[calculator] Fetching prices from iSagha.com/prices...");
+    const isaghaResult = await zai.functions.invoke("page_reader", {
+      url: "https://market.isagha.com/prices",
+    });
+    const isaghaHtml = isaghaResult?.data?.html || "";
+    if (isaghaHtml) {
+      isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+    }
+  } catch (err) {
+    console.error("[calculator] iSagha prices page failed:", err);
+  }
+
+  // Fetch from iSagha calculator page for silver price
+  try {
+    console.log("[calculator] Fetching silver price from iSagha.com/calculateGoldPrice...");
+    const calcResult = await zai.functions.invoke("page_reader", {
+      url: "https://market.isagha.com/calculateGoldPrice",
+    });
+    const calcHtml = calcResult?.data?.html || "";
+    if (calcHtml) {
+      const calcPrices = extractFromIsaghaHtml(calcHtml);
+      // Silver price is more likely on the calculator page
+      if (calcPrices.silverSell && !isaghaPrices?.silverSell) {
+        if (isaghaPrices) {
+          isaghaPrices.silverSell = calcPrices.silverSell;
+          isaghaPrices.silverBuy = calcPrices.silverBuy;
+        } else {
+          isaghaPrices = calcPrices;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[calculator] iSagha calculator page failed:", err);
+  }
+
+  if (!isaghaPrices) {
+    return emptyResult;
+  }
+
+  // Build the karats array
+  const karatMap: Record<number, { sell: number | null; buy: number | null; sellW: number | null; buyW: number | null }> = {
+    24: { sell: isaghaPrices.gold24Sell, buy: isaghaPrices.gold24Buy, sellW: isaghaPrices.gold24SellWorkmanship, buyW: isaghaPrices.gold24BuyWorkmanship },
+    22: { sell: isaghaPrices.gold22Sell, buy: isaghaPrices.gold22Buy, sellW: isaghaPrices.gold22SellWorkmanship, buyW: isaghaPrices.gold22BuyWorkmanship },
+    21: { sell: isaghaPrices.gold21Sell, buy: isaghaPrices.gold21Buy, sellW: isaghaPrices.gold21SellWorkmanship, buyW: isaghaPrices.gold21BuyWorkmanship },
+    18: { sell: isaghaPrices.gold18Sell, buy: isaghaPrices.gold18Buy, sellW: isaghaPrices.gold18SellWorkmanship, buyW: isaghaPrices.gold18BuyWorkmanship },
+  };
+
+  const karats: KaratPrice[] = [24, 22, 21, 18].map((k) => ({
+    karat: k,
+    sellPrice: karatMap[k]?.sell ?? null,
+    buyPrice: karatMap[k]?.buy ?? null,
+    sellWorkmanship: karatMap[k]?.sellW ?? null,
+    buyWorkmanship: karatMap[k]?.buyW ?? null,
+  }));
+
+  return {
+    karats,
+    goldPound: {
+      sellPrice: isaghaPrices.goldPoundSell,
+      buyPrice: isaghaPrices.goldPoundBuy,
+      sellWorkmanship: isaghaPrices.goldPoundSellWorkmanship,
+      buyWorkmanship: isaghaPrices.goldPoundBuyWorkmanship,
+    },
+    silver: {
+      sellPrice: isaghaPrices.silverSell,
+      buyPrice: isaghaPrices.silverBuy,
+    },
+    source: "iSagha.com",
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 /**

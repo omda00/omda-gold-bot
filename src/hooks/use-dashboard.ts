@@ -8,6 +8,7 @@ import type {
   AppConfig,
   PriceHistoryResponse,
   SignalResult,
+  CalculatorPriceResult,
 } from "@/lib/dashboard-types";
 
 export function useDashboardData() {
@@ -17,6 +18,7 @@ export function useDashboardData() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryResponse>({ records: [], count: 0 });
   const [signal, setSignal] = useState<SignalResult | null>(null);
+  const [calculatorData, setCalculatorData] = useState<CalculatorPriceResult | null>(null);
 
   const [loading, setLoading] = useState({
     prices: true,
@@ -26,6 +28,7 @@ export function useDashboardData() {
     history: false,
     fetching: false,
     automation: false,
+    calculator: true,
   });
 
   const [lastAutomationRun, setLastAutomationRun] = useState<string | null>(null);
@@ -128,6 +131,24 @@ export function useDashboardData() {
       console.error("Fetch history error:", err);
     } finally {
       setLoading((prev) => ({ ...prev, history: false }));
+    }
+    return null;
+  }, []);
+
+  // Fetch calculator prices
+  const fetchCalculatorData = useCallback(async () => {
+    setLoading((prev) => ({ ...prev, calculator: true }));
+    try {
+      const res = await fetch("/api/calculator");
+      if (res.ok) {
+        const data = await res.json();
+        setCalculatorData(data);
+        return data;
+      }
+    } catch (err) {
+      console.error("Fetch calculator error:", err);
+    } finally {
+      setLoading((prev) => ({ ...prev, calculator: false }));
     }
     return null;
   }, []);
@@ -283,6 +304,7 @@ export function useDashboardData() {
         fetchPlans(),
         fetchConfig(),
         fetchLogs(),
+        fetchCalculatorData(),
       ]);
       setLoading((prev) => ({
         ...prev,
@@ -290,10 +312,11 @@ export function useDashboardData() {
         plans: false,
         logs: false,
         config: false,
+        calculator: false,
       }));
     };
     init();
-  }, [seedData, fetchPrices, fetchPlans, fetchConfig, fetchLogs]);
+  }, [seedData, fetchPrices, fetchPlans, fetchConfig, fetchLogs, fetchCalculatorData]);
 
   // Update signal when prices or plans change
   useEffect(() => {
@@ -328,6 +351,7 @@ export function useDashboardData() {
     config,
     priceHistory,
     signal,
+    calculatorData,
     loading,
     lastAutomationRun,
     fetchPrices,
@@ -342,6 +366,7 @@ export function useDashboardData() {
     seedPlan,
     savePlans,
     runAutomation,
+    fetchCalculatorData,
     detectCurrentSignal,
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { LayoutDashboard, BarChart3, Settings, Bell, Play } from "lucide-react";
+import { LayoutDashboard, BarChart3, Settings, Bell, Play, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { PriceHistoryTab } from "@/components/dashboard/price-history";
 import { SettingsTab } from "@/components/dashboard/settings";
 import { LogsTab } from "@/components/dashboard/logs";
+import { GoldCalculator } from "@/components/dashboard/gold-calculator";
 import { DashboardFooter } from "@/components/dashboard/footer";
 
 export default function Home() {
@@ -26,6 +27,7 @@ export default function Home() {
     config,
     priceHistory,
     signal,
+    calculatorData,
     loading,
     lastAutomationRun,
     fetchLogs,
@@ -36,6 +38,7 @@ export default function Home() {
     seedPlan,
     savePlans,
     runAutomation,
+    fetchCalculatorData,
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -79,10 +82,14 @@ export default function Home() {
           className="space-y-4"
         >
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <TabsList className="w-full sm:w-auto">
+            <TabsList className="w-full sm:w-auto flex-wrap">
               <TabsTrigger value="dashboard" className="gap-1.5">
                 <LayoutDashboard className="w-3.5 h-3.5" />
                 <span>Dashboard</span>
+              </TabsTrigger>
+              <TabsTrigger value="calculator" className="gap-1.5">
+                <Calculator className="w-3.5 h-3.5" />
+                <span>حاسبة الذهب</span>
               </TabsTrigger>
               <TabsTrigger value="prices" className="gap-1.5">
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -141,7 +148,16 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          {/* TAB 2: Prices */}
+          {/* TAB 2: Gold & Silver Calculator */}
+          <TabsContent value="calculator">
+            <GoldCalculator
+              calculatorData={calculatorData}
+              loading={loading.calculator}
+              onFetch={fetchCalculatorData}
+            />
+          </TabsContent>
+
+          {/* TAB 3: Prices */}
           <TabsContent value="prices">
             <PriceHistoryTab
               priceHistory={priceHistory}
@@ -150,7 +166,7 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* TAB 3: Settings */}
+          {/* TAB 4: Settings */}
           <TabsContent value="settings">
             <SettingsTab
               config={config}
@@ -162,7 +178,7 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* TAB 4: Logs */}
+          {/* TAB 5: Logs */}
           <TabsContent value="logs">
             <LogsTab logs={logs} onFetchLogs={fetchLogs} />
           </TabsContent>
