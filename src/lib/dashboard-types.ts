@@ -7,6 +7,8 @@ export interface PriceRecord {
   currency: string;
   change: number | null;
   source: string | null;
+  buyPrice: number | null;
+  sellPrice: number | null;
   createdAt: string;
 }
 

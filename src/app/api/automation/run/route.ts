@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fetchGoldEgpPrice, fetchUsdEgpRate, savePriceRecord } from "@/lib/price-fetcher";
+import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
 import { detectSignal, detectUsdDrop } from "@/lib/signal-detector";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { getConfig } from "@/lib/config-seeder";
@@ -34,20 +34,35 @@ export async function POST() {
       );
     }
 
-    // Step 1: Fetch current prices
+    // Step 1: Fetch current prices (single call for efficiency)
     let goldRecord;
     let usdEgpRecord;
 
     try {
-      const [goldResult, usdEgpResult] = await Promise.all([
-        fetchGoldEgpPrice(),
-        fetchUsdEgpRate(),
-      ]);
+      const allPrices = await fetchAllPrices();
 
-      [goldRecord, usdEgpRecord] = await Promise.all([
-        savePriceRecord("GOLD_EGP", goldResult.price, "EGP", goldResult.source),
-        savePriceRecord("USD_EGP", usdEgpResult.price, "EGP", usdEgpResult.source),
-      ]);
+      if (!allPrices.gold && !allPrices.usdEgp) {
+        throw new Error("Could not fetch any prices from any source");
+      }
+
+      const savePromises: Promise<unknown>[] = [];
+      if (allPrices.gold) {
+        savePromises.push(
+          savePriceRecord("GOLD_EGP", allPrices.gold.price, "EGP", allPrices.gold.source, {
+            buyPrice: allPrices.gold.buyPrice,
+            sellPrice: allPrices.gold.sellPrice,
+          })
+        );
+      }
+      if (allPrices.usdEgp) {
+        savePromises.push(
+          savePriceRecord("USD_EGP", allPrices.usdEgp.price, "EGP", allPrices.usdEgp.source)
+        );
+      }
+
+      const saved = await Promise.all(savePromises);
+      goldRecord = allPrices.gold ? saved[0] as Awaited<ReturnType<typeof savePriceRecord>> : undefined;
+      usdEgpRecord = allPrices.usdEgp ? saved[allPrices.gold ? 1 : 0] as Awaited<ReturnType<typeof savePriceRecord>> : undefined;
 
       results.prices = {
         gold: { price: goldRecord.price, change: goldRecord.change ?? 0 },
@@ -94,12 +109,16 @@ export async function POST() {
 
     if (canSendTelegram) {
       // Always send daily report with both prices
+      const goldBuySell = goldRecord.buyPrice && goldRecord.sellPrice
+        ? `\n   بيع: ${goldRecord.sellPrice.toLocaleString()} | شراء: ${goldRecord.buyPrice.toLocaleString()}`
+        : "";
       const dailyReport = "📊 <b>التقرير اليومي - أسعار الذهب والعملات</b>\n\n" +
         `🥇 <b>ذهب عيار 21:</b> ${goldRecord.price.toLocaleString()} EGP/جرام` +
+        `${goldBuySell}` +
         `${goldRecord.change ? (goldRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(goldRecord.change).toFixed(2) + "%" : ""}\n` +
         `💱 <b>USD/EGP:</b> ${usdEgpRecord.price.toFixed(2)} EGP` +
         `${usdEgpRecord.change ? (usdEgpRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(usdEgpRecord.change).toFixed(2) + "%" : ""}\n\n` +
-        `📌 المصدر: gold-price-live.com & Google Finance`;
+        `📌 المصدر: edahabapp.com`;
 
       const dailyResult = await sendTelegramMessage(botToken, chatId, dailyReport);
       results.notifications?.push({
@@ -153,7 +172,7 @@ export async function POST() {
           `📉 السابق: ${previousUsdEgp?.price.toFixed(2)} EGP\n` +
           `📊 التغيير: ${usdEgpRecord.change?.toFixed(2)}%\n` +
           `🎯 الحد: ${threshold}%\n` +
-          `📌 المصدر: Google Finance`;
+          `📌 المصدر: edahabapp.com`;
 
         const sendResult = await sendTelegramMessage(botToken, chatId, dropMessage);
         results.notifications?.push({

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fetchGoldEgpPrice, fetchUsdEgpRate, savePriceRecord } from "@/lib/price-fetcher";
+import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
 import { seedDefaultConfig } from "@/lib/config-seeder";
 
 /**
@@ -35,22 +35,41 @@ export async function GET() {
 
 /**
  * POST /api/prices - Trigger a manual price fetch
+ * Uses fetchAllPrices() for efficiency (single page read instead of two)
  */
 export async function POST() {
   try {
-    const [goldResult, usdEgpResult] = await Promise.all([
-      fetchGoldEgpPrice(),
-      fetchUsdEgpRate(),
-    ]);
+    const allPrices = await fetchAllPrices();
 
-    const [goldRecord, usdEgpRecord] = await Promise.all([
-      savePriceRecord("GOLD_EGP", goldResult.price, "EGP", goldResult.source),
-      savePriceRecord("USD_EGP", usdEgpResult.price, "EGP", usdEgpResult.source),
-    ]);
+    if (!allPrices.gold && !allPrices.usdEgp) {
+      return NextResponse.json(
+        { error: "Could not fetch any prices from any source" },
+        { status: 500 }
+      );
+    }
+
+    const savePromises: Promise<unknown>[] = [];
+
+    if (allPrices.gold) {
+      savePromises.push(
+        savePriceRecord("GOLD_EGP", allPrices.gold.price, "EGP", allPrices.gold.source, {
+          buyPrice: allPrices.gold.buyPrice,
+          sellPrice: allPrices.gold.sellPrice,
+        })
+      );
+    }
+
+    if (allPrices.usdEgp) {
+      savePromises.push(
+        savePriceRecord("USD_EGP", allPrices.usdEgp.price, "EGP", allPrices.usdEgp.source)
+      );
+    }
+
+    const saved = await Promise.all(savePromises);
 
     return NextResponse.json({
-      gold: goldRecord,
-      usdEgp: usdEgpRecord,
+      gold: allPrices.gold ? saved[0] : null,
+      usdEgp: allPrices.usdEgp ? saved[allPrices.gold ? 1 : 0] : null,
       message: "Prices fetched and saved successfully",
     });
   } catch (error) {

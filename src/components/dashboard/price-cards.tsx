@@ -7,6 +7,7 @@ import {
   RefreshCw,
   DollarSign,
   Gem,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ function PriceCard({
 }: PriceCardProps) {
   const change = price?.change ?? 0;
   const isPositive = change >= 0;
+  const hasBuySell = price?.buyPrice && price?.sellPrice;
 
   if (loading) {
     return (
@@ -96,39 +98,93 @@ function PriceCard({
         <CardContent>
           {price ? (
             <>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-foreground tracking-tight">
-                  {price.price.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                <span className="text-sm font-medium text-muted-foreground">
-                  {price.currency}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <div
-                  className={`flex items-center gap-0.5 text-sm font-medium ${
-                    isPositive ? "text-emerald-600" : "text-red-600"
-                  }`}
-                >
-                  {isPositive ? (
-                    <TrendingUp className="w-3.5 h-3.5" />
-                  ) : (
-                    <TrendingDown className="w-3.5 h-3.5" />
-                  )}
-                  <span>
-                    {isPositive ? "+" : ""}
-                    {change.toFixed(2)}%
-                  </span>
+              {hasBuySell ? (
+                /* Show buy/sell prices for gold */
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1" dir="rtl">
+                        <ArrowRightLeft className="w-3 h-3" />
+                        بيع (سعر التاجر)
+                      </div>
+                      <div className="text-2xl font-bold text-foreground tracking-tight">
+                        {price.sellPrice?.toLocaleString("en-US", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        })}
+                      </div>
+                    </div>
+                    <div className="w-px h-10 bg-border" />
+                    <div className="flex-1">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1" dir="rtl">
+                        <ArrowRightLeft className="w-3 h-3" />
+                        شراء (سعر التاجر)
+                      </div>
+                      <div className="text-2xl font-bold text-foreground tracking-tight">
+                        {price.buyPrice?.toLocaleString("en-US", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">EGP/جرام</span>
+                    <div
+                      className={`flex items-center gap-0.5 text-sm font-medium ${
+                        isPositive ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {isPositive ? (
+                        <TrendingUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <TrendingDown className="w-3.5 h-3.5" />
+                      )}
+                      <span>
+                        {isPositive ? "+" : ""}
+                        {change.toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                {price.source && (
-                  <span className="text-xs text-muted-foreground">
-                    via {price.source}
-                  </span>
-                )}
-              </div>
+              ) : (
+                /* Standard price display for non-gold items (USD/EGP) */
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-foreground tracking-tight">
+                      {price.price.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {price.currency}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div
+                      className={`flex items-center gap-0.5 text-sm font-medium ${
+                        isPositive ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {isPositive ? (
+                        <TrendingUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <TrendingDown className="w-3.5 h-3.5" />
+                      )}
+                      <span>
+                        {isPositive ? "+" : ""}
+                        {change.toFixed(2)}%
+                      </span>
+                    </div>
+                    {price.source && (
+                      <span className="text-xs text-muted-foreground">
+                        via {price.source}
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
               <p className="text-xs text-muted-foreground mt-2">
                 Updated:{" "}
                 {new Date(price.createdAt).toLocaleString("en-US", {
@@ -137,6 +193,12 @@ function PriceCard({
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
+                {price.source && !hasBuySell && (
+                  <span className="ml-1">• {price.source}</span>
+                )}
+                {hasBuySell && (
+                  <span className="ml-1">• {price.source}</span>
+                )}
               </p>
             </>
           ) : (

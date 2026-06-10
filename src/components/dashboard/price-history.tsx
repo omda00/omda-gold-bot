@@ -43,7 +43,7 @@ export function PriceHistoryTab({
   loading,
   onFetchHistory,
 }: PriceHistoryTabProps) {
-  const [symbol, setSymbol] = useState("ARAMCO");
+  const [symbol, setSymbol] = useState("GOLD_EGP");
   const [days, setDays] = useState(30);
 
   const loadData = useCallback(async () => {
@@ -172,6 +172,7 @@ export function PriceHistoryTab({
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>Buy / Sell</TableHead>
                   <TableHead>Change</TableHead>
                   <TableHead>Source</TableHead>
                 </TableRow>
@@ -180,7 +181,7 @@ export function PriceHistoryTab({
                 {priceHistory.records.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="text-center text-muted-foreground py-6"
                     >
                       No records found
@@ -203,6 +204,11 @@ export function PriceHistoryTab({
                           maximumFractionDigits: 2,
                         })}{" "}
                         {record.currency}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {record.buyPrice && record.sellPrice
+                          ? `${record.buyPrice.toLocaleString()} / ${record.sellPrice.toLocaleString()}`
+                          : "—"}
                       </TableCell>
                       <TableCell>
                         <span

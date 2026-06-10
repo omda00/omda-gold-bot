@@ -12,11 +12,13 @@ datasource db {
 
 model PriceRecord {
   id        String   @id @default(cuid())
-  symbol    String   // "ARAMCO" or "USD_EGP"
+  symbol    String   // "GOLD_EGP" or "USD_EGP"
   price     Float
-  currency  String   // "SAR" or "EGP"
+  currency  String   // "EGP"
   change    Float?   // percentage change from previous
   source    String?  // Where the price was fetched from
+  buyPrice  Float?   // Price the shop buys from you (for gold)
+  sellPrice Float?   // Price the shop sells to you (for gold)
   createdAt DateTime @default(now())
 }
 
