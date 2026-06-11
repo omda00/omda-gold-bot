@@ -374,3 +374,38 @@ Stage Summary:
 - Cron now auto-initializes when the dashboard first loads via /api/cron/init
 - All three schedules active: hourly reports, daily 9AM, 30-min price refresh
 - Telegram reports confirmed working: sent to 1/1 registered user
+
+---
+Task ID: 10
+Agent: Main Agent
+Task: Fix hourly Telegram reports not being sent when website is closed
+
+Work Log:
+- User reported: "محتاج لما اكون قافل الموقع التقارير تتبعت بردو" (want reports sent even when website is closed)
+- Previous solution (Task 9) embedded cron in Next.js process, but it only initialized when someone visited the site
+- If no one visits the site, the in-process cron never starts → no hourly reports
+- SOLUTION: Revived the standalone cron-service mini-service with major improvements:
+  1. Removed the HTTP server from cron-service (was causing crashes with async handlers in bun)
+  2. Made it a pure cron-only script with setInterval heartbeat
+  3. Added process-wide unhandledRejection/uncaughtException handlers
+  4. Added isRunning flag to prevent concurrent automation runs
+  5. Created keep-alive supervisor script (start.sh) that auto-restarts if process dies
+  6. Used setsid + bash supervisor wrapper for persistent background execution
+- Removed dead in-process cron code from Next.js app:
+  - Deleted src/lib/cron-scheduler.ts
+  - Deleted src/app/api/cron/init/route.ts
+  - Removed /api/cron/init call from use-dashboard.ts
+  - Removed node-cron and @types/node-cron from main package.json
+- Cron service runs independently on port 3031 with:
+  - Hourly: Full automation at :01 (Cairo time) — refreshes prices + sends Telegram
+  - 30-minute: Price refresh only (keeps DB current)
+  - Heartbeat: Every 5 minutes (confirms service is alive)
+- Tested manually: automation sends report to 1/1 user successfully
+- Service stayed alive for 2+ minutes without crashes
+- Lint passes, browser verification: all tabs working
+
+Stage Summary:
+- Standalone cron-service now runs independently from the website
+- Reports will be sent every hour even when the website is closed
+- Removed in-process cron from Next.js (no longer needed)
+- Cron service uses supervisor script for auto-restart on crash

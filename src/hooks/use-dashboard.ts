@@ -36,13 +36,11 @@ export function useDashboardData() {
   const isFetchingRef = useRef(false);
   const lastFetchAttemptRef = useRef<number>(0);
 
-  // Seed data on first load + initialize cron scheduler
+  // Seed data on first load
   const seedData = useCallback(async () => {
     if (seededRef.current) return;
     try {
       await fetch("/api/config");
-      // Initialize cron scheduler (hourly Telegram reports)
-      await fetch("/api/cron/init");
       seededRef.current = true;
     } catch (err) {
       console.error("Seed error:", err);
