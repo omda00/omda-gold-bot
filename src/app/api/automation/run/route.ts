@@ -231,87 +231,22 @@ export async function POST() {
     results.usdDrop = usdDropDetected;
 
     // =============================================
-    // Step 3: Send hourly report (DEDUPLICATED)
-    // Only sends if last report was 55+ minutes ago
+    // Step 3: HOURLY REPORTS are now handled ONLY by /api/cron/refresh-prices
+    // This endpoint only fetches prices and detects USD drops.
+    // Reports are sent from a SINGLE place to prevent duplicates.
     // =============================================
-    const alreadySent = await wasReportSentRecently("hourly_report", 55);
+    results.notifications?.push({
+      type: "info",
+      sent: true,
+      details: "التقارير الساعية يتم إرسالها من /api/cron/refresh-prices فقط — لمنع التكرار",
+    });
 
-    if (alreadySent) {
-      console.log("[automation] ⏭️ Hourly report already sent in last 55 min — skipping duplicate");
-      results.notifications?.push({
-        type: "hourly_report",
-        sent: false,
-        details: "تم إرسال التقرير بالفعل في آخر ساعة — تم التخطي لتجنب التكرار",
-      });
-    } else {
-      console.log("[automation] 📨 No report sent in last 55 min — sending hourly report now");
-
-      const hourlyReport = buildHourlyReport({
-        goldPrice: goldRecord.price,
-        goldBuyPrice: goldRecord.buyPrice,
-        goldSellPrice: goldRecord.sellPrice,
-        goldChange: goldRecord.change ?? 0,
-        goldSource: goldRecord.source || "multi-source",
-        allKarats: allKaratsData,
-        goldPound: goldPoundData,
-        usdEgpPrice: usdEgpRecord.price,
-        usdEgpChange: usdEgpRecord.change ?? 0,
-        usdEgpSource: usdEgpRecord.source || "multi-source",
-      });
-
-      const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
-
-      if (activeUsers.length > 0) {
-        const dailyResult = await notifyAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
-        results.notifications?.push({
-          type: "hourly_report",
-          sent: dailyResult.sent > 0,
-          details: `تم الإرسال إلى ${dailyResult.sent}/${dailyResult.total} مستخدم`,
-        });
-      } else {
-        // Fallback to global config
-        const botToken = await getConfig("TELEGRAM_BOT_TOKEN");
-        const chatId = await getConfig("TELEGRAM_CHAT_ID");
-
-        if (botToken && chatId) {
-          const dailySendResult = await sendTelegramMessage(botToken, chatId, hourlyReport);
-          results.notifications?.push({
-            type: "hourly_report",
-            sent: dailySendResult.ok,
-            error: dailySendResult.error,
-            details: "تم الإرسال عبر الإعدادات العامة",
-          });
-
-          await db.notificationLog.create({
-            data: {
-              type: "hourly_report",
-              title: "Hourly Price Report (Global Config)",
-              message: hourlyReport,
-              success: dailySendResult.ok,
-              error: dailySendResult.error,
-            },
-          });
-        } else {
-          results.notifications?.push({
-            type: "hourly_report",
-            sent: false,
-            error: "لا يوجد مستخدمين مسجلين ولا إعدادات عامة للتيليجرام",
-          });
-        }
-      }
-    }
-
-    // Step 4: Send USD drop alert (also deduplicated)
+    // Step 4: Send USD drop alert (critical — sent from here too but deduplicated)
     if (usdDropDetected) {
       const dropAlreadySent = await wasReportSentRecently("usd_drop_alert", 10);
 
       if (dropAlreadySent) {
         console.log("[automation] ⏭️ USD drop alert already sent recently — skipping");
-        results.notifications?.push({
-          type: "usd_drop_alert",
-          sent: false,
-          details: "تم إرسال تنبيه الانخفاض بالفعل — تم التخطي",
-        });
       } else {
         const usdSource = usdEgpRecord.source || "multi-source";
         const dropMessage = "⚠️ <b>تنبيه نزول قوي لسعر الدولار</b>\n\n" +
