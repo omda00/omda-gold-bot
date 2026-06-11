@@ -12,7 +12,7 @@ import type {
 } from "@/lib/dashboard-types";
 
 export function useDashboardData() {
-  const [prices, setPrices] = useState<PricesResponse>({ gold: null, usdEgp: null });
+  const [prices, setPrices] = useState<PricesResponse>({ gold: null, usdEgp: null, allKarats: [] });
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -173,7 +173,7 @@ export function useDashboardData() {
       const res = await fetch("/api/prices", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        setPrices({ gold: data.gold, usdEgp: data.usdEgp });
+        setPrices({ gold: data.gold, usdEgp: data.usdEgp, allKarats: data.allKarats || [] });
         setLastWebFetch(new Date().toISOString());
         return data;
       } else {
@@ -182,7 +182,7 @@ export function useDashboardData() {
           const errorData = await res.json();
           // The API might still return cached prices
           if (errorData.gold || errorData.usdEgp) {
-            setPrices({ gold: errorData.gold, usdEgp: errorData.usdEgp });
+            setPrices({ gold: errorData.gold, usdEgp: errorData.usdEgp, allKarats: errorData.allKarats || [] });
           }
           console.error("Fetch prices error:", errorData.error || errorData.message);
         } catch {
@@ -376,20 +376,18 @@ export function useDashboardData() {
 
   // =============================================
   // Auto-fetch: Fetch fresh prices from the web
-  // every 5 minutes in the background
+  // every 1 minute in the background
   // This keeps the database updated so the 1-second
   // polling always shows relatively fresh data
-  // NOTE: Changed from 1 minute to 5 minutes to avoid
-  // hitting Z-AI SDK rate limits (429 errors)
   // =============================================
   const startAutoFetch = useCallback(() => {
     if (autoFetchIntervalRef.current) clearInterval(autoFetchIntervalRef.current);
     // Fetch immediately on start
     triggerFetchPrices();
-    // Then every 5 minutes (300000ms) — avoids rate limiting
+    // Then every 1 minute (60000ms)
     autoFetchIntervalRef.current = setInterval(() => {
       triggerFetchPrices();
-    }, 300000);
+    }, 60000);
   }, [triggerFetchPrices]);
 
   const stopAutoFetch = useCallback(() => {

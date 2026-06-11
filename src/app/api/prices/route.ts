@@ -2,6 +2,33 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { fetchAllPrices, savePriceRecord, isRateLimited } from "@/lib/price-fetcher";
 
+// Karat symbol mapping
+const KARAT_SYMBOLS: Record<number, string> = {
+  24: "GOLD_24K_EGP",
+  22: "GOLD_22K_EGP",
+  21: "GOLD_21K_EGP",
+  18: "GOLD_18K_EGP",
+};
+
+/**
+ * Calculate other karat prices from 21K price as fallback.
+ * Gold prices are proportional to purity: price_k = price_21 × (k/21)
+ */
+function calculateKaratFrom21(price21Sell: number, price21Buy: number | null): KaratPriceResult[] {
+  const ratios: Record<number, number> = { 24: 24 / 21, 22: 22 / 21, 21: 1, 18: 18 / 21 };
+  return [24, 22, 21, 18].map((k) => ({
+    karat: k,
+    sellPrice: Math.round(price21Sell * ratios[k]),
+    buyPrice: price21Buy !== null ? Math.round(price21Buy * ratios[k]) : null,
+  }));
+}
+
+interface KaratPriceResult {
+  karat: number;
+  sellPrice: number | null;
+  buyPrice: number | null;
+}
+
 /**
  * GET /api/prices - Return the latest Gold and USD/EGP prices
  * This is called every second by the polling mechanism, so it must be lightweight.
@@ -19,9 +46,31 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    // Fetch all karat prices from DB
+    let allKarats: KaratPriceResult[] = await Promise.all(
+      [24, 22, 21, 18].map(async (karat): Promise<KaratPriceResult> => {
+        const record = await db.priceRecord.findFirst({
+          where: { symbol: KARAT_SYMBOLS[karat] },
+          orderBy: { createdAt: "desc" },
+        });
+        return {
+          karat,
+          sellPrice: record?.sellPrice ?? null,
+          buyPrice: record?.buyPrice ?? null,
+        };
+      })
+    );
+
+    // Fallback: If karat prices from DB are all null, calculate from 21K gold price
+    const hasKaratData = allKarats.some((k) => k.sellPrice !== null);
+    if (!hasKaratData && goldPrice?.sellPrice) {
+      allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
+    }
+
     return NextResponse.json({
       gold: goldPrice,
       usdEgp: usdEgpRate,
+      allKarats,
     });
   } catch (error) {
     console.error("Error fetching prices:", error);
@@ -35,17 +84,14 @@ export async function GET() {
 /**
  * POST /api/prices - Trigger a price fetch from the web
  * Uses fetchAllPrices() for efficiency (single page read instead of two)
- * 
- * This endpoint is called both manually (via تحديث button) and automatically
- * (via the background auto-refresh). It should handle errors gracefully
- * and always return the latest DB prices even if the web fetch fails.
+ * Now also saves all karat prices (24K, 22K, 21K, 18K) to the DB.
  */
 export async function POST() {
   try {
     const allPrices = await fetchAllPrices();
 
     // Save whatever we got from the web
-    if (allPrices.gold || allPrices.usdEgp) {
+    if (allPrices.gold || allPrices.usdEgp || allPrices.allKarats.length > 0) {
       const savePromises: Promise<unknown>[] = [];
 
       if (allPrices.gold) {
@@ -63,6 +109,19 @@ export async function POST() {
         );
       }
 
+      // Save all karat prices
+      for (const karatPrice of allPrices.allKarats) {
+        const symbol = KARAT_SYMBOLS[karatPrice.karat];
+        if (symbol) {
+          savePromises.push(
+            savePriceRecord(symbol, karatPrice.sellPrice, "EGP", "iSagha.com", {
+              buyPrice: karatPrice.buyPrice ?? undefined,
+              sellPrice: karatPrice.sellPrice,
+            })
+          );
+        }
+      }
+
       await Promise.all(savePromises);
     }
 
@@ -77,9 +136,31 @@ export async function POST() {
       orderBy: { createdAt: "desc" },
     });
 
+    // Fetch all karat prices from DB
+    let allKarats: KaratPriceResult[] = await Promise.all(
+      [24, 22, 21, 18].map(async (karat): Promise<KaratPriceResult> => {
+        const record = await db.priceRecord.findFirst({
+          where: { symbol: KARAT_SYMBOLS[karat] },
+          orderBy: { createdAt: "desc" },
+        });
+        return {
+          karat,
+          sellPrice: record?.sellPrice ?? null,
+          buyPrice: record?.buyPrice ?? null,
+        };
+      })
+    );
+
+    // Fallback: If karat prices from DB are all null, calculate from 21K gold price
+    const hasKaratData = allKarats.some((k) => k.sellPrice !== null);
+    if (!hasKaratData && goldPrice?.sellPrice) {
+      allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
+    }
+
     return NextResponse.json({
       gold: goldPrice,
       usdEgp: usdEgpRate,
+      allKarats,
       fetched: {
         gold: allPrices.gold !== null,
         usdEgp: allPrices.usdEgp !== null,
@@ -106,9 +187,30 @@ export async function POST() {
         orderBy: { createdAt: "desc" },
       });
 
+      let allKarats: KaratPriceResult[] = await Promise.all(
+        [24, 22, 21, 18].map(async (karat): Promise<KaratPriceResult> => {
+          const record = await db.priceRecord.findFirst({
+            where: { symbol: KARAT_SYMBOLS[karat] },
+            orderBy: { createdAt: "desc" },
+          });
+          return {
+            karat,
+            sellPrice: record?.sellPrice ?? null,
+            buyPrice: record?.buyPrice ?? null,
+          };
+        })
+      );
+
+      // Fallback: If karat prices from DB are all null, calculate from 21K gold price
+      const hasKaratData = allKarats.some((k) => k.sellPrice !== null);
+      if (!hasKaratData && goldPrice?.sellPrice) {
+        allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
+      }
+
       return NextResponse.json({
         gold: goldPrice,
         usdEgp: usdEgpRate,
+        allKarats,
         fetched: { gold: false, usdEgp: false },
         message: "Web fetch failed — showing latest cached prices",
       });

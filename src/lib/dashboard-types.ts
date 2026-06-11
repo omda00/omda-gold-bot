@@ -12,9 +12,16 @@ export interface PriceRecord {
   createdAt: string;
 }
 
+export interface KaratPriceRecord {
+  karat: number;
+  sellPrice: number | null;
+  buyPrice: number | null;
+}
+
 export interface PricesResponse {
   gold: PriceRecord | null;
   usdEgp: PriceRecord | null;
+  allKarats: KaratPriceRecord[];
 }
 
 export interface InvestmentPlan {

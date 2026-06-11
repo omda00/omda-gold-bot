@@ -37,9 +37,16 @@ export interface PriceFetchResult {
   sellPrice?: number;
 }
 
+export interface KaratPriceResult {
+  karat: number;
+  sellPrice: number;
+  buyPrice: number | null;
+}
+
 export interface CombinedPriceResult {
   gold: PriceFetchResult | null;
   usdEgp: PriceFetchResult | null;
+  allKarats: KaratPriceResult[];
 }
 
 export interface KaratPrice {
@@ -406,13 +413,14 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   // If we're in rate-limit cooldown, skip fetching entirely
   if (isInCooldown()) {
     console.log("[price-fetcher] ⏸️ Skipping fetch — in rate-limit cooldown");
-    return { gold: null, usdEgp: null };
+    return { gold: null, usdEgp: null, allKarats: [] };
   }
 
   const zai = await ZAI.create();
   const combinedResult: CombinedPriceResult = {
     gold: null,
     usdEgp: null,
+    allKarats: [],
   };
 
   // ==========================================
@@ -440,6 +448,24 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
           `[price-fetcher] ✅ Got gold from iSagha: sell=${isaghaPrices.gold21Sell}, buy=${isaghaPrices.gold21Buy}`
         );
       }
+
+      // Extract all karat prices from iSagha data
+      const karatData: { karat: number; sell: number | null; buy: number | null }[] = [
+        { karat: 24, sell: isaghaPrices.gold24Sell, buy: isaghaPrices.gold24Buy },
+        { karat: 22, sell: isaghaPrices.gold22Sell, buy: isaghaPrices.gold22Buy },
+        { karat: 21, sell: isaghaPrices.gold21Sell, buy: isaghaPrices.gold21Buy },
+        { karat: 18, sell: isaghaPrices.gold18Sell, buy: isaghaPrices.gold18Buy },
+      ];
+      for (const k of karatData) {
+        if (k.sell && k.sell > 0) {
+          combinedResult.allKarats.push({
+            karat: k.karat,
+            sellPrice: k.sell,
+            buyPrice: k.buy,
+          });
+        }
+      }
+      console.log(`[price-fetcher] ✅ Extracted ${combinedResult.allKarats.length} karat prices from iSagha`);
 
       // Note: We do NOT use iSagha's USD/EGP rate — user wants Google Finance as primary source
       // Store iSagha USD/EGP rate only as fallback info
