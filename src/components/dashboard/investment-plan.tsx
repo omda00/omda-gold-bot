@@ -734,7 +734,7 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
                     : "text-muted-foreground"
                 }`}
               >
-                العائد: {signal.expectedReturn > 0 ? "+" : ""}
+                نسبة الميزانية: {signal.expectedReturn > 0 ? "+" : ""}
                 {signal.expectedReturn}%
               </p>
             </div>
