@@ -10,6 +10,7 @@ import {
   ArrowRightLeft,
   ArrowDownUp,
   Radio,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -191,19 +192,27 @@ function PriceCard({
                   </div>
                 </>
               )}
-              <p className="text-xs text-muted-foreground mt-4 pt-2 border-t border-border/30">
-                آخر تحديث:{" "}
-                {new Date(price.createdAt).toLocaleString("ar-EG", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-                {price.source && hasBuySell && (
-                  <span className="mr-1">• {price.source}</span>
+              <div className="flex items-center gap-2 mt-4 pt-2 border-t border-border/30">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  آخر تحديث:{" "}
+                  {new Date(price.createdAt).toLocaleString("ar-EG", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                  {price.source && hasBuySell && (
+                    <span className="mr-1">• {price.source}</span>
+                  )}
+                </p>
+                {fetching && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-bold animate-pulse mr-auto">
+                    جارِ التحديث...
+                  </span>
                 )}
-              </p>
+              </div>
             </>
           ) : (
             <div className="py-8 text-center">
@@ -263,6 +272,7 @@ export function PriceCards({
         loading={loading}
         fetching={fetching}
         onFetch={onFetchPrices}
+        showFetchButton
       />
     </div>
   );

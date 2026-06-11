@@ -32,8 +32,11 @@ export function useDashboardData() {
   });
 
   const [lastAutomationRun, setLastAutomationRun] = useState<string | null>(null);
+  const [lastWebFetch, setLastWebFetch] = useState<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoFetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seededRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   // Seed data on first load
   const seedData = useCallback(async () => {
@@ -53,7 +56,7 @@ export function useDashboardData() {
     }
   }, []);
 
-  // Fetch prices
+  // Fetch prices from DB (lightweight GET)
   const fetchPrices = useCallback(async () => {
     try {
       const res = await fetch("/api/prices");
@@ -153,32 +156,39 @@ export function useDashboardData() {
     return null;
   }, []);
 
-  // Trigger manual price fetch
+  // Trigger manual price fetch from the web (POST)
   const triggerFetchPrices = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return null;
+    isFetchingRef.current = true;
     setLoading((prev) => ({ ...prev, fetching: true }));
     try {
       const res = await fetch("/api/prices", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
         setPrices({ gold: data.gold, usdEgp: data.usdEgp });
+        setLastWebFetch(new Date().toISOString());
         return data;
       } else {
-        // Don't throw - just log the error and return null
-        // The 1-second polling will keep showing existing prices
+        // Even on error, try to get the latest prices from the response
         try {
           const errorData = await res.json();
-          console.error("Fetch prices error:", errorData.error);
+          // The API might still return cached prices
+          if (errorData.gold || errorData.usdEgp) {
+            setPrices({ gold: errorData.gold, usdEgp: errorData.usdEgp });
+          }
+          console.error("Fetch prices error:", errorData.error || errorData.message);
         } catch {
           console.error("Fetch prices error: Unknown error");
         }
         return null;
       }
     } catch (err) {
-      // Network error - don't crash, just log
       console.error("Network error fetching prices:", err);
       return null;
     } finally {
       setLoading((prev) => ({ ...prev, fetching: false }));
+      isFetchingRef.current = false;
     }
   }, []);
 
@@ -334,7 +344,11 @@ export function useDashboardData() {
     detectCurrentSignal(prices.gold?.price ?? null);
   }, [prices.gold?.price, plans, detectCurrentSignal]);
 
-  // Poll for prices every 1 second (reads from database - fast)
+  // =============================================
+  // Polling: Read DB prices every 1 second
+  // This is lightweight and ensures the UI always
+  // shows the latest data from the database
+  // =============================================
   const startPolling = useCallback(() => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = setInterval(() => {
@@ -349,11 +363,38 @@ export function useDashboardData() {
     }
   }, []);
 
-  // Auto-poll when on dashboard
+  // =============================================
+  // Auto-fetch: Fetch fresh prices from the web
+  // every 30 seconds in the background
+  // This keeps the database updated so the 1-second
+  // polling always shows relatively fresh data
+  // =============================================
+  const startAutoFetch = useCallback(() => {
+    if (autoFetchIntervalRef.current) clearInterval(autoFetchIntervalRef.current);
+    // Fetch immediately on start
+    triggerFetchPrices();
+    // Then every 30 seconds
+    autoFetchIntervalRef.current = setInterval(() => {
+      triggerFetchPrices();
+    }, 30000);
+  }, [triggerFetchPrices]);
+
+  const stopAutoFetch = useCallback(() => {
+    if (autoFetchIntervalRef.current) {
+      clearInterval(autoFetchIntervalRef.current);
+      autoFetchIntervalRef.current = null;
+    }
+  }, []);
+
+  // Start both polling and auto-fetch
   useEffect(() => {
     startPolling();
-    return () => stopPolling();
-  }, [startPolling, stopPolling]);
+    startAutoFetch();
+    return () => {
+      stopPolling();
+      stopAutoFetch();
+    };
+  }, [startPolling, stopPolling, startAutoFetch, stopAutoFetch]);
 
   return {
     prices,
@@ -365,6 +406,7 @@ export function useDashboardData() {
     calculatorData,
     loading,
     lastAutomationRun,
+    lastWebFetch,
     fetchPrices,
     fetchPlans,
     fetchConfig,

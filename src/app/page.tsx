@@ -47,12 +47,19 @@ export default function Home() {
     try {
       const result = await triggerFetchPrices();
       if (result) {
-        toast.success("تم جلب الأسعار بنجاح", { duration: 3000 });
+        const fetched = result.fetched;
+        if (fetched?.gold && fetched?.usdEgp) {
+          toast.success("تم جلب الأسعار بنجاح", { duration: 3000 });
+        } else if (fetched?.gold || fetched?.usdEgp) {
+          toast.success("تم جلب بعض الأسعار — يتم عرض آخر الأسعار المتاحة", { duration: 4000 });
+        } else {
+          toast.info("لم يتم جلب أسعار جديدة — يتم عرض آخر الأسعار المخزنة", { duration: 4000 });
+        }
       } else {
-        toast.error("فشل جلب أسعار جديدة — الأسعار المعروضة من آخر تحديث ناجح", { duration: 5000 });
+        toast.error("فشل الاتصال بالخادم — يتم عرض آخر الأسعار المتاحة", { duration: 5000 });
       }
     } catch {
-      toast.error("حدث خطأ في الاتصال", { duration: 5000 });
+      toast.error("حدث خطأ في الاتصال — يتم عرض آخر الأسعار المتاحة", { duration: 5000 });
     }
   }, [triggerFetchPrices]);
 

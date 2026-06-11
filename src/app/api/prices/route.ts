@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
-import { seedDefaultConfig } from "@/lib/config-seeder";
 
 /**
  * GET /api/prices - Return the latest Gold and USD/EGP prices
+ * This is called every second by the polling mechanism, so it must be lightweight.
+ * No seeding or heavy operations here.
  */
 export async function GET() {
   try {
-    await seedDefaultConfig();
-
     const goldPrice = await db.priceRecord.findFirst({
       where: { symbol: "GOLD_EGP" },
       orderBy: { createdAt: "desc" },
@@ -34,50 +33,88 @@ export async function GET() {
 }
 
 /**
- * POST /api/prices - Trigger a manual price fetch
+ * POST /api/prices - Trigger a price fetch from the web
  * Uses fetchAllPrices() for efficiency (single page read instead of two)
+ * 
+ * This endpoint is called both manually (via تحديث button) and automatically
+ * (via the background auto-refresh). It should handle errors gracefully
+ * and always return the latest DB prices even if the web fetch fails.
  */
 export async function POST() {
   try {
     const allPrices = await fetchAllPrices();
 
-    if (!allPrices.gold && !allPrices.usdEgp) {
-      return NextResponse.json(
-        { error: "Could not fetch any prices from any source" },
-        { status: 500 }
-      );
+    // Save whatever we got from the web
+    if (allPrices.gold || allPrices.usdEgp) {
+      const savePromises: Promise<unknown>[] = [];
+
+      if (allPrices.gold) {
+        savePromises.push(
+          savePriceRecord("GOLD_EGP", allPrices.gold.price, "EGP", allPrices.gold.source, {
+            buyPrice: allPrices.gold.buyPrice,
+            sellPrice: allPrices.gold.sellPrice,
+          })
+        );
+      }
+
+      if (allPrices.usdEgp) {
+        savePromises.push(
+          savePriceRecord("USD_EGP", allPrices.usdEgp.price, "EGP", allPrices.usdEgp.source)
+        );
+      }
+
+      await Promise.all(savePromises);
     }
 
-    const savePromises: Promise<unknown>[] = [];
+    // Always return the latest DB prices (even if web fetch partially failed)
+    const goldPrice = await db.priceRecord.findFirst({
+      where: { symbol: "GOLD_EGP" },
+      orderBy: { createdAt: "desc" },
+    });
 
-    if (allPrices.gold) {
-      savePromises.push(
-        savePriceRecord("GOLD_EGP", allPrices.gold.price, "EGP", allPrices.gold.source, {
-          buyPrice: allPrices.gold.buyPrice,
-          sellPrice: allPrices.gold.sellPrice,
-        })
-      );
-    }
-
-    if (allPrices.usdEgp) {
-      savePromises.push(
-        savePriceRecord("USD_EGP", allPrices.usdEgp.price, "EGP", allPrices.usdEgp.source)
-      );
-    }
-
-    const saved = await Promise.all(savePromises);
+    const usdEgpRate = await db.priceRecord.findFirst({
+      where: { symbol: "USD_EGP" },
+      orderBy: { createdAt: "desc" },
+    });
 
     return NextResponse.json({
-      gold: allPrices.gold ? saved[0] : null,
-      usdEgp: allPrices.usdEgp ? saved[allPrices.gold ? 1 : 0] : null,
-      message: "Prices fetched and saved successfully",
+      gold: goldPrice,
+      usdEgp: usdEgpRate,
+      fetched: {
+        gold: allPrices.gold !== null,
+        usdEgp: allPrices.usdEgp !== null,
+      },
+      message: allPrices.gold || allPrices.usdEgp
+        ? "Prices fetched successfully"
+        : "Could not fetch new prices from web — showing latest cached prices",
     });
   } catch (error) {
     console.error("Error fetching prices:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { error: `Failed to fetch prices: ${message}` },
-      { status: 500 }
-    );
+    
+    // Even on error, try to return the latest DB prices
+    try {
+      const goldPrice = await db.priceRecord.findFirst({
+        where: { symbol: "GOLD_EGP" },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const usdEgpRate = await db.priceRecord.findFirst({
+        where: { symbol: "USD_EGP" },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json({
+        gold: goldPrice,
+        usdEgp: usdEgpRate,
+        fetched: { gold: false, usdEgp: false },
+        message: "Web fetch failed — showing latest cached prices",
+      });
+    } catch {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json(
+        { error: `Failed to fetch prices: ${message}` },
+        { status: 500 }
+      );
+    }
   }
 }
