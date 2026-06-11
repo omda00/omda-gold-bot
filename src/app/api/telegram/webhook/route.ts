@@ -111,41 +111,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /start command - Register user
+    // Handle /start command - Register user (upsert to prevent duplicates)
     if (text === "/start" || text.startsWith("/start ")) {
-      // Check if user is already registered
-      const existing = await db.telegramUser.findFirst({
-        where: { chatId, botToken },
-      });
-
-      if (existing) {
-        // Already registered - reactivate if stopped, or welcome back
-        if (!existing.active) {
-          await db.telegramUser.update({
-            where: { id: existing.id },
-            data: { active: true },
-          });
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            `👋 أهلاً بيك تاني يا ${existing.name}!\n\n✅ تم تفعيل الإشعارات من تاني\n📊 هتصلك التحديثات كل ساعة\n\n💡 لو عايز توقف الإشعارات ابعت /stop`
-          );
-        } else {
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            `👋 أهلاً بيك تاني يا ${existing.name}!\n\n✅ أنت مسجل بالفعل وبتستقبل التحديثات كل ساعة.\n\n💡 لو عايز توقف الإشعارات ابعت /stop`
-          );
-        }
-        return NextResponse.json({ ok: true });
-      }
-
-      // Register new user
       const userName = fromUser.first_name 
         + (fromUser.last_name ? ` ${fromUser.last_name}` : "");
 
-      const newUser = await db.telegramUser.create({
-        data: {
+      // Use upsert to guarantee no duplicates (chatId+botToken is unique)
+      const user = await db.telegramUser.upsert({
+        where: { chatId_botToken: { chatId, botToken } },
+        update: { active: true, name: userName },
+        create: {
           name: userName,
           botToken,
           chatId,
@@ -153,30 +128,39 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Log the registration
-      await db.notificationLog.create({
-        data: {
-          type: "bot_registration",
-          title: `تسجيل مشترك جديد: ${userName}`,
-          message: `مشترك جديد: ${userName} (Chat ID: ${chatId})`,
-          success: true,
-        },
-      });
+      const wasReactivated = user.createdAt !== user.updatedAt;
 
-      // Send welcome message
-      const welcomeMessage = `🎉 أهلاً بيك يا ${userName}!\n\n✅ تم تسجيلك بنجاح في بوت أسعار الذهب والعملات\n\n📊 هتصلك تحديثات كل ساعة:\n  • أسعار الذهب (عيار 24، 22، 21، 18)\n  • جنيه الذهب\n  • سعر الدولار\n  • تنبيهات انخفاض الدولار\n\n🔔 أول تقرير هيوصلك في الساعة الجاية\n\n💡 أوامر البوت:\n/start — تسجيل / تفعيل\n/stop — إيقاف الإشعارات\n/help — المساعدة`;
+      if (wasReactivated) {
+        // User existed before — welcome back
+        await sendTelegramMessage(
+          botToken,
+          chatId,
+          `👋 أهلاً بيك تاني يا ${userName}!\n\n✅ تم تفعيل الإشعارات\n📊 هتصلك التحديثات كل ساعة\n\n💡 لو عايز توقف الإشعارات ابعت /stop`
+        );
+      } else {
+        // New user — send full welcome + log registration
+        await db.notificationLog.create({
+          data: {
+            type: "bot_registration",
+            title: `تسجيل مشترك جديد: ${userName}`,
+            message: `مشترك جديد: ${userName} (Chat ID: ${chatId})`,
+            success: true,
+          },
+        });
 
-      await sendTelegramMessage(botToken, chatId, welcomeMessage);
+        const welcomeMessage = `🎉 أهلاً بيك يا ${userName}!\n\n✅ تم تسجيلك بنجاح في بوت أسعار الذهب والعملات\n\n📊 هتصلك تحديثات كل ساعة:\n  • أسعار الذهب (عيار 24، 22، 21، 18)\n  • جنيه الذهب\n  • سعر الدولار\n  • تنبيهات انخفاض الدولار\n\n🔔 أول تقرير هيوصلك في الساعة الجاية\n\n💡 أوامر البوت:\n/start — تسجيل / تفعيل\n/stop — إيقاف الإشعارات\n/help — المساعدة`;
 
-      console.log(`[webhook] ✅ New subscriber: ${userName} (Chat ID: ${chatId})`);
+        await sendTelegramMessage(botToken, chatId, welcomeMessage);
+        console.log(`[webhook] ✅ New subscriber: ${userName} (Chat ID: ${chatId})`);
+      }
 
       return NextResponse.json({ ok: true, registered: true });
     }
 
     // Handle /stop command - Deactivate user
     if (text === "/stop") {
-      const existing = await db.telegramUser.findFirst({
-        where: { chatId, botToken },
+      const existing = await db.telegramUser.findUnique({
+        where: { chatId_botToken: { chatId, botToken } },
       });
 
       if (existing) {

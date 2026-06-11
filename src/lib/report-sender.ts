@@ -30,7 +30,8 @@ export async function wasReportSentRecently(
 }
 
 /**
- * Send a report to ALL active Telegram users (deduplicated).
+ * Send a report to ALL active Telegram users (deduplicated by chatId).
+ * Ensures each unique chatId receives the message only ONCE per report.
  * Returns send results.
  */
 export async function sendReportToAllUsers(
@@ -38,11 +39,27 @@ export async function sendReportToAllUsers(
   type: string,
   title: string
 ): Promise<{ sent: number; failed: number; total: number }> {
-  const users = await db.telegramUser.findMany({ where: { active: true } });
+  const allUsers = await db.telegramUser.findMany({ where: { active: true } });
+
+  // Deduplicate by chatId — keep only one record per unique chatId
+  // If multiple entries exist for the same chatId, keep the most recently updated one
+  const seenChatIds = new Set<string>();
+  const uniqueUsers = allUsers
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .filter((user) => {
+      if (seenChatIds.has(user.chatId)) {
+        return false; // Skip duplicate
+      }
+      seenChatIds.add(user.chatId);
+      return true;
+    });
+
+  console.log(`[report] Users: ${allUsers.length} total, ${uniqueUsers.length} unique (deduped)`);
+
   let sent = 0;
   let failed = 0;
 
-  for (const user of users) {
+  for (const user of uniqueUsers) {
     try {
       const result = await sendTelegramMessage(user.botToken, user.chatId, message);
 
@@ -68,7 +85,7 @@ export async function sendReportToAllUsers(
     }
   }
 
-  return { sent, failed, total: users.length };
+  return { sent, failed, total: uniqueUsers.length };
 }
 
 /**

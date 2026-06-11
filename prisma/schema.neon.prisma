@@ -56,4 +56,6 @@ model TelegramUser {
   active    Boolean  @default(true) // Whether to send notifications to this user
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([chatId, botToken])
 }

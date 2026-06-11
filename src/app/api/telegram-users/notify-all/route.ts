@@ -22,11 +22,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Get all active Telegram users
-    const users = await db.telegramUser.findMany({
+    const allUsers = await db.telegramUser.findMany({
       where: { active: true },
     });
 
-    if (users.length === 0) {
+    // Deduplicate by chatId — ensure each unique chatId gets message only ONCE
+    const seenChatIds = new Set<string>();
+    const uniqueUsers = allUsers
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .filter((user) => {
+        if (seenChatIds.has(user.chatId)) return false;
+        seenChatIds.add(user.chatId);
+        return true;
+      });
+
+    if (uniqueUsers.length === 0) {
       return NextResponse.json({
         sent: 0,
         total: 0,
@@ -34,9 +44,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Send to each user individually using their own bot token and chat ID
+    console.log(`[notify-all] Users: ${allUsers.length} total, ${uniqueUsers.length} unique (deduped)`);
+
+    // Send to each unique user individually using their own bot token and chat ID
     const results = await Promise.allSettled(
-      users.map(async (user) => {
+      uniqueUsers.map(async (user) => {
         const result = await sendTelegramMessage(user.botToken, user.chatId, message);
 
         // Log each notification
@@ -67,7 +79,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       sent: succeeded,
       failed,
-      total: users.length,
+      total: uniqueUsers.length,
+      duplicatesRemoved: allUsers.length - uniqueUsers.length,
       results: results.map((r) =>
         r.status === "fulfilled" ? r.value : { sent: false, error: "Unknown error" }
       ),

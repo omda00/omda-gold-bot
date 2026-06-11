@@ -76,23 +76,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this bot token + chat ID combination already exists
-    const existing = await db.telegramUser.findFirst({
-      where: {
-        botToken: botToken.trim(),
-        chatId: chatId.trim(),
+    // Upsert to prevent duplicates (chatId+botToken is unique)
+    const user = await db.telegramUser.upsert({
+      where: { chatId_botToken: { chatId: chatId.trim(), botToken: botToken.trim() } },
+      update: {
+        name: name.trim(),
+        active: true,
       },
-    });
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "هذا البوت مسجل بالفعل" },
-        { status: 409 }
-      );
-    }
-
-    const user = await db.telegramUser.create({
-      data: {
+      create: {
         name: name.trim(),
         botToken: botToken.trim(),
         chatId: chatId.trim(),
@@ -100,7 +91,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(user, { status: 201 });
+    // Mask bot token in response
+    return NextResponse.json({
+      ...user,
+      botToken: user.botToken ? `****${user.botToken.slice(-5)}` : "",
+    }, { status: user.createdAt.getTime() === user.updatedAt.getTime() ? 201 : 200 });
   } catch (error) {
     console.error("Error creating telegram user:", error);
     return NextResponse.json(

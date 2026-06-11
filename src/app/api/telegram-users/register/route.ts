@@ -33,41 +33,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this bot token + chat ID combination already exists
-    const existing = await db.telegramUser.findFirst({
-      where: {
-        botToken: botToken.trim(),
-        chatId: chatId.trim(),
-      },
-    });
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "هذا البوت مسجل بالفعل — إذا كنت تواجه مشكلة تواصل مع المسؤول" },
-        { status: 409 }
-      );
-    }
-
-    // Test the bot connection before registering
-    const testMessage = `✅ تم تسجيل بوتك بنجاح!\n\n🔔 ستصلك تحديثات أسعار الذهب والدولار كل ساعة بتوقيت مصر\n\n👤 الاسم: ${name.trim()}`;
-    const testResult = await sendTelegramMessage(botToken.trim(), chatId.trim(), testMessage);
-
-    if (!testResult.ok) {
-      return NextResponse.json(
-        { error: `فشل الاتصال بالبوت — تأكد من صحة Bot Token و Chat ID\nالخطأ: ${testResult.error || "غير معروف"}` },
-        { status: 400 }
-      );
-    }
-
-    // Register the user
-    const user = await db.telegramUser.create({
-      data: {
+    // Check if this bot token + chat ID combination already exists — upsert to prevent duplicates
+    const user = await db.telegramUser.upsert({
+      where: { chatId_botToken: { chatId: chatId.trim(), botToken: botToken.trim() } },
+      update: { active: true, name: name.trim() },
+      create: {
         name: name.trim(),
         botToken: botToken.trim(),
         chatId: chatId.trim(),
         active: true,
       },
     });
+
+    const isNewUser = user.createdAt.getTime() === user.updatedAt.getTime();
+
+    if (!isNewUser) {
+      // User was reactivated — test connection and notify
+      const testMessage = `✅ تم تفعيل الإشعارات من جديد!\n\n🔔 ستصلك تحديثات أسعار الذهب والدولار كل ساعة بتوقيت مصر\n\n👤 الاسم: ${name.trim()}`;
+      const testResult = await sendTelegramMessage(botToken.trim(), chatId.trim(), testMessage);
+
+      if (!testResult.ok) {
+        return NextResponse.json(
+          { error: `فشل الاتصال بالبوت — تأكد من صحة Bot Token و Chat ID\nالخطأ: ${testResult.error || "غير معروف"}` },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: "تم تفعيل الإشعارات من جديد — سيصلك التحديث كل ساعة",
+        data: {
+          id: user.id,
+          name: user.name,
+          active: user.active,
+          reactivated: true,
+        },
+      });
+    }
+
+    // New user — test the bot connection before registering
+    const testMessage = `✅ تم تسجيل بوتك بنجاح!\n\n🔔 ستصلك تحديثات أسعار الذهب والدولار كل ساعة بتوقيت مصر\n\n👤 الاسم: ${name.trim()}`;
+    const testResult = await sendTelegramMessage(botToken.trim(), chatId.trim(), testMessage);
+
+    if (!testResult.ok) {
+      // Connection failed — delete the user we just created
+      await db.telegramUser.delete({ where: { id: user.id } });
+      return NextResponse.json(
+        { error: `فشل الاتصال بالبوت — تأكد من صحة Bot Token و Chat ID\nالخطأ: ${testResult.error || "غير معروف"}` },
+        { status: 400 }
+      );
+    }
 
     // Log the registration
     await db.notificationLog.create({
