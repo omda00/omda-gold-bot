@@ -1,3 +1,4 @@
+// Auto-deploy: updated
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
