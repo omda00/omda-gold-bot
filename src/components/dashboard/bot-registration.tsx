@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 const BOT_LINK = "https://t.me/gold_investmentbot";
 
 export function BotRegistration() {
-  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+  const [subscriberStats, setSubscriberStats] = useState<{ total: number; active: number } | null>(null);
 
   useEffect(() => {
     async function fetchCount() {
@@ -27,7 +27,7 @@ export function BotRegistration() {
         const res = await fetch("/api/telegram-users/count");
         if (res.ok) {
           const data = await res.json();
-          setSubscriberCount(data.active ?? 0);
+          setSubscriberStats({ total: data.total ?? 0, active: data.active ?? 0 });
         }
       } catch {
         // ignore
@@ -79,13 +79,20 @@ export function BotRegistration() {
             </p>
 
             {/* Subscriber Count */}
-            {subscriberCount !== null && (
-              <div className="flex items-center justify-center gap-1.5 mb-4">
-                <Users className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                  {subscriberCount.toLocaleString("ar-EG")} مشترك
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            {subscriberStats !== null && (
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    {subscriberStats.active.toLocaleString("ar-EG")} مشترك نشط
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                {subscriberStats.total > subscriberStats.active && (
+                  <span className="text-xs text-muted-foreground/60">
+                    من أصل {subscriberStats.total.toLocaleString("ar-EG")}
+                  </span>
+                )}
               </div>
             )}
 

@@ -451,3 +451,27 @@ Stage Summary:
 - Admin password set on first login, stored in DB
 - JWT session with HTTP-only cookies for security
 - Public users see only: prices, calculator, price history, login prompt
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Add subscriber count display to dashboard for Telegram bot
+
+Work Log:
+- Read existing code: bot-registration.tsx, settings.tsx, use-dashboard.ts, count API endpoint
+- Found that /api/telegram-users/count already exists and returns {total, active}
+- Found that bot-registration.tsx already had a basic subscriber count display
+- Enhanced bot-registration.tsx to show both active and total subscribers (instead of just active)
+- Added new subscriber stats card to admin settings tab with:
+  - Active subscribers count with green styling
+  - Total subscribers count with amber styling
+  - Progress bar showing active vs total ratio
+  - Stopped subscribers count with red icon
+- Both components now auto-refresh subscriber stats every 30 seconds
+- Verified with lint check (passed) and browser testing (confirmed working)
+
+Stage Summary:
+- Subscriber count now visible in TWO places:
+  1. "بوت التيليجرام" tab: Shows "١ مشترك نشط" with total if different
+  2. "الإعدادات" tab (admin): Full stats card with active/total/progress bar
+- Current stats: 1 active subscriber out of 1 total (100% active rate)

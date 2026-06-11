@@ -25,6 +25,8 @@ import {
   Lock,
   LogOut,
   ShieldCheck,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,9 @@ export function SettingsTab({
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
 
+  // Subscriber count
+  const [subscriberStats, setSubscriberStats] = useState<{ total: number; active: number } | null>(null);
+
   useEffect(() => {
     if (config) {
       setAutomationEnabled(config.AUTOMATION_ENABLED === "true");
@@ -106,6 +111,25 @@ export function SettingsTab({
       setUsdDropThreshold(config.USD_DROP_THRESHOLD || "2");
     }
   }, [config]);
+
+  // Fetch subscriber count
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function fetchCount() {
+      try {
+        const res = await fetch("/api/telegram-users/count");
+        if (res.ok) {
+          const data = await res.json();
+          setSubscriberStats({ total: data.total ?? 0, active: data.active ?? 0 });
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   const handleSaveConfig = async () => {
     setSavingConfig(true);
@@ -280,6 +304,69 @@ export function SettingsTab({
   // =============================================
   return (
     <div className="space-y-3">
+      {/* Subscriber Stats Card */}
+      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-emerald-500" />
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
+              <Users className="w-4.5 h-4.5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">إحصائيات المشتركين</h3>
+              <p className="text-xs text-muted-foreground">عدد المشتركين في بوت التيليجرام</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 rounded-xl p-4 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                  <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">نشط</span>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                {subscriberStats ? subscriberStats.active.toLocaleString("ar-EG") : "..."}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">مشترك نشط يستقبل الإشعارات</p>
+            </div>
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 rounded-xl p-4 ring-1 ring-amber-200/50 dark:ring-amber-800/30">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-300">إجمالي</span>
+              </div>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                {subscriberStats ? subscriberStats.total.toLocaleString("ar-EG") : "..."}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">إجمالي المشتركين (نشط + متوقف)</p>
+            </div>
+          </div>
+          {subscriberStats && subscriberStats.total > 0 && (
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: `${(subscriberStats.active / subscriberStats.total) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold text-muted-foreground">
+                {Math.round((subscriberStats.active / subscriberStats.total) * 100)}%
+              </span>
+            </div>
+          )}
+          {subscriberStats && subscriberStats.total > 0 && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <UserX className="w-3.5 h-3.5 text-red-400" />
+              <span className="text-xs text-muted-foreground">
+                {subscriberStats.total - subscriberStats.active} مشترك متوقف عن الاستقبال
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Admin badge / logout */}
       <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-500" />
