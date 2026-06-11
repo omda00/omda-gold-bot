@@ -1,53 +1,63 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// Gold Investment Strategy based on thorough PDF analysis (June 2026)
-// Strategy covers buy/sell levels, DCA phases, and risk management until end of 2026
+// Smart Investment Strategy for Gold 21K in EGP
+// These ranges are CONTINUOUS (no gaps) and cover all realistic price levels
+// The smart signal system will analyze trends and match against these zones
 // 21 Karat gold price per gram in EGP
 const DEFAULT_PLANS = [
   {
-    priceRangeMin: 5700,
-    priceRangeMax: 5900,
+    priceRangeMin: 0,
+    priceRangeMax: 5500,
     action: "شراء قوي",
-    expectedReturn: 40,
-    label: "فرصة شراء قوية — دعم نادر (40% من الميزانية)",
+    expectedReturn: 50,
+    label: "فرصة شراء نادرة — سعر متدنٍ جداً (50% من الميزانية)",
     order: 1,
     active: true,
   },
   {
-    priceRangeMin: 6100,
-    priceRangeMax: 6300,
-    action: "شراء تدريجي",
-    expectedReturn: 30,
-    label: "منطقة الشراء التدريجي الحالية (30% من الميزانية)",
+    priceRangeMin: 5500,
+    priceRangeMax: 6000,
+    action: "شراء قوي",
+    expectedReturn: 40,
+    label: "فرصة شراء قوية — دعم قوي (40% من الميزانية)",
     order: 2,
     active: true,
   },
   {
-    priceRangeMin: 6300,
-    priceRangeMax: 6800,
-    action: "مراقبة فقط",
-    expectedReturn: 0,
-    label: "منطقة المراقبة — عدم الشراء حتى تصحيح أعمق",
+    priceRangeMin: 6000,
+    priceRangeMax: 6400,
+    action: "شراء تدريجي",
+    expectedReturn: 30,
+    label: "منطقة الشراء التدريجي — دخول مرحلي (30% من الميزانية)",
     order: 3,
     active: true,
   },
   {
-    priceRangeMin: 7000,
-    priceRangeMax: 7200,
-    action: "بيع جزئي 30%",
-    expectedReturn: -30,
-    label: "بيع 30% من المحفظة — جني أرباح جزئي",
+    priceRangeMin: 6400,
+    priceRangeMax: 6900,
+    action: "انتظار ومراقبة",
+    expectedReturn: 5,
+    label: "منطقة المراقبة — لا تتعجل بالشراء أو البيع",
     order: 4,
     active: true,
   },
   {
-    priceRangeMin: 7500,
-    priceRangeMax: null,
-    action: "بيع نشط 50%",
-    expectedReturn: -50,
-    label: "بيع إضافي 50% — منطقة البيع النشط",
+    priceRangeMin: 6900,
+    priceRangeMax: 7300,
+    action: "بيع جزئي",
+    expectedReturn: -20,
+    label: "بيع 30% من المحفظة — جني أرباح جزئي",
     order: 5,
+    active: true,
+  },
+  {
+    priceRangeMin: 7300,
+    priceRangeMax: null,
+    action: "بيع نشط",
+    expectedReturn: -40,
+    label: "بيع 50% — منطقة البيع النشط — أسعار مرتفعة",
+    order: 6,
     active: true,
   },
 ];

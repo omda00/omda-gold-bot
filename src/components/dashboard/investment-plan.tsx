@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { InvestmentPlan, SignalResult } from "@/lib/dashboard-types";
+import type { InvestmentPlan, SignalResult, SmartSignalResult } from "@/lib/dashboard-types";
 
 // ─── Helper: Action config ───
 function getActionConfig(action: string) {
@@ -648,14 +648,19 @@ export function InvestmentPlanTable({
   );
 }
 
-// ─── Current Signal Card ───
+// ─── Current Signal Card (Smart) ───
 interface CurrentSignalCardProps {
   signal: SignalResult | null;
+  smartSignal: SmartSignalResult | null;
   currentPrice: number | null;
 }
 
-export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardProps) {
-  if (!signal) {
+export function CurrentSignalCard({ signal, smartSignal, currentPrice }: CurrentSignalCardProps) {
+  // Use smart signal if available, otherwise fall back to plan-based signal
+  const effectiveSignal = smartSignal || signal;
+  const isSmart = !!smartSignal;
+
+  if (!effectiveSignal) {
     return (
       <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden h-full">
         <div className="h-1 bg-muted" />
@@ -664,8 +669,8 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
             <Minus className="w-4 h-4 text-muted-foreground" />
           </div>
           <div>
-            <h3 className="text-sm font-bold">الإشارة الحالية</h3>
-            <p className="text-xs text-muted-foreground">Current Signal</p>
+            <h3 className="text-sm font-bold">الإشارة الذكية</h3>
+            <p className="text-xs text-muted-foreground">Smart Signal</p>
           </div>
         </div>
         <CardContent className="p-4">
@@ -675,11 +680,11 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
                 <p className="text-muted-foreground text-xs">
                   السعر الحالي:{" "}
                   <span className="font-mono font-black text-foreground text-lg tabular-nums">
-                    {currentPrice.toLocaleString()} EGP/g
+                    {currentPrice.toLocaleString()} ج.م
                   </span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  لا توجد خطة مطابقة
+                  في انتظار تحليل البيانات...
                 </p>
               </>
             ) : (
@@ -693,7 +698,10 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
     );
   }
 
-  const config = getActionConfig(signal.action);
+  const action = effectiveSignal.action;
+  const config = getActionConfig(action);
+  const expectedReturn = effectiveSignal.expectedReturn;
+  const confidence = isSmart ? (smartSignal as SmartSignalResult).confidence : 50;
 
   return (
     <motion.div
@@ -704,44 +712,186 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
     >
       <Card className={`rounded-2xl border-0 shadow-lg ring-2 ${config.border} overflow-hidden h-full`}>
         {/* Top gradient bar */}
-        <div className={`h-1 bg-gradient-to-r ${config.gradient}`} />
-        <div className="bg-gradient-to-r from-muted/30 to-transparent px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
-            <Target className="w-4 h-4 text-white" />
+        <div className={`h-1.5 bg-gradient-to-r ${config.gradient}`} />
+        <div className="bg-gradient-to-r from-muted/30 to-transparent px-4 py-3 flex items-center justify-between border-b border-border/30">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
+              <Target className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">الإشارة الذكية</h3>
+              <p className="text-[10px] text-muted-foreground">Smart Signal — تحليل تلقائي</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-bold">الإشارة الحالية</h3>
-            <p className="text-xs text-muted-foreground">Current Signal</p>
-          </div>
+          {isSmart && (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-amber-400/50 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
+              ذكي
+            </Badge>
+          )}
         </div>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3">
-            <div className={`${config.badgeBg} text-white text-sm font-bold px-3 py-2 rounded-xl shadow-sm flex items-center gap-1.5 justify-center`}>
-              {config.icon}
-              {signal.action}
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-black font-mono text-foreground tabular-nums">
-                {currentPrice?.toLocaleString()}
-                <span className="text-sm text-muted-foreground font-medium ml-1">EGP/g</span>
-              </p>
-              <p
-                className={`text-sm font-bold mt-1.5 ${
-                  signal.expectedReturn > 0
-                    ? "text-emerald-600"
-                    : signal.expectedReturn < 0
-                    ? "text-red-600"
-                    : "text-muted-foreground"
-                }`}
-              >
-                نسبة الميزانية: {signal.expectedReturn > 0 ? "+" : ""}
-                {signal.expectedReturn}%
-              </p>
-            </div>
-            <p className="text-xs text-muted-foreground text-center">
-              {signal.label}
+        <CardContent className="p-4 space-y-3">
+          {/* Action Badge */}
+          <div className={`${config.badgeBg} text-white text-sm font-bold px-3 py-2 rounded-xl shadow-sm flex items-center gap-1.5 justify-center`}>
+            {config.icon}
+            {action}
+          </div>
+
+          {/* Current Price */}
+          <div className="text-center">
+            <p className="text-2xl font-black font-mono text-foreground tabular-nums">
+              {currentPrice?.toLocaleString()}
+              <span className="text-sm text-muted-foreground font-medium ml-1">ج.م/جرام</span>
             </p>
           </div>
+
+          {/* Smart Signal Details */}
+          {isSmart && (
+            <div className="space-y-2.5">
+              {/* Confidence Meter */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-muted-foreground">مستوى الثقة</span>
+                  <span className={`text-[10px] font-black tabular-nums ${
+                    confidence >= 70 ? "text-emerald-600" : confidence >= 50 ? "text-amber-600" : "text-red-600"
+                  }`}>{confidence}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${confidence}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className={`h-full rounded-full ${
+                      confidence >= 70 ? "bg-emerald-500" : confidence >= 50 ? "bg-amber-500" : "bg-red-500"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Price Position Gauge */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-muted-foreground">موقع السعر</span>
+                  <span className="text-[10px] font-bold tabular-nums text-muted-foreground">
+                    {(smartSignal as SmartSignalResult).pricePosition}%
+                  </span>
+                </div>
+                <div className="relative w-full h-2 rounded-full overflow-hidden bg-gradient-to-r from-emerald-400 via-amber-400 to-red-400 opacity-60">
+                  <motion.div
+                    initial={{ left: 0 }}
+                    animate={{ left: `${(smartSignal as SmartSignalResult).pricePosition}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="absolute top-0 w-1 h-full bg-white rounded-full shadow-sm"
+                    style={{ transform: "translateX(-50%)" }}
+                  />
+                </div>
+                <div className="flex justify-between mt-0.5">
+                  <span className="text-[8px] text-emerald-600 font-bold">شراء</span>
+                  <span className="text-[8px] text-amber-600 font-bold">مراقبة</span>
+                  <span className="text-[8px] text-red-600 font-bold">بيع</span>
+                </div>
+              </div>
+
+              {/* Trend + USD Trend */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-muted/30 p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-0.5">
+                    {(smartSignal as SmartSignalResult).trend === "up" ? (
+                      <TrendingUp className="w-3 h-3 text-emerald-500" />
+                    ) : (smartSignal as SmartSignalResult).trend === "down" ? (
+                      <TrendingDown className="w-3 h-3 text-red-500" />
+                    ) : (
+                      <Minus className="w-3 h-3 text-amber-500" />
+                    )}
+                    <span className="text-[10px] font-bold">اتجاه الذهب</span>
+                  </div>
+                  <span className={`text-xs font-black ${
+                    (smartSignal as SmartSignalResult).trend === "up" ? "text-emerald-600" :
+                    (smartSignal as SmartSignalResult).trend === "down" ? "text-red-600" :
+                    "text-amber-600"
+                  }`}>
+                    {(smartSignal as SmartSignalResult).trend === "up" ? "صاعد" :
+                     (smartSignal as SmartSignalResult).trend === "down" ? "هابط" : "مستقر"}
+                  </span>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-2 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-0.5">
+                    {(smartSignal as SmartSignalResult).usdEgpTrend === "up" ? (
+                      <DollarSign className="w-3 h-3 text-emerald-500" />
+                    ) : (smartSignal as SmartSignalResult).usdEgpTrend === "down" ? (
+                      <DollarSign className="w-3 h-3 text-red-500" />
+                    ) : (
+                      <DollarSign className="w-3 h-3 text-amber-500" />
+                    )}
+                    <span className="text-[10px] font-bold">اتجاه الدولار</span>
+                  </div>
+                  <span className={`text-xs font-black ${
+                    (smartSignal as SmartSignalResult).usdEgpTrend === "up" ? "text-emerald-600" :
+                    (smartSignal as SmartSignalResult).usdEgpTrend === "down" ? "text-red-600" :
+                    "text-amber-600"
+                  }`}>
+                    {(smartSignal as SmartSignalResult).usdEgpTrend === "up" ? "مرتفع" :
+                     (smartSignal as SmartSignalResult).usdEgpTrend === "down" ? "منخفض" : "مستقر"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Price Range */}
+              <div className="rounded-lg bg-muted/20 p-2">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-muted-foreground font-bold">أقل سعر</span>
+                  <span className="font-mono font-black tabular-nums text-red-600">{(smartSignal as SmartSignalResult).recentLow.toLocaleString()} ج.م</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] mt-1">
+                  <span className="text-muted-foreground font-bold">المتوسط</span>
+                  <span className="font-mono font-black tabular-nums text-foreground">{(smartSignal as SmartSignalResult).averagePrice.toLocaleString()} ج.م</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] mt-1">
+                  <span className="text-muted-foreground font-bold">أعلى سعر</span>
+                  <span className="font-mono font-black tabular-nums text-emerald-600">{(smartSignal as SmartSignalResult).recentHigh.toLocaleString()} ج.م</span>
+                </div>
+              </div>
+
+              {/* Budget Allocation */}
+              <div className="flex items-center justify-between rounded-lg bg-muted/20 p-2">
+                <span className="text-[10px] font-bold text-muted-foreground">نسبة الميزانية المقترحة</span>
+                <span className={`text-xs font-black tabular-nums ${
+                  expectedReturn > 0 ? "text-emerald-600" : expectedReturn < 0 ? "text-red-600" : "text-muted-foreground"
+                }`}>
+                  {(smartSignal as SmartSignalResult).budgetAllocation}% — {expectedReturn > 0 ? "+" : ""}{expectedReturn}%
+                </span>
+              </div>
+
+              {/* Reason */}
+              {(smartSignal as SmartSignalResult).reason && (
+                <div className="rounded-lg bg-muted/10 p-2 ring-1 ring-border/10">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Info className="w-2.5 h-2.5 text-muted-foreground" />
+                    <span className="text-[9px] font-bold text-muted-foreground">تحليل الإشارة</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    {(smartSignal as SmartSignalResult).reason}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fallback for non-smart signal */}
+          {!isSmart && signal && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground font-bold">نسبة الميزانية</span>
+                <span className={`text-sm font-black tabular-nums ${
+                  expectedReturn > 0 ? "text-emerald-600" : expectedReturn < 0 ? "text-red-600" : "text-muted-foreground"
+                }`}>
+                  {expectedReturn > 0 ? "+" : ""}{expectedReturn}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                {signal.label}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>

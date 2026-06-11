@@ -27,6 +27,7 @@ export default function Home() {
     config,
     priceHistory,
     signal,
+    smartSignal,
     calculatorData,
     telegramUsers,
     loading,
@@ -162,6 +163,7 @@ export default function Home() {
               <div>
                 <CurrentSignalCard
                   signal={signal}
+                  smartSignal={smartSignal}
                   currentPrice={prices.gold?.price ?? null}
                 />
               </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
-import { detectSignal, detectUsdDrop } from "@/lib/signal-detector";
+import { detectSignal, detectUsdDrop, generateSmartSignal } from "@/lib/signal-detector";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { getConfig } from "@/lib/config-seeder";
 
@@ -197,13 +197,52 @@ export async function POST() {
       );
     }
 
-    // Step 2: Check investment plan signals (now based on gold price)
+    // Step 2: Check investment plan signals — use SMART signal if price history available
     const plans = await db.investmentPlan.findMany({
       where: { active: true },
       orderBy: { order: "asc" },
     });
 
-    const signal = detectSignal(goldRecord.price, plans);
+    // Try smart signal first (analyzes price history + trends)
+    let signal = detectSignal(goldRecord.price, plans);
+    let smartSignalInfo: { action: string; confidence: number; reason: string; trend: string; usdEgpTrend: string; budgetAllocation: number } | null = null;
+
+    try {
+      const goldHistory = await db.priceRecord.findMany({
+        where: { symbol: "GOLD_EGP" },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      const usdHistory = await db.priceRecord.findMany({
+        where: { symbol: "USD_EGP" },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+
+      if (goldHistory.length >= 2) {
+        const smartAnalysis = generateSmartSignal({
+          currentGoldPrice: goldRecord.price,
+          goldPriceHistory: goldHistory.reverse().map((r) => ({ price: r.sellPrice ?? r.price, timestamp: r.createdAt })),
+          currentUsdEgp: usdEgpRecord.price,
+          usdEgpHistory: usdHistory.reverse().map((r) => ({ price: r.price, timestamp: r.createdAt })),
+          investmentPlans: plans,
+        });
+
+        smartSignalInfo = {
+          action: smartAnalysis.action,
+          confidence: smartAnalysis.confidence,
+          reason: smartAnalysis.reason,
+          trend: smartAnalysis.trend,
+          usdEgpTrend: smartAnalysis.usdEgpTrend,
+          budgetAllocation: smartAnalysis.budgetAllocation,
+        };
+
+        // Override signal with smart analysis
+        signal = { action: smartAnalysis.action, plan: signal?.plan ?? { label: smartAnalysis.label, expectedReturn: smartAnalysis.expectedReturn } as any };
+      }
+    } catch (smartErr) {
+      console.error("[automation] Smart signal generation failed, using plan-based signal:", smartErr);
+    }
     results.signals = signal ? { action: signal.action, label: signal.plan.label } : null;
 
     // Step 3: Check USD/EGP drop
@@ -254,11 +293,22 @@ export async function POST() {
       if (signal && (signal.action.includes("شراء") || signal.action.includes("بيع"))) {
         const isBuy = signal.action.includes("شراء");
         const emoji = isBuy ? "🟢" : "🔴";
-        const signalMessage = `${emoji} <b>${signal.action}</b>\n\n` +
-          `🥇 ذهب عيار 21: ${goldRecord.price.toLocaleString()} ج.م/جرام\n` +
-          `📋 الخطة: ${signal.plan.label}\n` +
-          `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n` +
-          `📈 التغيير: ${goldRecord.change > 0 ? "+" : ""}${goldRecord.change?.toFixed(2)}%`;
+        let signalMessage = `${emoji} <b>${signal.action}</b>\n\n` +
+          `🥇 ذهب عيار 21: ${goldRecord.price.toLocaleString()} ج.م/جرام\n`;
+
+        if (smartSignalInfo) {
+          const trendEmoji = smartSignalInfo.trend === "up" ? "📈" : smartSignalInfo.trend === "down" ? "📉" : "➡️";
+          const usdEmoji = smartSignalInfo.usdEgpTrend === "up" ? "💹" : smartSignalInfo.usdEgpTrend === "down" ? "🔻" : "💲";
+          signalMessage += `${trendEmoji} اتجاه الذهب: ${smartSignalInfo.trend === "up" ? "صاعد" : smartSignalInfo.trend === "down" ? "هابط" : "مستقر"}\n`;
+          signalMessage += `${usdEmoji} اتجاه الدولار: ${smartSignalInfo.usdEgpTrend === "up" ? "مرتفع" : smartSignalInfo.usdEgpTrend === "down" ? "منخفض" : "مستقر"}\n`;
+          signalMessage += `🎯 نسبة الميزانية: ${smartSignalInfo.budgetAllocation}%\n`;
+          signalMessage += `🔐 الثقة: ${smartSignalInfo.confidence}%\n`;
+        } else {
+          signalMessage += `📋 الخطة: ${signal.plan.label}\n`;
+          signalMessage += `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n`;
+        }
+
+        signalMessage += `📈 التغيير: ${goldRecord.change > 0 ? "+" : ""}${goldRecord.change?.toFixed(2)}%`;
 
         const signalResult = await notifyAllUsers(signalMessage, isBuy ? "buy_signal" : "sell_signal", `${signal.action} Signal`);
         results.notifications?.push({
@@ -326,11 +376,22 @@ export async function POST() {
         if (signal && (signal.action.includes("شراء") || signal.action.includes("بيع"))) {
           const isBuy = signal.action.includes("شراء");
           const emoji = isBuy ? "🟢" : "🔴";
-          const signalMessage = `${emoji} <b>${signal.action}</b>\n\n` +
-            `🥇 ذهب عيار 21: ${goldRecord.price.toLocaleString()} ج.م/جرام\n` +
-            `📋 الخطة: ${signal.plan.label}\n` +
-            `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n` +
-            `📈 التغيير: ${goldRecord.change > 0 ? "+" : ""}${goldRecord.change?.toFixed(2)}%`;
+          let signalMessage = `${emoji} <b>${signal.action}</b>\n\n` +
+            `🥇 ذهب عيار 21: ${goldRecord.price.toLocaleString()} ج.م/جرام\n`;
+
+          if (smartSignalInfo) {
+            const trendEmoji = smartSignalInfo.trend === "up" ? "📈" : smartSignalInfo.trend === "down" ? "📉" : "➡️";
+            const usdEmoji = smartSignalInfo.usdEgpTrend === "up" ? "💹" : smartSignalInfo.usdEgpTrend === "down" ? "🔻" : "💲";
+            signalMessage += `${trendEmoji} اتجاه الذهب: ${smartSignalInfo.trend === "up" ? "صاعد" : smartSignalInfo.trend === "down" ? "هابط" : "مستقر"}\n`;
+            signalMessage += `${usdEmoji} اتجاه الدولار: ${smartSignalInfo.usdEgpTrend === "up" ? "مرتفع" : smartSignalInfo.usdEgpTrend === "down" ? "منخفض" : "مستقر"}\n`;
+            signalMessage += `🎯 نسبة الميزانية: ${smartSignalInfo.budgetAllocation}%\n`;
+            signalMessage += `🔐 الثقة: ${smartSignalInfo.confidence}%\n`;
+          } else {
+            signalMessage += `📋 الخطة: ${signal.plan.label}\n`;
+            signalMessage += `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n`;
+          }
+
+          signalMessage += `📈 التغيير: ${goldRecord.change > 0 ? "+" : ""}${goldRecord.change?.toFixed(2)}%`;
 
           const signalSendResult = await sendTelegramMessage(botToken, chatId, signalMessage);
           results.notifications?.push({

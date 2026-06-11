@@ -239,3 +239,47 @@ Stage Summary:
 - المصنعية/صنعة completely removed from website UI (price cards + gold pound)
 - المصنعية/صنعة completely removed from Telegram notification messages
 - Backend data storage unchanged (workmanship still saved to DB for potential future use)
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Make signal smart — read prices, analyze trends, align with investment plan
+
+Work Log:
+- Redesigned signal system from simple price-range matching to intelligent multi-factor analysis
+- Created `signal-detector.ts` with `generateSmartSignal()` function that considers:
+  1. Price position relative to recent range (0-100 scale) — 40% weight
+  2. Trend direction via linear regression (up/down/sideways) — 30% weight
+  3. USD/EGP correlation and trend — 20% weight
+  4. Volatility adjustment — 10% weight
+- Signal categories: شراء قوي (score ≥50), شراء تدريجي (≥20), انتظار ومراقبة (-20 to +20), بيع جزئي (≤-20), بيع نشط (≤-50)
+- Created `/api/signal` endpoint that reads price history from DB and generates smart signal
+- Updated investment plan seed with CONTINUOUS ranges (no gaps):
+  - 0-5500: شراء قوي (50%)
+  - 5500-6000: شراء قوي (40%)
+  - 6000-6400: شراء تدريجي (30%)
+  - 6400-6900: انتظار ومراقبة (0%)
+  - 6900-7300: بيع جزئي (-20%)
+  - 7300+: بيع نشط (-40%)
+- Redesigned `CurrentSignalCard` UI with:
+  - Smart Signal badge ("ذكي")
+  - Confidence meter (0-100%)
+  - Price position gauge (gradient bar with buy/watch/sell zones)
+  - Gold trend indicator (صاعد/هابط/مستقر)
+  - USD/EGP trend indicator (مرتفع/منخفض/مستقر)
+  - Price range (low/average/high)
+  - Budget allocation recommendation
+  - Analysis reason text
+- Updated `use-dashboard.ts` hook to fetch smart signal from `/api/signal`
+- Updated `automation/run/route.ts` to use `generateSmartSignal()` for Telegram notifications
+- Telegram notifications now show: trend direction, USD trend, budget allocation, confidence level
+- Re-seeded investment plans with new continuous ranges (6 plans, no gaps)
+- Browser verification: smart signal card displays correctly with all details
+- Lint passes with no errors
+
+Stage Summary:
+- Signal is now "smart" — reads price history, analyzes trends, considers USD/EGP correlation
+- Smart signal overrides simple plan-based signal when price history is available
+- UI shows comprehensive analysis: confidence, position, trends, allocation, reasoning
+- Telegram notifications include smart analysis data
+- Investment plans now have continuous ranges (no price gap issues)

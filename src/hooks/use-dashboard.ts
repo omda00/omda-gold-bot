@@ -8,6 +8,7 @@ import type {
   AppConfig,
   PriceHistoryResponse,
   SignalResult,
+  SmartSignalResult,
   CalculatorPriceResult,
   TelegramUser,
 } from "@/lib/dashboard-types";
@@ -19,6 +20,7 @@ export function useDashboardData() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryResponse>({ records: [], count: 0 });
   const [signal, setSignal] = useState<SignalResult | null>(null);
+  const [smartSignal, setSmartSignal] = useState<SmartSignalResult | null>(null);
   const [calculatorData, setCalculatorData] = useState<CalculatorPriceResult | null>(null);
   const [telegramUsers, setTelegramUsers] = useState<TelegramUser[]>([]);
 
@@ -302,7 +304,7 @@ export function useDashboardData() {
     }
   }, [fetchPrices, fetchLogs, fetchPlans]);
 
-  // Detect current signal
+  // Detect current signal (simple plan-based)
   const detectCurrentSignal = useCallback(
     (goldPrice: number | null) => {
       if (goldPrice === null || !plans.length) {
@@ -328,6 +330,21 @@ export function useDashboardData() {
     },
     [plans]
   );
+
+  // Fetch smart signal from API (analyzes price history + trends)
+  const fetchSmartSignal = useCallback(async () => {
+    try {
+      const res = await fetch("/api/signal");
+      if (res.ok) {
+        const data = await res.json();
+        setSmartSignal(data);
+        return data;
+      }
+    } catch (err) {
+      console.error("Fetch smart signal error:", err);
+    }
+    return null;
+  }, []);
 
   // ==========================================
   // Telegram Users Management
@@ -443,6 +460,13 @@ export function useDashboardData() {
     detectCurrentSignal(prices.gold?.price ?? null);
   }, [prices.gold?.price, plans, detectCurrentSignal]);
 
+  // Fetch smart signal when gold price changes
+  useEffect(() => {
+    if (prices.gold?.price) {
+      fetchSmartSignal();
+    }
+  }, [prices.gold?.price, fetchSmartSignal]);
+
   // =============================================
   // Polling: Read DB prices every 10 seconds
   // This is lightweight and ensures the UI always
@@ -502,6 +526,7 @@ export function useDashboardData() {
     config,
     priceHistory,
     signal,
+    smartSignal,
     calculatorData,
     telegramUsers,
     loading,
@@ -521,6 +546,7 @@ export function useDashboardData() {
     runAutomation,
     fetchCalculatorData,
     detectCurrentSignal,
+    fetchSmartSignal,
     fetchTelegramUsers,
     addTelegramUser,
     deleteTelegramUser,

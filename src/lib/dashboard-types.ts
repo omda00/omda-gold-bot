@@ -84,6 +84,23 @@ export interface SignalResult {
   expectedReturn: number;
 }
 
+export interface SmartSignalResult {
+  action: string;
+  confidence: number;
+  reason: string;
+  pricePosition: number;
+  trend: "up" | "down" | "sideways";
+  trendStrength: number;
+  usdEgpTrend: "up" | "down" | "stable";
+  currentPrice: number;
+  averagePrice: number;
+  recentHigh: number;
+  recentLow: number;
+  budgetAllocation: number;
+  expectedReturn: number;
+  label: string;
+}
+
 export interface AutomationResult {
   prices?: {
     gold?: { price: number; change: number };
