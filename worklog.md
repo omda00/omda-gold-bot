@@ -134,3 +134,27 @@ Stage Summary:
 - USD/EGP now comes from Google Finance (direct HTTP, no rate limits)
 - Website and Telegram both show Google Finance as USD/EGP source
 - Gold continues to come from iSagha.com as before
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix USD/EGP price mismatch between website and Google Finance
+
+Work Log:
+- Analyzed user's uploaded screenshots showing website at 51.88 vs Google Finance at 51.95
+- Discovered Google Finance blocks direct HTTP with wrong headers (Accept-Encoding: identity → timeout)
+- Found that Google Finance requires: 1) Follow redirects (302→beta), 2) Accept-Encoding: gzip/deflate, 3) Correct extraction patterns
+- Fixed fetchUsdEgpFromGoogleFinanceDirect() with correct headers and extraction patterns
+- Key patterns: Pdsbrc span (primary), AF_initDataCallback JS data (secondary), data-last-price (tertiary)
+- Removed unreliable text-content extraction that was picking up previous close price instead of current price
+- Fixed regex from [^0-9]*? to .{0,200}? because there are digits between "USD / EGP" and the price
+- Updated Z-AI SDK Google Finance fallback with same improved patterns
+- Source labels now correctly distinguish "Google Finance" vs "Exchange Rate API"
+- Text "تحديث ساعة" already correct in the codebase (was changed in previous session)
+- Verified: website shows 51.88, Google Finance shows 51.8779 — matches perfectly
+
+Stage Summary:
+- Google Finance Direct HTTP fetch now works reliably (~5s download time with gzip)
+- USD/EGP rates now come from Google Finance as the user requested
+- Both website and Telegram use the same Google Finance rate
+- Source attribution is correct (won't falsely label free API data as "Google Finance")
