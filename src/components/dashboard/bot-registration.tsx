@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Bell,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Zap,
   Heart,
+  Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,26 @@ import { Button } from "@/components/ui/button";
 const BOT_LINK = "https://t.me/gold_investmentbot";
 
 export function BotRegistration() {
+  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchCount() {
+      try {
+        const res = await fetch("/api/telegram-users/count");
+        if (res.ok) {
+          const data = await res.json();
+          setSubscriberCount(data.active ?? 0);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Hero Card - Telegram Bot Join */}
@@ -55,6 +77,17 @@ export function BotRegistration() {
             <p className="text-xs text-muted-foreground/70 mb-5">
               احصل على أسعار الذهب والدولار فوراً على تيليجرام
             </p>
+
+            {/* Subscriber Count */}
+            {subscriberCount !== null && (
+              <div className="flex items-center justify-center gap-1.5 mb-4">
+                <Users className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  {subscriberCount.toLocaleString("ar-EG")} مشترك
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+            )}
 
             {/* Join Button */}
             <a href={BOT_LINK} target="_blank" rel="noopener noreferrer">
