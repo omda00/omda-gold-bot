@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Activity } from "lucide-react";
+import Image from "next/image";
+import { Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface DashboardHeaderProps {
@@ -43,8 +44,14 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
             <div className="relative">
-              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-md shadow-amber-400/25">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-900/90 to-yellow-900/90 shadow-md shadow-amber-400/25 overflow-hidden">
+                <Image
+                  src="/images/omda-logo.png"
+                  alt="Gold Investment Logo"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
             </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Bell,
   TrendingDown,
@@ -8,7 +9,7 @@ import {
   ExternalLink,
   Sparkles,
   Zap,
-  ArrowLeft,
+  Heart,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,37 +29,24 @@ export function BotRegistration() {
             <div className="absolute top-4 left-4 w-20 h-20 rounded-full bg-[#229ED9]/5 blur-xl" />
             <div className="absolute bottom-2 right-6 w-24 h-24 rounded-full bg-amber-400/5 blur-xl" />
 
-            {/* Telegram Logo */}
+            {/* Omda Logo */}
             <div className="relative mx-auto mb-5">
-              <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-[#229ED9] to-[#1a8bc4] flex items-center justify-center shadow-lg shadow-[#229ED9]/30 ring-4 ring-white/20 dark:ring-white/5">
-                <svg
-                  viewBox="0 0 240 240"
-                  className="w-14 h-14"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <defs>
-                    <linearGradient id="tgGrad" x1="0.5" y1="0" x2="0.5" y2="1">
-                      <stop offset="0%" stopColor="#fff" stopOpacity="1" />
-                      <stop offset="100%" stopColor="#e8f4fd" stopOpacity="1" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d="M98.175 180.345C94.305 180.345 94.95 188.88 91.695 188.88C88.44 188.88 82.74 181.5 79.86 178.62L56.22 152.94C54.09 150.6 54.39 146.94 57.015 145.11L161.52 71.46C164.55 69.36 167.82 73.38 165.57 76.26L105.375 157.23C103.8 159.27 104.25 162.15 106.35 163.65L120.45 174.45C123.45 176.7 121.8 181.38 118.05 181.38H100.5C99.225 181.38 98.55 180.87 98.175 180.345Z"
-                    fill="url(#tgGrad)"
-                  />
-                  <path
-                    d="M57.0 144.0C54.6 145.8 54.3 149.4 56.4 151.65L80.1 177.3C81.0 178.2 82.2 178.8 83.4 178.8C84.6 178.8 85.8 178.2 86.7 177.3C87.6 176.4 88.05 175.2 88.05 173.85C88.05 172.5 87.6 171.3 86.7 170.4L63.0 144.75C62.1 143.85 60.9 143.25 59.7 143.25C58.5 143.25 57.6 143.55 57.0 144.0Z"
-                    fill="white"
-                    opacity="0.3"
-                  />
-                </svg>
+              <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 ring-4 ring-amber-400/20 dark:ring-amber-400/10 overflow-hidden bg-gradient-to-br from-amber-900/90 to-yellow-900/90">
+                <Image
+                  src="/images/omda-logo.png"
+                  alt="Gold Investment Bot Logo"
+                  width={96}
+                  height={96}
+                  className="w-full h-full object-contain"
+                  priority
+                />
               </div>
               {/* Glow ring */}
-              <div className="absolute inset-0 w-24 h-24 mx-auto rounded-3xl bg-[#229ED9]/20 animate-pulse" style={{ animationDuration: '3s' }} />
+              <div className="absolute inset-0 w-24 h-24 mx-auto rounded-full bg-amber-400/15 animate-pulse" style={{ animationDuration: '3s' }} />
             </div>
 
             {/* Title */}
-            <h2 className="text-xl font-black mb-1.5 bg-gradient-to-r from-[#229ED9] to-[#1a8bc4] bg-clip-text text-transparent">
+            <h2 className="text-xl font-black mb-1.5 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">
               بوت الذهب والعملات
             </h2>
             <p className="text-sm text-muted-foreground font-medium mb-1">
@@ -194,6 +182,20 @@ export function BotRegistration() {
                 انضم الآن — مجاناً
               </Button>
             </a>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Made With ❤️ By Omda */}
+      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+        <CardContent className="p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="text-xs text-muted-foreground/60 font-medium">Made With</span>
+            <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+            <span className="text-xs text-muted-foreground/60 font-medium">By</span>
+            <span className="text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">
+              Omda
+            </span>
           </div>
         </CardContent>
       </Card>
