@@ -83,11 +83,10 @@ function setupDailyCron() {
   }
 
   // Default: 9:00 AM Cairo time (UTC+2) = 7:00 AM UTC
-  // We'll also check config every hour to see if the time changed
   dailyJob = cron.schedule("0 7 * * *", async () => {
     console.log("⏰ Daily automation triggered at", new Date().toISOString());
     const config = await getConfig();
-    
+
     if (config.AUTOMATION_ENABLED === "true") {
       await runAutomation();
     } else {
@@ -100,29 +99,36 @@ function setupDailyCron() {
   console.log("✅ Daily cron job scheduled at 9:00 AM Cairo time");
 }
 
-// Also run a check every 4 hours for signal detection
-let periodicJob: cron.ScheduledTask | null = null;
+// =============================================
+// HOURLY automation: Every hour on the hour
+// Cairo time. This sends updates to ALL
+// registered Telegram users with:
+// - Gold buy/sell prices
+// - USD/EGP exchange rate
+// - Investment signals (if any)
+// =============================================
+let hourlyJob: cron.ScheduledTask | null = null;
 
-function setupPeriodicCron() {
-  if (periodicJob) {
-    periodicJob.stop();
+function setupHourlyCron() {
+  if (hourlyJob) {
+    hourlyJob.stop();
   }
 
-  // Every 4 hours: 1:00, 5:00, 9:00, 13:00, 17:00, 21:00 Cairo time
-  periodicJob = cron.schedule("0 1,5,9,13,17,21 * * *", async () => {
-    console.log("🔄 Periodic check triggered at", new Date().toISOString());
+  // Every hour at minute 0: 00:00, 01:00, 02:00, ..., 23:00 Cairo time
+  hourlyJob = cron.schedule("0 * * * *", async () => {
+    console.log("🔄 Hourly update triggered at", new Date().toISOString());
     const config = await getConfig();
-    
+
     if (config.AUTOMATION_ENABLED === "true") {
       await runAutomation();
     } else {
-      console.log("Automation is disabled. Skipping periodic check.");
+      console.log("Automation is disabled. Skipping hourly update.");
     }
   }, {
     timezone: "Africa/Cairo",
   });
 
-  console.log("✅ Periodic cron job scheduled (every 4 hours Cairo time)");
+  console.log("✅ Hourly cron job scheduled (every hour Cairo time - Africa/Cairo)");
 }
 
 // HTTP server for health check and manual triggers
@@ -149,7 +155,11 @@ const server = http.createServer(async (req, res) => {
       uptime: process.uptime(),
       cronJobs: {
         daily: dailyJob ? "active" : "inactive",
-        periodic: periodicJob ? "active" : "inactive",
+        hourly: hourlyJob ? "active" : "inactive",
+      },
+      schedule: {
+        daily: "9:00 AM Cairo time",
+        hourly: "Every hour on the hour (Cairo time)",
       },
     }));
     return;
@@ -181,18 +191,21 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`🚀 Cron Service running on port ${PORT}`);
   setupDailyCron();
-  setupPeriodicCron();
+  setupHourlyCron();
   console.log(`📋 Endpoints:`);
   console.log(`   GET  /health  - Service health check`);
   console.log(`   POST /trigger - Manually trigger automation`);
   console.log(`   GET  /config  - Get current config`);
+  console.log(`⏰ Schedules:`);
+  console.log(`   Daily:  9:00 AM Cairo time`);
+  console.log(`   Hourly: Every hour on the hour (Cairo time)`);
 });
 
 // Graceful shutdown
 process.on("SIGINT", () => {
   console.log("\n🛑 Shutting down cron service...");
   if (dailyJob) dailyJob.stop();
-  if (periodicJob) periodicJob.stop();
+  if (hourlyJob) hourlyJob.stop();
   server.close();
   process.exit(0);
 });
@@ -200,7 +213,7 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   console.log("\n🛑 Shutting down cron service...");
   if (dailyJob) dailyJob.stop();
-  if (periodicJob) periodicJob.stop();
+  if (hourlyJob) hourlyJob.stop();
   server.close();
   process.exit(0);
 });

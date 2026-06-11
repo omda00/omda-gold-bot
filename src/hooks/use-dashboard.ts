@@ -9,6 +9,7 @@ import type {
   PriceHistoryResponse,
   SignalResult,
   CalculatorPriceResult,
+  TelegramUser,
 } from "@/lib/dashboard-types";
 
 export function useDashboardData() {
@@ -19,6 +20,7 @@ export function useDashboardData() {
   const [priceHistory, setPriceHistory] = useState<PriceHistoryResponse>({ records: [], count: 0 });
   const [signal, setSignal] = useState<SignalResult | null>(null);
   const [calculatorData, setCalculatorData] = useState<CalculatorPriceResult | null>(null);
+  const [telegramUsers, setTelegramUsers] = useState<TelegramUser[]>([]);
 
   const [loading, setLoading] = useState({
     prices: true,
@@ -327,6 +329,91 @@ export function useDashboardData() {
     [plans]
   );
 
+  // ==========================================
+  // Telegram Users Management
+  // ==========================================
+
+  // Fetch telegram users
+  const fetchTelegramUsers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/telegram-users");
+      if (res.ok) {
+        const data = await res.json();
+        setTelegramUsers(Array.isArray(data) ? data : []);
+        return data;
+      }
+    } catch (err) {
+      console.error("Fetch telegram users error:", err);
+    }
+    return [];
+  }, []);
+
+  // Add telegram user
+  const addTelegramUser = useCallback(async (name: string, botToken: string, chatId: string) => {
+    try {
+      const res = await fetch("/api/telegram-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, botToken, chatId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchTelegramUsers();
+        return { ok: true, data };
+      }
+      return { ok: false, error: data.error || "فشل في إضافة المستخدم" };
+    } catch (err) {
+      console.error("Add telegram user error:", err);
+      return { ok: false, error: "خطأ في الاتصال" };
+    }
+  }, [fetchTelegramUsers]);
+
+  // Delete telegram user
+  const deleteTelegramUser = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/telegram-users/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchTelegramUsers();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Delete telegram user error:", err);
+      return false;
+    }
+  }, [fetchTelegramUsers]);
+
+  // Toggle telegram user active status
+  const toggleTelegramUser = useCallback(async (id: string, active: boolean) => {
+    try {
+      const res = await fetch(`/api/telegram-users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      });
+      if (res.ok) {
+        await fetchTelegramUsers();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Toggle telegram user error:", err);
+      return false;
+    }
+  }, [fetchTelegramUsers]);
+
+  // Test telegram user connection
+  const testTelegramUser = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/telegram-users/${id}/test`, { method: "POST" });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error("Test telegram user error:", err);
+      return { ok: false, error: "خطأ في الاتصال" };
+    }
+  }, []);
+
   // Initial data load
   useEffect(() => {
     const init = async () => {
@@ -337,6 +424,7 @@ export function useDashboardData() {
         fetchConfig(),
         fetchLogs(),
         fetchCalculatorData(),
+        fetchTelegramUsers(),
       ]);
       setLoading((prev) => ({
         ...prev,
@@ -415,6 +503,7 @@ export function useDashboardData() {
     priceHistory,
     signal,
     calculatorData,
+    telegramUsers,
     loading,
     lastAutomationRun,
     lastWebFetch,
@@ -432,5 +521,10 @@ export function useDashboardData() {
     runAutomation,
     fetchCalculatorData,
     detectCurrentSignal,
+    fetchTelegramUsers,
+    addTelegramUser,
+    deleteTelegramUser,
+    toggleTelegramUser,
+    testTelegramUser,
   };
 }

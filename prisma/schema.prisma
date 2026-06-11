@@ -48,3 +48,13 @@ model NotificationLog {
   success   Boolean
   error     String?
 }
+
+model TelegramUser {
+  id          String   @id @default(cuid())
+  name        String   // Display name for the user
+  botToken    String   // Unique Telegram Bot Token for this user
+  chatId      String   // Unique Chat ID for this user
+  active      Boolean  @default(true) // Whether to send notifications to this user
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

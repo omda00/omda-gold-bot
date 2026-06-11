@@ -96,3 +96,14 @@ export interface CalculatorPriceResult {
   source: string;
   fetchedAt: string;
 }
+
+// Telegram User types
+export interface TelegramUser {
+  id: string;
+  name: string;
+  botToken: string; // Masked in API responses
+  chatId: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

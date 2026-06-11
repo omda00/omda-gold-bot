@@ -28,6 +28,7 @@ export default function Home() {
     priceHistory,
     signal,
     calculatorData,
+    telegramUsers,
     loading,
     lastAutomationRun,
     fetchLogs,
@@ -39,6 +40,10 @@ export default function Home() {
     savePlans,
     runAutomation,
     fetchCalculatorData,
+    addTelegramUser,
+    deleteTelegramUser,
+    toggleTelegramUser,
+    testTelegramUser,
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -190,6 +195,11 @@ export default function Home() {
               onTestTelegram={testTelegram}
               onSeedPlan={seedPlan}
               onSavePlans={savePlans}
+              telegramUsers={telegramUsers}
+              onAddTelegramUser={addTelegramUser}
+              onDeleteTelegramUser={deleteTelegramUser}
+              onToggleTelegramUser={toggleTelegramUser}
+              onTestTelegramUser={testTelegramUser}
             />
           </TabsContent>
 
