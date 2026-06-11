@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
+import { fetchAllPrices, savePriceRecord, isRateLimited } from "@/lib/price-fetcher";
 
 /**
  * GET /api/prices - Return the latest Gold and USD/EGP prices
@@ -84,9 +84,12 @@ export async function POST() {
         gold: allPrices.gold !== null,
         usdEgp: allPrices.usdEgp !== null,
       },
+      rateLimited: isRateLimited(),
       message: allPrices.gold || allPrices.usdEgp
         ? "Prices fetched successfully"
-        : "Could not fetch new prices from web — showing latest cached prices",
+        : isRateLimited()
+          ? "Rate limited — retrying later. Showing cached prices."
+          : "Could not fetch new prices from web — showing latest cached prices",
     });
   } catch (error) {
     console.error("Error fetching prices:", error);

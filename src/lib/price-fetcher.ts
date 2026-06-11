@@ -1,6 +1,35 @@
 import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
 
+// ==========================================
+// Rate limit protection: If we get a 429,
+// stop trying for 5 minutes to avoid hammering
+// the API and getting more 429s
+// ==========================================
+let last429Time = 0;
+const COOLDOWN_AFTER_429 = 5 * 60 * 1000; // 5 minutes
+
+function isInCooldown(): boolean {
+  return Date.now() - last429Time < COOLDOWN_AFTER_429;
+}
+
+function mark429(): void {
+  last429Time = Date.now();
+  console.log(`[price-fetcher] ⚠️ Rate limit hit (429). Cooling down for 5 minutes until ${new Date(last429Time + COOLDOWN_AFTER_429).toLocaleTimeString()}`);
+}
+
+/** Check if an error is a 429 rate limit error and mark cooldown if so */
+function checkAndMark429(error: unknown): void {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes("429") || msg.includes("Too many requests")) {
+    mark429();
+  }
+}
+
+export function isRateLimited(): boolean {
+  return isInCooldown();
+}
+
 export interface PriceFetchResult {
   price: number;
   source: string;
@@ -281,6 +310,7 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       console.log("[price-fetcher] Google Finance beta page loaded but couldn't extract rate from HTML");
     } catch (pageErr) {
       console.error("[price-fetcher] Google Finance beta page_reader failed:", pageErr);
+      checkAndMark429(pageErr);
     }
 
     // ==========================================
@@ -302,6 +332,7 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       }
     } catch (pageErr) {
       console.error("[price-fetcher] Google Finance non-beta page_reader failed:", pageErr);
+      checkAndMark429(pageErr);
     }
 
     // ==========================================
@@ -328,6 +359,7 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       }
     } catch (searchErr) {
       console.error("[price-fetcher] Google Finance web_search failed:", searchErr);
+      checkAndMark429(searchErr);
     }
 
   } catch (error) {
@@ -344,6 +376,12 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
  * USD/EGP source: Google Finance — PRIMARY (user requested)
  */
 export async function fetchAllPrices(): Promise<CombinedPriceResult> {
+  // If we're in rate-limit cooldown, skip fetching entirely
+  if (isInCooldown()) {
+    console.log("[price-fetcher] ⏸️ Skipping fetch — in rate-limit cooldown");
+    return { gold: null, usdEgp: null };
+  }
+
   const zai = await ZAI.create();
   const combinedResult: CombinedPriceResult = {
     gold: null,
@@ -384,6 +422,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
     }
   } catch (pageError) {
     console.error("[price-fetcher] ❌ iSagha page_reader failed:", pageError);
+    checkAndMark429(pageError);
   }
 
   // ==========================================
@@ -399,6 +438,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
     }
   } catch (error) {
     console.error("[price-fetcher] Google Finance fetch failed:", error);
+    checkAndMark429(error);
   }
 
   // If we have both from primary sources, return immediately
@@ -436,6 +476,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
       }
     } catch (searchError) {
       console.error("[price-fetcher] iSagha web_search failed:", searchError);
+      checkAndMark429(searchError);
     }
   }
 
@@ -476,6 +517,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
       }
     } catch (pageError) {
       console.error("[price-fetcher] banklive.net failed:", pageError);
+      checkAndMark429(pageError);
     }
   }
 
@@ -547,6 +589,7 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
       }
     } catch (llmError) {
       console.error("[price-fetcher] LLM extraction failed:", llmError);
+      checkAndMark429(llmError);
     }
   }
 
@@ -558,6 +601,22 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
  * Uses BOTH the prices page and the calculator page for complete data.
  */
 export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
+  // Respect rate limit cooldown
+  if (isInCooldown()) {
+    console.log("[calculator] ⏸️ Skipping fetch — in rate-limit cooldown");
+    return {
+      karats: [
+        { karat: 24, sellPrice: null, buyPrice: null },
+        { karat: 22, sellPrice: null, buyPrice: null },
+        { karat: 21, sellPrice: null, buyPrice: null },
+        { karat: 18, sellPrice: null, buyPrice: null },
+      ],
+      goldPound: { sellPrice: null, buyPrice: null },
+      source: "",
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
   const zai = await ZAI.create();
 
   const emptyResult: CalculatorPriceResult = {
@@ -585,6 +644,7 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
     }
   } catch (err) {
     console.error("[calculator] iSagha prices page failed:", err);
+    checkAndMark429(err);
   }
 
   // Fetch from iSagha calculator page for additional data
@@ -599,6 +659,7 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
     }
   } catch (err) {
     console.error("[calculator] iSagha calculator page failed:", err);
+    checkAndMark429(err);
   }
 
   if (!isaghaPrices) {
