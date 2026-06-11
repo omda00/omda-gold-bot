@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { LayoutDashboard, BarChart3, Settings, Bell, Play, Calculator } from "lucide-react";
+import { LayoutDashboard, BarChart3, Settings, Bell, Play, Calculator, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { PriceHistoryTab } from "@/components/dashboard/price-history";
 import { SettingsTab } from "@/components/dashboard/settings";
 import { LogsTab } from "@/components/dashboard/logs";
 import { GoldCalculator } from "@/components/dashboard/gold-calculator";
+import { BotRegistration } from "@/components/dashboard/bot-registration";
 import { DashboardFooter } from "@/components/dashboard/footer";
 
 export default function Home() {
@@ -38,6 +39,7 @@ export default function Home() {
     deleteTelegramUser,
     toggleTelegramUser,
     testTelegramUser,
+    registerTelegramBot,
     adminLogin,
     adminLogout,
   } = useDashboardData();
@@ -106,6 +108,13 @@ export default function Home() {
                 <span>الأسعار</span>
               </TabsTrigger>
               <TabsTrigger
+                value="register-bot"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-400 data-[state=active]:to-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-teal-400/20 px-3 py-1.5 text-xs font-bold transition-all"
+              >
+                <Bot className="w-3.5 h-3.5" />
+                <span>تسجيل بوت</span>
+              </TabsTrigger>
+              <TabsTrigger
                 value="settings"
                 className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-400 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-sky-400/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
@@ -169,7 +178,12 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* TAB 4: Settings */}
+          {/* TAB 4: Register Bot (Public) */}
+          <TabsContent value="register-bot">
+            <BotRegistration onRegister={registerTelegramBot} />
+          </TabsContent>
+
+          {/* TAB 5: Settings (Admin) */}
           <TabsContent value="settings">
             <SettingsTab
               config={config}
@@ -187,7 +201,7 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* TAB 5: Logs (Admin Only) */}
+          {/* TAB 6: Logs (Admin Only) */}
           {isAdmin && (
             <TabsContent value="logs">
               <LogsTab logs={logs} onFetchLogs={fetchLogs} />

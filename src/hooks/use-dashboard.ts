@@ -362,6 +362,28 @@ export function useDashboardData() {
     }
   }, []);
 
+  // ==========================================
+  // Public Bot Registration (No Admin Required)
+  // ==========================================
+
+  const registerTelegramBot = useCallback(async (name: string, botToken: string, chatId: string) => {
+    try {
+      const res = await fetch("/api/telegram-users/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, botToken, chatId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { ok: true, message: data.message };
+      }
+      return { ok: false, error: data.error || "فشل في تسجيل البوت" };
+    } catch (err) {
+      console.error("Register bot error:", err);
+      return { ok: false, error: "خطأ في الاتصال" };
+    }
+  }, []);
+
   // Initial data load
   useEffect(() => {
     const init = async () => {
@@ -465,6 +487,7 @@ export function useDashboardData() {
     deleteTelegramUser,
     toggleTelegramUser,
     testTelegramUser,
+    registerTelegramBot,
     adminLogin,
     adminLogout,
   };
