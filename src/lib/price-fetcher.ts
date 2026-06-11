@@ -223,48 +223,113 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
   try {
     console.log("[price-fetcher] Fetching USD/EGP from Google Finance...");
 
-    const searchResults = await zai.functions.invoke("web_search", {
-      query: "site:google.com finance USD EGP exchange rate",
-      num: 3,
-    });
+    // ==========================================
+    // Strategy 1: Direct page_reader from Google Finance beta quote URL
+    // This is the PRIMARY method — user specifically requested this URL
+    // ==========================================
+    try {
+      const gfResult = await zai.functions.invoke("page_reader", {
+        url: "https://www.google.com/finance/beta/quote/USD-EGP",
+      });
 
-    const searchText =
-      typeof searchResults === "string" ? searchResults : JSON.stringify(searchResults);
+      const gfHtml = gfResult?.data?.html || "";
 
-    const rateMatch = searchText.match(
-      /United States Dollar\s*\/\s*Egyptian Pound[^0-9]*?([0-9]+\.[0-9]+)/
-    );
-
-    if (rateMatch) {
-      const rate = parseFloat(rateMatch[1]);
-      if (rate > 40 && rate < 80) {
-        console.log(`[price-fetcher] Got USD/EGP from Google Finance: ${rate}`);
-        return { price: rate, source: "Google Finance" };
+      // Try multiple patterns to extract the rate from the HTML
+      // Pattern 1: data-last-price attribute
+      const dataLastPriceMatch = gfHtml.match(/data-last-price="([0-9.]+)"/);
+      if (dataLastPriceMatch) {
+        const rate = parseFloat(dataLastPriceMatch[1]);
+        if (rate > 40 && rate < 80) {
+          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (data-last-price): ${rate}`);
+          return { price: rate, source: "Google Finance" };
+        }
       }
+
+      // Pattern 2: Extract from text content — look for "United States Dollar / Egyptian Pound" followed by a number
+      const textContent = gfHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+      const usdEgpTextMatch = textContent.match(
+        /United States Dollar\s*\/\s*Egyptian Pound[^0-9]*?([0-9]+\.[0-9]+)/
+      );
+      if (usdEgpTextMatch) {
+        const rate = parseFloat(usdEgpTextMatch[1]);
+        if (rate > 40 && rate < 80) {
+          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (text): ${rate}`);
+          return { price: rate, source: "Google Finance" };
+        }
+      }
+
+      // Pattern 3: Look for USD/Egyptian Pound patterns with price
+      const poundMatch = textContent.match(/USD\s*\/\s*EGP[^0-9]*?([4-7][0-9]\.[0-9]+)/);
+      if (poundMatch) {
+        const rate = parseFloat(poundMatch[1]);
+        if (rate > 40 && rate < 80) {
+          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (USD/EGP): ${rate}`);
+          return { price: rate, source: "Google Finance" };
+        }
+      }
+
+      // Pattern 4: Any number in the 40-80 range that looks like an exchange rate
+      const priceNumbers = textContent.match(/[0-9]+\.[0-9]{2,4}/g) || [];
+      for (const numStr of priceNumbers) {
+        const val = parseFloat(numStr);
+        if (val > 40 && val < 80) {
+          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (fallback number): ${val}`);
+          return { price: val, source: "Google Finance" };
+        }
+      }
+
+      console.log("[price-fetcher] Google Finance beta page loaded but couldn't extract rate from HTML");
+    } catch (pageErr) {
+      console.error("[price-fetcher] Google Finance beta page_reader failed:", pageErr);
     }
 
-    const betaMatch = searchText.match(
-      /google\.com\/finance\/beta\/quote\/USD-EGP[^0-9]*?([0-9]+\.[0-9]+)/
-    );
-    if (betaMatch) {
-      const rate = parseFloat(betaMatch[1]);
-      if (rate > 40 && rate < 80) {
-        return { price: rate, source: "Google Finance" };
+    // ==========================================
+    // Strategy 2: Try the non-beta Google Finance URL
+    // ==========================================
+    try {
+      const gfResult = await zai.functions.invoke("page_reader", {
+        url: "https://www.google.com/finance/quote/USD-EGP",
+      });
+
+      const gfHtml = gfResult?.data?.html || "";
+      const gfRateMatch = gfHtml.match(/data-last-price="([0-9.]+)"/);
+      if (gfRateMatch) {
+        const rate = parseFloat(gfRateMatch[1]);
+        if (rate > 0 && rate < 200) {
+          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (non-beta): ${rate}`);
+          return { price: rate, source: "Google Finance" };
+        }
       }
+    } catch (pageErr) {
+      console.error("[price-fetcher] Google Finance non-beta page_reader failed:", pageErr);
     }
 
-    const gfResult = await zai.functions.invoke("page_reader", {
-      url: "https://www.google.com/finance/quote/USD-EGP",
-    });
+    // ==========================================
+    // Strategy 3: web_search as last resort
+    // ==========================================
+    try {
+      const searchResults = await zai.functions.invoke("web_search", {
+        query: "site:google.com finance USD EGP exchange rate",
+        num: 3,
+      });
 
-    const gfHtml = gfResult?.data?.html || "";
-    const gfRateMatch = gfHtml.match(/data-last-price="([0-9.]+)"/);
-    if (gfRateMatch) {
-      const rate = parseFloat(gfRateMatch[1]);
-      if (rate > 0 && rate < 200) {
-        return { price: rate, source: "Google Finance" };
+      const searchText =
+        typeof searchResults === "string" ? searchResults : JSON.stringify(searchResults);
+
+      const rateMatch = searchText.match(
+        /United States Dollar\s*\/\s*Egyptian Pound[^0-9]*?([0-9]+\.[0-9]+)/
+      );
+      if (rateMatch) {
+        const rate = parseFloat(rateMatch[1]);
+        if (rate > 40 && rate < 80) {
+          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (web_search): ${rate}`);
+          return { price: rate, source: "Google Finance" };
+        }
       }
+    } catch (searchErr) {
+      console.error("[price-fetcher] Google Finance web_search failed:", searchErr);
     }
+
   } catch (error) {
     console.error("[price-fetcher] Google Finance fetch failed:", error);
   }

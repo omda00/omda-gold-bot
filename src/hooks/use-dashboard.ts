@@ -37,6 +37,7 @@ export function useDashboardData() {
   const autoFetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seededRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const lastFetchAttemptRef = useRef<number>(0);
 
   // Seed data on first load
   const seedData = useCallback(async () => {
@@ -166,6 +167,7 @@ export function useDashboardData() {
       return null;
     }
     isFetchingRef.current = true;
+    lastFetchAttemptRef.current = Date.now();
     setLoading((prev) => ({ ...prev, fetching: true }));
     try {
       const res = await fetch("/api/prices", { method: "POST" });
@@ -374,7 +376,7 @@ export function useDashboardData() {
 
   // =============================================
   // Auto-fetch: Fetch fresh prices from the web
-  // every 30 seconds in the background
+  // every 1 minute in the background
   // This keeps the database updated so the 1-second
   // polling always shows relatively fresh data
   // =============================================
@@ -382,10 +384,10 @@ export function useDashboardData() {
     if (autoFetchIntervalRef.current) clearInterval(autoFetchIntervalRef.current);
     // Fetch immediately on start
     triggerFetchPrices();
-    // Then every 30 seconds
+    // Then every 1 minute (60000ms)
     autoFetchIntervalRef.current = setInterval(() => {
       triggerFetchPrices();
-    }, 30000);
+    }, 60000);
   }, [triggerFetchPrices]);
 
   const stopAutoFetch = useCallback(() => {
