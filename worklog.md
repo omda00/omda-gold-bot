@@ -342,3 +342,35 @@ Stage Summary:
 - USD drop alert feature preserved (detectUsdDrop function inlined)
 - All related code cleaned up: components, hooks, types, API routes, database schema
 - No remaining references to investment-plan, InvestmentPlan, signal-detector, smartSignal in codebase
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Fix hourly Telegram reports not being sent — cron service was dead
+
+Work Log:
+- User reported that an hour passed with no Telegram report being sent
+- Investigated and found the cron service on port 3031 was NOT running
+- The separate cron-service (mini-services/cron-service) kept crashing/dying when run as a background process
+- Multiple attempts to start it with nohup/disown/exec all resulted in the process dying within seconds
+- Root cause: separate mini-service process management is unreliable — process gets killed
+- SOLUTION: Integrated cron scheduling directly INTO the Next.js server process
+  - Installed node-cron package in main app: `bun add node-cron`
+  - Created `src/lib/cron-scheduler.ts` — runs inside Next.js process, never dies
+    - Hourly job: Every hour at :01 Cairo time (full automation + Telegram)
+    - Daily job: 9:00 AM Cairo time
+    - Price refresh: Every 30 minutes (keeps DB current)
+  - Created `src/app/api/cron/init/route.ts` — API endpoint to initialize cron on first load
+  - Updated `src/hooks/use-dashboard.ts` — calls /api/cron/init on first data load
+  - Cron scheduler is now a singleton — initialized once, runs for the life of the server process
+- Tested automation manually: Telegram report sent successfully to 1/1 user ✅
+- Verified cron init endpoint returns all jobs as "active"
+- Browser verification: all tabs working, Telegram bot "Omda" active
+- Lint passes with no errors
+
+Stage Summary:
+- Problem: Separate cron-service kept dying, causing missed hourly Telegram reports
+- Fix: Integrated cron scheduling into Next.js server process (no separate service)
+- Cron now auto-initializes when the dashboard first loads via /api/cron/init
+- All three schedules active: hourly reports, daily 9AM, 30-min price refresh
+- Telegram reports confirmed working: sent to 1/1 registered user
