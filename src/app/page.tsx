@@ -47,14 +47,7 @@ export default function Home() {
     try {
       const result = await triggerFetchPrices();
       if (result) {
-        const fetched = result.fetched;
-        if (fetched?.gold && fetched?.usdEgp) {
-          toast.success("تم تحديث أسعار الذهب والدولار بنجاح", { duration: 3000 });
-        } else if (fetched?.gold || fetched?.usdEgp) {
-          toast.success("تم جلب بعض الأسعار — يتم عرض آخر الأسعار المتاحة", { duration: 4000 });
-        } else {
-          toast.success("لم يتم جلب بيانات جديدة - يتم عرض آخر الأسعار المخزنة من المصدر", { duration: 4000 });
-        }
+        toast.success("تم تحديث الأسعار بنجاح", { duration: 3000 });
       } else {
         // null result means a fetch is already in progress or DB was refreshed
         toast.info("جارِ التحديث بالفعل — يتم عرض آخر الأسعار المتاحة", { duration: 2000 });
