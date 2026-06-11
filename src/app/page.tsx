@@ -53,7 +53,7 @@ export default function Home() {
         } else if (fetched?.gold || fetched?.usdEgp) {
           toast.success("تم جلب بعض الأسعار — يتم عرض آخر الأسعار المتاحة", { duration: 4000 });
         } else {
-          toast.success("لم يتم جلب أسعار جديدة - تم التحديث إلي آخر الأسعار المخزنة من المصدر", { duration: 4000 });
+          toast.success("لم يتم جلب بيانات جديدة - يتم عرض آخر الأسعار المخزنة من المصدر", { duration: 4000 });
         }
       } else {
         // null result means a fetch is already in progress or DB was refreshed
