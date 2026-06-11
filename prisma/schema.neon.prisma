@@ -1,26 +1,20 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is the PRODUCTION Prisma schema for Neon PostgreSQL (Vercel deployment).
+// Copy this content to prisma/schema.prisma before deploying to Vercel + Neon.
 //
-// =============================================
-// DEPLOYMENT NOTE (Vercel + Neon PostgreSQL):
-// =============================================
-// For LOCAL DEVELOPMENT: provider = "sqlite" with DATABASE_URL="file:./db/custom.db"
-// For PRODUCTION (Vercel + Neon): provider = "postgresql" with Neon connection strings
-//
-// When deploying to Vercel + Neon:
-// 1. Change provider below from "sqlite" to "postgresql"
-// 2. Set DATABASE_URL to Neon pooled connection
-// 3. Set DIRECT_URL to Neon direct connection
-// 4. Run: prisma db push
-// =============================================
+// Steps:
+// 1. Replace the content of prisma/schema.prisma with this file
+// 2. Set DATABASE_URL and DIRECT_URL in your .env (or Vercel environment variables)
+// 3. Run: npx prisma db push
+// 4. Deploy to Vercel
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "sqlite"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model PriceRecord {

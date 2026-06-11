@@ -10,6 +10,8 @@
         "@dnd-kit/utilities": "^3.2.2",
         "@hookform/resolvers": "^5.1.1",
         "@mdxeditor/editor": "^3.39.1",
+        "@neondatabase/serverless": "^1.1.0",
+        "@prisma/adapter-neon": "6.11.1",
         "@prisma/client": "^6.11.1",
         "@radix-ui/react-accordion": "^1.2.11",
         "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -402,6 +404,8 @@
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@0.2.12", "https://registry.npmjs.com/@napi-rs/wasm-runtime/-/wasm-runtime-0.2.12.tgz", { "dependencies": { "@emnapi/core": "^1.4.3", "@emnapi/runtime": "^1.4.3", "@tybys/wasm-util": "^0.10.0" } }, "sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ=="],
 
+    "@neondatabase/serverless": ["@neondatabase/serverless@1.1.0", "", {}, "sha512-r3ZZhRjEcfEdKIZnoB1RusNgvHuaBRqfCzV4Gi+5A9yUX0S4HTws/ASWqt13wL4y4I+0rqsWGdA2w7EQXHi3+Q=="],
+
     "@next/env": ["@next/env@16.1.3", "https://registry.npmjs.com/@next/env/-/env-16.1.3.tgz", {}, "sha512-BLP14oBOvZWXgfdJf9ao+VD8O30uE+x7PaV++QtACLX329WcRSJRO5YJ+Bcvu0Q+c/lei41TjSiFf6pXqnpbQA=="],
 
     "@next/eslint-plugin-next": ["@next/eslint-plugin-next@16.1.3", "https://registry.npmjs.com/@next/eslint-plugin-next/-/eslint-plugin-next-16.1.3.tgz", { "dependencies": { "fast-glob": "3.3.1" } }, "sha512-MqBh3ltFAy0AZCRFVdjVjjeV7nEszJDaVIpDAnkQcn8U9ib6OEwkSnuK6xdYxMGPhV/Y4IlY6RbDipPOpLfBqQ=="],
@@ -462,11 +466,15 @@
 
     "@parcel/watcher-win32-x64": ["@parcel/watcher-win32-x64@2.5.4", "https://registry.npmjs.com/@parcel/watcher-win32-x64/-/watcher-win32-x64-2.5.4.tgz", { "os": "win32", "cpu": "x64" }, "sha512-3A6efb6BOKwyw7yk9ro2vus2YTt2nvcd56AuzxdMiVOxL9umDyN5PKkKfZ/gZ9row41SjVmTVQNWQhaRRGpOKw=="],
 
+    "@prisma/adapter-neon": ["@prisma/adapter-neon@6.11.1", "", { "dependencies": { "@neondatabase/serverless": ">0.6.0 <2", "@prisma/driver-adapter-utils": "6.11.1", "postgres-array": "3.0.4" } }, "sha512-MQXU71rio1FGHzmgBVl65fOo4AsXj7U/a7RWmQrP+Qa/Jq5wq3JU42sR9SHU8v4vO77aUMWm8oRRy/zWBY5P1g=="],
+
     "@prisma/client": ["@prisma/client@6.19.2", "https://registry.npmjs.com/@prisma/client/-/client-6.19.2.tgz", { "peerDependencies": { "prisma": "*", "typescript": ">=5.1.0" }, "optionalPeers": ["prisma", "typescript"] }, "sha512-gR2EMvfK/aTxsuooaDA32D8v+us/8AAet+C3J1cc04SW35FPdZYgLF+iN4NDLUgAaUGTKdAB0CYenu1TAgGdMg=="],
 
     "@prisma/config": ["@prisma/config@6.11.1", "", { "dependencies": { "jiti": "2.4.2" } }, "sha512-z6rCTQN741wxDq82cpdzx2uVykpnQIXalLhrWQSR0jlBVOxCIkz3HZnd8ern3uYTcWKfB3IpVAF7K2FU8t/8AQ=="],
 
     "@prisma/debug": ["@prisma/debug@6.11.1", "", {}, "sha512-lWRb/YSWu8l4Yum1UXfGLtqFzZkVS2ygkWYpgkbgMHn9XJlMITIgeMvJyX5GepChzhmxuSuiq/MY/kGFweOpGw=="],
+
+    "@prisma/driver-adapter-utils": ["@prisma/driver-adapter-utils@6.11.1", "", { "dependencies": { "@prisma/debug": "6.11.1" } }, "sha512-y09aIY3XTJIgPI1ZMfybn5kndbhu11Rjg81cH6pSi/Rg/PnbxomWVHhu4NnKmCGioidUqJ5KeQ7i75dIOVsSXQ=="],
 
     "@prisma/engines": ["@prisma/engines@6.11.1", "", { "dependencies": { "@prisma/debug": "6.11.1", "@prisma/engines-version": "6.11.1-1.f40f79ec31188888a2e33acda0ecc8fd10a853a9", "@prisma/fetch-engine": "6.11.1", "@prisma/get-platform": "6.11.1" } }, "sha512-6eKEcV6V8W2eZAUwX2xTktxqPM4vnx3sxz3SDtpZwjHKpC6lhOtc4vtAtFUuf5+eEqBk+dbJ9Dcaj6uQU+FNNg=="],
 
@@ -1515,6 +1523,8 @@
     "possible-typed-array-names": ["possible-typed-array-names@1.1.0", "https://registry.npmjs.com/possible-typed-array-names/-/possible-typed-array-names-1.1.0.tgz", {}, "sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg=="],
 
     "postcss": ["postcss@8.5.6", "https://registry.npmjs.com/postcss/-/postcss-8.5.6.tgz", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg=="],
+
+    "postgres-array": ["postgres-array@3.0.4", "", {}, "sha512-nAUSGfSDGOaOAEGwqsRY27GPOea7CNipJPOA7lPbdEpx5Kg3qzdP0AaWC5MlhTWV9s4hFX39nomVZ+C4tnGOJQ=="],
 
     "preact": ["preact@10.28.2", "https://registry.npmjs.com/preact/-/preact-10.28.2.tgz", {}, "sha512-lbteaWGzGHdlIuiJ0l2Jq454m6kcpI1zNje6d8MlGAFlYvP2GO4ibnat7P74Esfz4sPTdM6UxtTwh/d3pwM9JA=="],
 
