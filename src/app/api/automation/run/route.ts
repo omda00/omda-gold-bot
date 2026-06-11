@@ -3,11 +3,15 @@ import { db } from "@/lib/db";
 import { fetchAllPrices, savePriceRecord } from "@/lib/price-fetcher";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { getConfig } from "@/lib/config-seeder";
+import {
+  wasReportSentRecently,
+  sendReportToAllUsers,
+  sendReportViaGlobalConfig,
+  buildHourlyReport,
+} from "@/lib/report-sender";
 
 /**
  * Detect if USD/EGP has experienced a significant drop.
- * Returns true if the current rate dropped by at least the threshold percentage
- * compared to the previous rate.
  */
 function detectUsdDrop(
   currentRate: number,
@@ -20,108 +24,7 @@ function detectUsdDrop(
 }
 
 /**
- * Send a message to ALL active Telegram users.
- * Each user receives via their OWN bot token and chat ID for privacy.
- */
-async function notifyAllUsers(
-  message: string,
-  type: string,
-  title: string
-): Promise<{ sent: number; failed: number; total: number }> {
-  const users = await db.telegramUser.findMany({ where: { active: true } });
-  let sent = 0;
-  let failed = 0;
-
-  for (const user of users) {
-    try {
-      const result = await sendTelegramMessage(user.botToken, user.chatId, message);
-
-      await db.notificationLog.create({
-        data: {
-          type,
-          title: `${title} - ${user.name}`,
-          message,
-          success: result.ok,
-          error: result.error,
-        },
-      });
-
-      if (result.ok) {
-        sent++;
-      } else {
-        failed++;
-        console.error(`[automation] Failed to send to ${user.name}: ${result.error}`);
-      }
-    } catch (err) {
-      failed++;
-      console.error(`[automation] Error sending to ${user.name}:`, err);
-    }
-  }
-
-  return { sent, failed, total: users.length };
-}
-
-/**
- * Build a comprehensive hourly Telegram report with all karats, gold pound, and USD/EGP
- */
-function buildHourlyReport(params: {
-  goldPrice: number;
-  goldBuyPrice: number | null;
-  goldSellPrice: number | null;
-  goldChange: number;
-  goldSource: string;
-  allKarats: { karat: number; sellPrice: number; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null }[];
-  goldPound: { sellPrice: number | null; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null } | null;
-  usdEgpPrice: number;
-  usdEgpChange: number;
-  usdEgpSource: string;
-}): string {
-  const {
-    goldPrice, goldBuyPrice, goldSellPrice, goldChange, goldSource,
-    allKarats, goldPound, usdEgpPrice, usdEgpChange, usdEgpSource,
-  } = params;
-
-  const goldArrow = goldChange >= 0 ? "▲" : "▼";
-  const usdArrow = usdEgpChange >= 0 ? "▲" : "▼";
-
-  let report = "📊 <b>تحديث ساعة — أسعار الذهب والعملات</b>\n";
-  report += `🕐 ${new Date().toLocaleString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" })} بتوقيت مصر\n\n`;
-
-  // Gold prices for all karats
-  report += "🥇 <b>أسعار الذهب (ج.م/جرام):</b>\n";
-  report += "━━━━━━━━━━━━━━━━━━\n";
-
-  for (const kp of allKarats) {
-    const sell = kp.sellPrice?.toLocaleString() || "—";
-    const buy = kp.buyPrice?.toLocaleString() || "—";
-    const line = `عيار ${kp.karat}: بيع ${sell} | شراء ${buy}`;
-    report += `  ${line}\n`;
-  }
-
-  // Gold pound
-  if (goldPound && (goldPound.sellPrice || goldPound.buyPrice)) {
-    report += "\n🪙 <b>جنيه الذهب:</b>\n";
-    const gpLine = `  بيع ${goldPound.sellPrice?.toLocaleString() || "—"} | شراء ${goldPound.buyPrice?.toLocaleString() || "—"}`;
-    report += `${gpLine}\n`;
-  }
-
-  // Gold 21 change indicator
-  if (goldChange !== 0) {
-    report += `\n📈 التغيير (عيار 21): ${goldArrow} ${Math.abs(goldChange).toFixed(2)}%\n`;
-  }
-
-  // USD/EGP
-  report += `\n💱 <b>USD/EGP:</b> ${usdEgpPrice.toFixed(2)} ج.م ${usdArrow} ${Math.abs(usdEgpChange).toFixed(2)}%\n`;
-
-  // Sources
-  report += `\n📌 المصادر: ${goldSource} + ${usdEgpSource}`;
-
-  return report;
-}
-
-/**
- * GET /api/automation/run - Triggered by Vercel Cron (hourly)
- * Same as POST but accepts GET requests from Vercel's cron system.
+ * GET /api/automation/run - Triggered by Vercel Cron or UptimeRobot
  */
 export async function GET() {
   return POST();
@@ -131,8 +34,7 @@ export async function GET() {
  * POST /api/automation/run - Run the full automation cycle:
  * 1. Fetch current prices (Gold EGP + USD/EGP + all karats)
  * 2. Check if USD/EGP has a significant drop
- * 3. Send Telegram notifications to ALL registered users (each via their own bot)
- * 4. Log all notifications
+ * 3. Send Telegram notifications (DEDUPLICATED — only once per hour)
  */
 export async function POST() {
   const results: {
@@ -154,7 +56,7 @@ export async function POST() {
       );
     }
 
-    // Step 1: Fetch current prices (single call for efficiency)
+    // Step 1: Fetch current prices
     let goldRecord;
     let usdEgpRecord;
     let allKaratsData: { karat: number; sellPrice: number; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null }[] = [];
@@ -167,7 +69,6 @@ export async function POST() {
         throw new Error("Could not fetch any prices from any source");
       }
 
-      // Save karat data for the report
       allKaratsData = allPrices.allKarats || [];
       goldPoundData = allPrices.goldPound || null;
 
@@ -225,11 +126,17 @@ export async function POST() {
     }
     results.usdDrop = usdDropDetected;
 
-    // Step 3: Send Telegram notifications to ALL registered users
-    const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
+    // Step 3: Send hourly report (DEDUPLICATED — only once per 55 minutes)
+    const alreadySent = await wasReportSentRecently("hourly_report", 55);
 
-    if (activeUsers.length > 0) {
-      // Build the comprehensive hourly report with all karats and gold pound
+    if (alreadySent) {
+      console.log("[automation] ⏭️ Hourly report already sent in last 55 min — skipping");
+      results.notifications?.push({
+        type: "hourly_report",
+        sent: false,
+        details: "تم إرسال التقرير بالفعل في آخر ساعة — تم التخطي",
+      });
+    } else {
       const hourlyReport = buildHourlyReport({
         goldPrice: goldRecord.price,
         goldBuyPrice: goldRecord.buyPrice,
@@ -243,15 +150,33 @@ export async function POST() {
         usdEgpSource: usdEgpRecord.source || "multi-source",
       });
 
-      const dailyResult = await notifyAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
-      results.notifications?.push({
-        type: "hourly_report",
-        sent: dailyResult.sent > 0,
-        details: `تم الإرسال إلى ${dailyResult.sent}/${dailyResult.total} مستخدم`,
-      });
+      const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
 
-      // Send USD drop alert
-      if (usdDropDetected) {
+      if (activeUsers.length > 0) {
+        const dailyResult = await sendReportToAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
+        results.notifications?.push({
+          type: "hourly_report",
+          sent: dailyResult.sent > 0,
+          details: `تم الإرسال إلى ${dailyResult.sent}/${dailyResult.total} مستخدم`,
+        });
+      } else {
+        const result = await sendReportViaGlobalConfig(hourlyReport, "hourly_report", "Hourly Price Report");
+        results.notifications?.push({
+          type: "hourly_report",
+          sent: result.ok,
+          error: result.error,
+          details: "تم الإرسال عبر الإعدادات العامة",
+        });
+      }
+    }
+
+    // Send USD drop alert (separate type, also deduplicated per 10 min)
+    if (usdDropDetected) {
+      const dropAlreadySent = await wasReportSentRecently("usd_drop_alert", 10);
+
+      if (dropAlreadySent) {
+        console.log("[automation] ⏭️ USD drop alert already sent recently — skipping");
+      } else {
         const usdSource = usdEgpRecord.source || "multi-source";
         const dropMessage = "⚠️ <b>تنبيه نزول قوي لسعر الدولار</b>\n\n" +
           `💱 USD/EGP: ${usdEgpRecord.price.toFixed(2)} ج.م\n` +
@@ -260,82 +185,21 @@ export async function POST() {
           `🎯 الحد: ${threshold}%\n` +
           `📌 المصدر: ${usdSource}`;
 
-        const dropResult = await notifyAllUsers(dropMessage, "usd_drop_alert", "USD/EGP Drop Alert");
-        results.notifications?.push({
-          type: "usd_drop_alert",
-          sent: dropResult.sent > 0,
-          details: `تم الإرسال إلى ${dropResult.sent}/${dropResult.total} مستخدم`,
-        });
-      }
-    } else {
-      // Fallback: Also check the old global config for backward compatibility
-      const botToken = await getConfig("TELEGRAM_BOT_TOKEN");
-      const chatId = await getConfig("TELEGRAM_CHAT_ID");
+        const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
 
-      if (botToken && chatId) {
-        const hourlyReport = buildHourlyReport({
-          goldPrice: goldRecord.price,
-          goldBuyPrice: goldRecord.buyPrice,
-          goldSellPrice: goldRecord.sellPrice,
-          goldChange: goldRecord.change ?? 0,
-          goldSource: goldRecord.source || "multi-source",
-          allKarats: allKaratsData,
-          goldPound: goldPoundData,
-          usdEgpPrice: usdEgpRecord.price,
-          usdEgpChange: usdEgpRecord.change ?? 0,
-          usdEgpSource: usdEgpRecord.source || "multi-source",
-        });
-
-        const dailySendResult = await sendTelegramMessage(botToken, chatId, hourlyReport);
-        results.notifications?.push({
-          type: "hourly_report",
-          sent: dailySendResult.ok,
-          error: dailySendResult.error,
-          details: "تم الإرسال عبر الإعدادات العامة",
-        });
-
-        await db.notificationLog.create({
-          data: {
-            type: "hourly_report",
-            title: "Hourly Price Report (Global Config)",
-            message: hourlyReport,
-            success: dailySendResult.ok,
-            error: dailySendResult.error,
-          },
-        });
-
-        if (usdDropDetected) {
-          const usdSource = usdEgpRecord.source || "multi-source";
-          const dropMessage = "⚠️ <b>تنبيه نزول قوي لسعر الدولار</b>\n\n" +
-            `💱 USD/EGP: ${usdEgpRecord.price.toFixed(2)} ج.م\n` +
-            `📉 السابق: ${previousUsdEgp?.price.toFixed(2)} ج.م\n` +
-            `📊 التغيير: ${usdEgpRecord.change?.toFixed(2)}%\n` +
-            `🎯 الحد: ${threshold}%\n` +
-            `📌 المصدر: ${usdSource}`;
-
-          const dropSendResult = await sendTelegramMessage(botToken, chatId, dropMessage);
+        if (activeUsers.length > 0) {
+          const dropResult = await sendReportToAllUsers(dropMessage, "usd_drop_alert", "USD/EGP Drop Alert");
           results.notifications?.push({
             type: "usd_drop_alert",
-            sent: dropSendResult.ok,
-            error: dropSendResult.error,
+            sent: dropResult.sent > 0,
+            details: `تم الإرسال إلى ${dropResult.sent}/${dropResult.total} مستخدم`,
           });
-
-          await db.notificationLog.create({
-            data: {
-              type: "usd_drop_alert",
-              title: "USD/EGP Drop Alert (Global Config)",
-              message: dropMessage,
-              success: dropSendResult.ok,
-              error: dropSendResult.error,
-            },
-          });
-        }
-      } else {
-        if (usdDropDetected) {
+        } else {
+          const result = await sendReportViaGlobalConfig(dropMessage, "usd_drop_alert", "USD/EGP Drop Alert");
           results.notifications?.push({
-            type: "skipped",
-            sent: false,
-            error: "لا يوجد مستخدمين مسجلين ولا إعدادات عامة للتيليجرام",
+            type: "usd_drop_alert",
+            sent: result.ok,
+            error: result.error,
           });
         }
       }
