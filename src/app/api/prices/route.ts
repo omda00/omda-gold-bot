@@ -10,6 +10,27 @@ const KARAT_SYMBOLS: Record<number, string> = {
   18: "GOLD_18K_EGP",
 };
 
+const GOLD_POUND_SYMBOL = "GOLD_POUND_EGP";
+
+interface KaratPriceResult {
+  karat: number;
+  sellPrice: number | null;
+  buyPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+  changeAmount: number | null;
+  changePercent: number | null;
+}
+
+interface GoldPoundResult {
+  sellPrice: number | null;
+  buyPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+  changeAmount: number | null;
+  changePercent: number | null;
+}
+
 /**
  * Calculate other karat prices from 21K price as fallback.
  * Gold prices are proportional to purity: price_k = price_21 × (k/21)
@@ -20,13 +41,11 @@ function calculateKaratFrom21(price21Sell: number, price21Buy: number | null): K
     karat: k,
     sellPrice: Math.round(price21Sell * ratios[k]),
     buyPrice: price21Buy !== null ? Math.round(price21Buy * ratios[k]) : null,
+    sellWorkmanship: null,
+    buyWorkmanship: null,
+    changeAmount: null,
+    changePercent: null,
   }));
-}
-
-interface KaratPriceResult {
-  karat: number;
-  sellPrice: number | null;
-  buyPrice: number | null;
 }
 
 /**
@@ -57,6 +76,10 @@ export async function GET() {
           karat,
           sellPrice: record?.sellPrice ?? null,
           buyPrice: record?.buyPrice ?? null,
+          sellWorkmanship: record?.sellWorkmanship ?? null,
+          buyWorkmanship: record?.buyWorkmanship ?? null,
+          changeAmount: record?.changeAmount ?? null,
+          changePercent: record?.change ?? null,
         };
       })
     );
@@ -67,10 +90,28 @@ export async function GET() {
       allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
     }
 
+    // Fetch gold pound from DB
+    let goldPound: GoldPoundResult | null = null;
+    const gpRecord = await db.priceRecord.findFirst({
+      where: { symbol: GOLD_POUND_SYMBOL },
+      orderBy: { createdAt: "desc" },
+    });
+    if (gpRecord) {
+      goldPound = {
+        sellPrice: gpRecord.sellPrice,
+        buyPrice: gpRecord.buyPrice,
+        sellWorkmanship: gpRecord.sellWorkmanship,
+        buyWorkmanship: gpRecord.buyWorkmanship,
+        changeAmount: gpRecord.changeAmount,
+        changePercent: gpRecord.change,
+      };
+    }
+
     return NextResponse.json({
       gold: goldPrice,
       usdEgp: usdEgpRate,
       allKarats,
+      goldPound,
     });
   } catch (error) {
     console.error("Error fetching prices:", error);
@@ -119,7 +160,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Save all karat prices
+      // Save all karat prices with workmanship and change from iSagha
       for (const karatPrice of allPrices.allKarats) {
         const symbol = KARAT_SYMBOLS[karatPrice.karat];
         if (symbol) {
@@ -127,9 +168,27 @@ export async function POST(request: NextRequest) {
             savePriceRecord(symbol, karatPrice.sellPrice, "EGP", "iSagha.com", {
               buyPrice: karatPrice.buyPrice ?? undefined,
               sellPrice: karatPrice.sellPrice,
+              sellWorkmanship: karatPrice.sellWorkmanship ?? undefined,
+              buyWorkmanship: karatPrice.buyWorkmanship ?? undefined,
+              changeAmount: karatPrice.changeAmount ?? undefined,
+              changePercent: karatPrice.changePercent ?? undefined,
             })
           );
         }
+      }
+
+      // Save gold pound prices with workmanship and change from iSagha
+      if (allPrices.goldPound && allPrices.goldPound.sellPrice) {
+        savePromises.push(
+          savePriceRecord(GOLD_POUND_SYMBOL, allPrices.goldPound.sellPrice, "EGP", "iSagha.com", {
+            buyPrice: allPrices.goldPound.buyPrice ?? undefined,
+            sellPrice: allPrices.goldPound.sellPrice,
+            sellWorkmanship: allPrices.goldPound.sellWorkmanship ?? undefined,
+            buyWorkmanship: allPrices.goldPound.buyWorkmanship ?? undefined,
+            changeAmount: allPrices.goldPound.changeAmount ?? undefined,
+            changePercent: allPrices.goldPound.changePercent ?? undefined,
+          })
+        );
       }
 
       await Promise.all(savePromises);
@@ -157,6 +216,10 @@ export async function POST(request: NextRequest) {
           karat,
           sellPrice: record?.sellPrice ?? null,
           buyPrice: record?.buyPrice ?? null,
+          sellWorkmanship: record?.sellWorkmanship ?? null,
+          buyWorkmanship: record?.buyWorkmanship ?? null,
+          changeAmount: record?.changeAmount ?? null,
+          changePercent: record?.change ?? null,
         };
       })
     );
@@ -165,6 +228,23 @@ export async function POST(request: NextRequest) {
     const hasKaratData = allKarats.some((k) => k.sellPrice !== null);
     if (!hasKaratData && goldPrice?.sellPrice) {
       allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
+    }
+
+    // Fetch gold pound from DB
+    let goldPound: GoldPoundResult | null = null;
+    const gpRecord = await db.priceRecord.findFirst({
+      where: { symbol: GOLD_POUND_SYMBOL },
+      orderBy: { createdAt: "desc" },
+    });
+    if (gpRecord) {
+      goldPound = {
+        sellPrice: gpRecord.sellPrice,
+        buyPrice: gpRecord.buyPrice,
+        sellWorkmanship: gpRecord.sellWorkmanship,
+        buyWorkmanship: gpRecord.buyWorkmanship,
+        changeAmount: gpRecord.changeAmount,
+        changePercent: gpRecord.change,
+      };
     }
 
     const successMessage = allPrices.gold || allPrices.usdEgp
@@ -177,6 +257,7 @@ export async function POST(request: NextRequest) {
       gold: goldPrice,
       usdEgp: usdEgpRate,
       allKarats,
+      goldPound,
       fetched: {
         gold: allPrices.gold !== null,
         usdEgp: allPrices.usdEgp !== null,
@@ -209,6 +290,10 @@ export async function POST(request: NextRequest) {
             karat,
             sellPrice: record?.sellPrice ?? null,
             buyPrice: record?.buyPrice ?? null,
+            sellWorkmanship: record?.sellWorkmanship ?? null,
+            buyWorkmanship: record?.buyWorkmanship ?? null,
+            changeAmount: record?.changeAmount ?? null,
+            changePercent: record?.change ?? null,
           };
         })
       );
@@ -219,10 +304,27 @@ export async function POST(request: NextRequest) {
         allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
       }
 
+      let goldPound: GoldPoundResult | null = null;
+      const gpRecord = await db.priceRecord.findFirst({
+        where: { symbol: GOLD_POUND_SYMBOL },
+        orderBy: { createdAt: "desc" },
+      });
+      if (gpRecord) {
+        goldPound = {
+          sellPrice: gpRecord.sellPrice,
+          buyPrice: gpRecord.buyPrice,
+          sellWorkmanship: gpRecord.sellWorkmanship,
+          buyWorkmanship: gpRecord.buyWorkmanship,
+          changeAmount: gpRecord.changeAmount,
+          changePercent: gpRecord.change,
+        };
+      }
+
       return NextResponse.json({
         gold: goldPrice,
         usdEgp: usdEgpRate,
         allKarats,
+        goldPound,
         fetched: { gold: false, usdEgp: false },
         message: "Web fetch failed — showing latest cached prices",
       });

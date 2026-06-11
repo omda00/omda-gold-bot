@@ -48,7 +48,7 @@ async function notifyAllUsers(
 }
 
 /**
- * Build a comprehensive hourly Telegram report with all karats, USD/EGP, and signals
+ * Build a comprehensive hourly Telegram report with all karats, workmanship, gold pound, USD/EGP, and signals
  */
 function buildHourlyReport(params: {
   goldPrice: number;
@@ -56,7 +56,8 @@ function buildHourlyReport(params: {
   goldSellPrice: number | null;
   goldChange: number;
   goldSource: string;
-  allKarats: { karat: number; sellPrice: number; buyPrice: number | null }[];
+  allKarats: { karat: number; sellPrice: number; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null }[];
+  goldPound: { sellPrice: number | null; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null } | null;
   usdEgpPrice: number;
   usdEgpChange: number;
   usdEgpSource: string;
@@ -64,7 +65,7 @@ function buildHourlyReport(params: {
 }): string {
   const {
     goldPrice, goldBuyPrice, goldSellPrice, goldChange, goldSource,
-    allKarats, usdEgpPrice, usdEgpChange, usdEgpSource, signal,
+    allKarats, goldPound, usdEgpPrice, usdEgpChange, usdEgpSource, signal,
   } = params;
 
   const goldArrow = goldChange >= 0 ? "▲" : "▼";
@@ -73,14 +74,36 @@ function buildHourlyReport(params: {
   let report = "📊 <b>تحديث ساعة — أسعار الذهب والعملات</b>\n";
   report += `🕐 ${new Date().toLocaleString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" })} بتوقيت مصر\n\n`;
 
-  // Gold prices for all karats
+  // Gold prices for all karats with workmanship
   report += "🥇 <b>أسعار الذهب (ج.م/جرام):</b>\n";
   report += "━━━━━━━━━━━━━━━━━━\n";
 
   for (const kp of allKarats) {
     const sell = kp.sellPrice?.toLocaleString() || "—";
     const buy = kp.buyPrice?.toLocaleString() || "—";
-    report += `  عيار ${kp.karat}: بيع ${sell} | شراء ${buy}\n`;
+    let line = `عيار ${kp.karat}: بيع ${sell}`;
+    if (kp.sellWorkmanship !== null && kp.sellWorkmanship > 0) {
+      line += ` (صنعة ${kp.sellWorkmanship})`;
+    }
+    line += ` | شراء ${buy}`;
+    if (kp.buyWorkmanship !== null && kp.buyWorkmanship > 0) {
+      line += ` (صنعة ${kp.buyWorkmanship})`;
+    }
+    report += `  ${line}\n`;
+  }
+
+  // Gold pound
+  if (goldPound && (goldPound.sellPrice || goldPound.buyPrice)) {
+    report += "\n🪙 <b>جنيه الذهب:</b>\n";
+    let gpLine = `  بيع ${goldPound.sellPrice?.toLocaleString() || "—"}`;
+    if (goldPound.sellWorkmanship !== null && goldPound.sellWorkmanship > 0) {
+      gpLine += ` (صنعة ${goldPound.sellWorkmanship})`;
+    }
+    gpLine += ` | شراء ${goldPound.buyPrice?.toLocaleString() || "—"}`;
+    if (goldPound.buyWorkmanship !== null && goldPound.buyWorkmanship > 0) {
+      gpLine += ` (صنعة ${goldPound.buyWorkmanship})`;
+    }
+    report += `${gpLine}\n`;
   }
 
   // Gold 21 change indicator
@@ -138,7 +161,8 @@ export async function POST() {
     // Step 1: Fetch current prices (single call for efficiency)
     let goldRecord;
     let usdEgpRecord;
-    let allKaratsData: { karat: number; sellPrice: number; buyPrice: number | null }[] = [];
+    let allKaratsData: { karat: number; sellPrice: number; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null }[] = [];
+    let goldPoundData: { sellPrice: number | null; buyPrice: number | null; sellWorkmanship: number | null; buyWorkmanship: number | null; changeAmount: number | null; changePercent: number | null } | null = null;
 
     try {
       const allPrices = await fetchAllPrices();
@@ -149,6 +173,7 @@ export async function POST() {
 
       // Save karat data for the report
       allKaratsData = allPrices.allKarats || [];
+      goldPoundData = allPrices.goldPound || null;
 
       const savePromises: Promise<unknown>[] = [];
       if (allPrices.gold) {
@@ -217,7 +242,7 @@ export async function POST() {
     const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
 
     if (activeUsers.length > 0) {
-      // Build the comprehensive hourly report with all karats
+      // Build the comprehensive hourly report with all karats and gold pound
       const hourlyReport = buildHourlyReport({
         goldPrice: goldRecord.price,
         goldBuyPrice: goldRecord.buyPrice,
@@ -225,6 +250,7 @@ export async function POST() {
         goldChange: goldRecord.change ?? 0,
         goldSource: goldRecord.source || "multi-source",
         allKarats: allKaratsData,
+        goldPound: goldPoundData,
         usdEgpPrice: usdEgpRecord.price,
         usdEgpChange: usdEgpRecord.change ?? 0,
         usdEgpSource: usdEgpRecord.source || "multi-source",
@@ -286,6 +312,7 @@ export async function POST() {
           goldChange: goldRecord.change ?? 0,
           goldSource: goldRecord.source || "multi-source",
           allKarats: allKaratsData,
+          goldPound: goldPoundData,
           usdEgpPrice: usdEgpRecord.price,
           usdEgpChange: usdEgpRecord.change ?? 0,
           usdEgpSource: usdEgpRecord.source || "multi-source",

@@ -12,17 +12,18 @@ import {
   Globe,
   ArrowRightLeft,
   ArrowDownUp,
+  Coins,
+  Wrench,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { PriceRecord, KaratPriceRecord } from "@/lib/dashboard-types";
+import type { PriceRecord, KaratPriceRecord, GoldPoundRecord } from "@/lib/dashboard-types";
 
-function formatPrice(price: number | null | undefined): string {
+function formatPrice(price: number | null | undefined, decimals = 0): string {
   if (price === null || price === undefined) return "—";
   return price.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
 }
 
@@ -34,7 +35,7 @@ const karatLabels: Record<number, string> = {
 };
 
 interface PriceCardsProps {
-  prices: { gold: PriceRecord | null; usdEgp: PriceRecord | null; allKarats: KaratPriceRecord[] };
+  prices: { gold: PriceRecord | null; usdEgp: PriceRecord | null; allKarats: KaratPriceRecord[]; goldPound: GoldPoundRecord | null };
   loading: boolean;
   fetching: boolean;
   onFetchPrices: () => void;
@@ -54,7 +55,7 @@ export function PriceCards({
   // Ensure all 4 karats exist
   const allKarats: KaratPriceRecord[] = [24, 22, 21, 18].map((k) => {
     const found = prices.allKarats?.find((kp) => kp.karat === k);
-    return found || { karat: k, sellPrice: null, buyPrice: null };
+    return found || { karat: k, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null, changeAmount: null, changePercent: null };
   });
 
   return (
@@ -120,14 +121,16 @@ export function PriceCards({
         )}
       </div>
 
-      {/* ─── 4 Individual Karat Cards ─── */}
+      {/* ─── 4 Individual Karat Cards with Workmanship ─── */}
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="animate-pulse rounded-2xl bg-neutral-950 h-40 p-4 space-y-3 ring-1 ring-neutral-800">
+            <div key={i} className="animate-pulse rounded-2xl bg-neutral-950 h-56 p-4 space-y-3 ring-1 ring-neutral-800">
               <div className="h-6 bg-neutral-800 rounded-lg w-20" />
               <div className="h-8 bg-neutral-800 rounded-lg w-full" />
+              <div className="h-6 bg-neutral-800 rounded-lg w-full" />
               <div className="h-8 bg-neutral-800 rounded-lg w-full" />
+              <div className="h-6 bg-neutral-800 rounded-lg w-full" />
             </div>
           ))}
         </div>
@@ -136,6 +139,8 @@ export function PriceCards({
           {allKarats.map((kp, idx) => {
             const label = karatLabels[kp.karat];
             if (!label) return null;
+            const isPositive = (kp.changeAmount ?? 0) >= 0;
+            const hasChange = kp.changeAmount !== null && kp.changeAmount !== 0;
             return (
               <motion.div
                 key={kp.karat}
@@ -147,43 +152,76 @@ export function PriceCards({
                   {/* Gold accent line */}
                   <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400" />
 
-                  <CardContent className="p-3.5 sm:p-4 space-y-3">
+                  <CardContent className="p-3 sm:p-3.5 space-y-2">
                     {/* Karat badge */}
                     <div className="flex items-center justify-center">
-                      <div className="bg-gradient-to-r from-amber-400 to-yellow-400 px-4 py-1.5 rounded-lg shadow-sm">
+                      <div className="bg-gradient-to-r from-amber-400 to-yellow-400 px-4 py-1 rounded-lg shadow-sm">
                         <span className="text-sm font-black text-neutral-950 tracking-wide">
                           {label}
                         </span>
                       </div>
                     </div>
 
-                    {/* Sell price */}
-                    <div className="bg-neutral-900 rounded-xl p-2.5 ring-1 ring-neutral-800 group-hover:ring-emerald-500/20 transition-colors">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <ArrowRightLeft className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[11px] font-bold text-emerald-400">بيع</span>
+                    {/* Sell price + workmanship */}
+                    <div className="bg-neutral-900 rounded-xl p-2 ring-1 ring-neutral-800 group-hover:ring-emerald-500/20 transition-colors">
+                      <div className="flex items-center gap-1 mb-1">
+                        <ArrowRightLeft className="w-2.5 h-2.5 text-emerald-400" />
+                        <span className="text-[10px] font-bold text-emerald-400">بيع</span>
                       </div>
-                      <div className="flex items-baseline gap-1.5 justify-center">
-                        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                      <div className="flex items-baseline gap-1 justify-center">
+                        <span className="text-base sm:text-lg font-black text-white tabular-nums tracking-tight">
                           {formatPrice(kp.sellPrice)}
                         </span>
-                        <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
+                        <span className="text-[10px] text-neutral-500 font-bold">ج.م</span>
                       </div>
+                      {kp.sellWorkmanship !== null && kp.sellWorkmanship > 0 && (
+                        <div className="flex items-center justify-center gap-1 mt-0.5">
+                          <Wrench className="w-2 h-2 text-amber-500" />
+                          <span className="text-[9px] text-amber-500 font-bold">صنعة {formatPrice(kp.sellWorkmanship, 1)}</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Buy price */}
-                    <div className="bg-neutral-900 rounded-xl p-2.5 ring-1 ring-neutral-800 group-hover:ring-sky-500/20 transition-colors">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <ArrowDownUp className="w-3 h-3 text-sky-400" />
-                        <span className="text-[11px] font-bold text-sky-400">شراء</span>
+                    {/* Buy price + workmanship */}
+                    <div className="bg-neutral-900 rounded-xl p-2 ring-1 ring-neutral-800 group-hover:ring-sky-500/20 transition-colors">
+                      <div className="flex items-center gap-1 mb-1">
+                        <ArrowDownUp className="w-2.5 h-2.5 text-sky-400" />
+                        <span className="text-[10px] font-bold text-sky-400">شراء</span>
                       </div>
-                      <div className="flex items-baseline gap-1.5 justify-center">
-                        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                      <div className="flex items-baseline gap-1 justify-center">
+                        <span className="text-base sm:text-lg font-black text-white tabular-nums tracking-tight">
                           {formatPrice(kp.buyPrice)}
                         </span>
-                        <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
+                        <span className="text-[10px] text-neutral-500 font-bold">ج.م</span>
                       </div>
+                      {kp.buyWorkmanship !== null && kp.buyWorkmanship > 0 && (
+                        <div className="flex items-center justify-center gap-1 mt-0.5">
+                          <Wrench className="w-2 h-2 text-sky-500" />
+                          <span className="text-[9px] text-sky-500 font-bold">صنعة {formatPrice(kp.buyWorkmanship, 1)}</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Change indicator */}
+                    {hasChange && (
+                      <div className={`flex items-center justify-center gap-1 rounded-lg py-1 px-2 ${
+                        isPositive 
+                          ? "bg-emerald-950/30 text-emerald-400" 
+                          : "bg-red-950/30 text-red-400"
+                      }`}>
+                        {isPositive ? (
+                          <TrendingUp className="w-2.5 h-2.5" />
+                        ) : (
+                          <TrendingDown className="w-2.5 h-2.5" />
+                        )}
+                        <span className="text-[10px] font-black tabular-nums">
+                          {isPositive ? "+" : ""}{formatPrice(kp.changeAmount, 2)}
+                        </span>
+                        <span className="text-[10px] font-bold tabular-nums">
+                          ({isPositive ? "+" : ""}{kp.changePercent?.toFixed(2)}%)
+                        </span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -191,6 +229,94 @@ export function PriceCards({
           })}
         </div>
       )}
+
+      {/* ─── Gold Pound Card ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 20 }}
+      >
+        <Card className="rounded-2xl border-0 shadow-lg overflow-hidden bg-neutral-950 ring-1 ring-neutral-800 hover:ring-amber-400/30 transition-all duration-200 group">
+          <div className="h-1 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300" />
+          <CardContent className="p-3.5 sm:p-4">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="bg-gradient-to-r from-amber-400 to-yellow-400 px-4 py-1.5 rounded-lg shadow-sm flex items-center gap-2">
+                <Coins className="w-4 h-4 text-neutral-950" />
+                <span className="text-sm font-black text-neutral-950 tracking-wide">جنيه الذهب</span>
+              </div>
+            </div>
+
+            {prices.goldPound && (prices.goldPound.sellPrice || prices.goldPound.buyPrice) ? (
+              <div className="grid grid-cols-2 gap-3">
+                {/* Sell */}
+                <div className="bg-neutral-900 rounded-xl p-2.5 ring-1 ring-neutral-800 group-hover:ring-emerald-500/20 transition-colors">
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <ArrowRightLeft className="w-3 h-3 text-emerald-400" />
+                    <span className="text-[11px] font-bold text-emerald-400">بيع</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5 justify-center">
+                    <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                      {formatPrice(prices.goldPound.sellPrice)}
+                    </span>
+                    <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
+                  </div>
+                  {prices.goldPound.sellWorkmanship !== null && prices.goldPound.sellWorkmanship > 0 && (
+                    <div className="flex items-center justify-center gap-1 mt-1">
+                      <Wrench className="w-2.5 h-2.5 text-amber-500" />
+                      <span className="text-[10px] text-amber-500 font-bold">صنعة {formatPrice(prices.goldPound.sellWorkmanship, 1)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Buy */}
+                <div className="bg-neutral-900 rounded-xl p-2.5 ring-1 ring-neutral-800 group-hover:ring-sky-500/20 transition-colors">
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <ArrowDownUp className="w-3 h-3 text-sky-400" />
+                    <span className="text-[11px] font-bold text-sky-400">شراء</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5 justify-center">
+                    <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                      {formatPrice(prices.goldPound.buyPrice)}
+                    </span>
+                    <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
+                  </div>
+                  {prices.goldPound.buyWorkmanship !== null && prices.goldPound.buyWorkmanship > 0 && (
+                    <div className="flex items-center justify-center gap-1 mt-1">
+                      <Wrench className="w-2.5 h-2.5 text-sky-500" />
+                      <span className="text-[10px] text-sky-500 font-bold">صنعة {formatPrice(prices.goldPound.buyWorkmanship, 1)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="py-4 text-center">
+                <p className="text-neutral-500 text-xs">لا توجد بيانات جنيه الذهب</p>
+              </div>
+            )}
+
+            {/* Change indicator for gold pound */}
+            {prices.goldPound && prices.goldPound.changeAmount !== null && prices.goldPound.changeAmount !== 0 && (
+              <div className={`flex items-center justify-center gap-1 mt-2 rounded-lg py-1 px-2 ${
+                (prices.goldPound.changeAmount ?? 0) >= 0
+                  ? "bg-emerald-950/30 text-emerald-400"
+                  : "bg-red-950/30 text-red-400"
+              }`}>
+                {(prices.goldPound.changeAmount ?? 0) >= 0 ? (
+                  <TrendingUp className="w-2.5 h-2.5" />
+                ) : (
+                  <TrendingDown className="w-2.5 h-2.5" />
+                )}
+                <span className="text-[10px] font-black tabular-nums">
+                  {(prices.goldPound.changeAmount ?? 0) >= 0 ? "+" : ""}{formatPrice(prices.goldPound.changeAmount, 2)}
+                </span>
+                <span className="text-[10px] font-bold tabular-nums">
+                  ({(prices.goldPound.changeAmount ?? 0) >= 0 ? "+" : ""}{prices.goldPound.changePercent?.toFixed(2)}%)
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* ─── Footer: timestamp ─── */}
       <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-muted-foreground">

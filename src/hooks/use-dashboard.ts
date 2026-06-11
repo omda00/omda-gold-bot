@@ -13,7 +13,7 @@ import type {
 } from "@/lib/dashboard-types";
 
 export function useDashboardData() {
-  const [prices, setPrices] = useState<PricesResponse>({ gold: null, usdEgp: null, allKarats: [] });
+  const [prices, setPrices] = useState<PricesResponse>({ gold: null, usdEgp: null, allKarats: [], goldPound: null });
   const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -175,7 +175,7 @@ export function useDashboardData() {
       const res = await fetch("/api/prices", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        setPrices({ gold: data.gold, usdEgp: data.usdEgp, allKarats: data.allKarats || [] });
+        setPrices({ gold: data.gold, usdEgp: data.usdEgp, allKarats: data.allKarats || [], goldPound: data.goldPound || null });
         setLastWebFetch(new Date().toISOString());
         return data;
       } else {
@@ -184,7 +184,7 @@ export function useDashboardData() {
           const errorData = await res.json();
           // The API might still return cached prices
           if (errorData.gold || errorData.usdEgp) {
-            setPrices({ gold: errorData.gold, usdEgp: errorData.usdEgp, allKarats: errorData.allKarats || [] });
+            setPrices({ gold: errorData.gold, usdEgp: errorData.usdEgp, allKarats: errorData.allKarats || [], goldPound: errorData.goldPound || null });
           }
           console.error("Fetch prices error:", errorData.error || errorData.message);
         } catch {

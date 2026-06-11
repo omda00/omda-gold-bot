@@ -9,6 +9,9 @@ export interface PriceRecord {
   source: string | null;
   buyPrice: number | null;
   sellPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+  changeAmount: number | null;
   createdAt: string;
 }
 
@@ -16,12 +19,26 @@ export interface KaratPriceRecord {
   karat: number;
   sellPrice: number | null;
   buyPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+  changeAmount: number | null;
+  changePercent: number | null;
+}
+
+export interface GoldPoundRecord {
+  sellPrice: number | null;
+  buyPrice: number | null;
+  sellWorkmanship: number | null;
+  buyWorkmanship: number | null;
+  changeAmount: number | null;
+  changePercent: number | null;
 }
 
 export interface PricesResponse {
   gold: PriceRecord | null;
   usdEgp: PriceRecord | null;
   allKarats: KaratPriceRecord[];
+  goldPound: GoldPoundRecord | null;
 }
 
 export interface InvestmentPlan {

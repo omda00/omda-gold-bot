@@ -11,15 +11,18 @@ datasource db {
 }
 
 model PriceRecord {
-  id        String   @id @default(cuid())
-  symbol    String   // "GOLD_EGP" or "USD_EGP"
-  price     Float
-  currency  String   // "EGP"
-  change    Float?   // percentage change from previous
-  source    String?  // Where the price was fetched from
-  buyPrice  Float?   // Price the shop buys from you (for gold)
-  sellPrice Float?   // Price the shop sells to you (for gold)
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  symbol          String   // "GOLD_EGP", "USD_EGP", "GOLD_POUND_EGP", "GOLD_24K_EGP", etc.
+  price           Float
+  currency        String   // "EGP"
+  change          Float?   // percentage change from previous
+  source          String?  // Where the price was fetched from
+  buyPrice        Float?   // Price the shop buys from you (for gold)
+  sellPrice       Float?   // Price the shop sells to you (for gold)
+  sellWorkmanship Float?   // Workmanship fee on sell (صنعة البيع)
+  buyWorkmanship  Float?   // Workmanship fee on buy (صنعة الشراء)
+  changeAmount    Float?   // Absolute change amount (e.g., -10.48)
+  createdAt       DateTime @default(now())
 }
 
 model AppConfig {

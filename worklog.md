@@ -158,3 +158,60 @@ Stage Summary:
 - USD/EGP rates now come from Google Finance as the user requested
 - Both website and Telegram use the same Google Finance rate
 - Source attribution is correct (won't falsely label free API data as "Google Finance")
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Make website display identical to iSagha — add workmanship (صنعة), change values, and gold pound
+
+Work Log:
+- Updated Prisma schema to add `sellWorkmanship`, `buyWorkmanship`, and `changeAmount` fields to PriceRecord model
+- Ran `bun run db:push` to apply schema changes and `bunx prisma generate` to regenerate the client
+- Updated `price-fetcher.ts`:
+  - Added `sellWorkmanship`, `buyWorkmanship`, `changeAmount`, `changePercent` to `KaratPriceResult` interface
+  - Added `GoldPoundResult` interface with workmanship and change fields
+  - Added `goldPound` field to `CombinedPriceResult` interface
+  - Updated `fetchAllPrices()` to populate workmanship data from iSagha extraction for all karats and gold pound
+  - Updated `savePriceRecord()` to accept and save `sellWorkmanship`, `buyWorkmanship` and calculate `changeAmount`
+  - Lowered `minWork` thresholds in karat configs (50 for 24K/22K/21K, 40 for 18K) to capture buy workmanship values
+  - Lowered gold pound workmanship min from 500 to 300 to capture lower buy workmanship
+- Updated `dashboard-types.ts`:
+  - Added `sellWorkmanship`, `buyWorkmanship`, `changeAmount` to `PriceRecord` interface
+  - Added `sellWorkmanship`, `buyWorkmanship`, `changeAmount`, `changePercent` to `KaratPriceRecord` interface
+  - Added `GoldPoundRecord` interface with workmanship and change fields
+  - Added `goldPound` field to `PricesResponse` interface
+- Updated `prices/route.ts` API:
+  - GET handler returns workmanship, changeAmount, changePercent for all karats and gold pound
+  - POST handler saves workmanship data from fetch results, including gold pound (GOLD_POUND_EGP symbol)
+  - Both GET and POST return `goldPound` object in response
+- Updated `price-cards.tsx` UI:
+  - Each karat card now shows sell price + sell workmanship (صنعة) with wrench icon
+  - Each karat card now shows buy price + buy workmanship (صنعة) with wrench icon
+  - Added change indicator row showing change amount + percentage with colored arrows
+  - Added Gold Pound (جنيه الذهب) card below karat cards with sell/buy prices + workmanship
+  - Gold pound card also shows change amount + percentage
+  - All new elements follow existing dark card design with proper animations
+- Updated `automation/run/route.ts`:
+  - `buildHourlyReport()` now shows workmanship (صنعة) for each karat in Telegram notifications
+  - Added gold pound section to Telegram report with workmanship
+  - Updated `allKarats` type to include workmanship and change fields
+  - Added `goldPoundData` parameter to report builder
+- Updated `use-dashboard.ts` hook:
+  - Added `goldPound` to initial state for `prices`
+  - Updated `setPrices` calls to include `goldPound` from API responses
+- Cleared .next cache and restarted server to pick up Prisma client changes
+- Verified all workmanship values are correctly extracted and stored:
+  - Karat 24: sellWorkmanship=109.75, buyWorkmanship=60.25
+  - Karat 22: sellWorkmanship=100.25, buyWorkmanship=55.5
+  - Karat 21: sellWorkmanship=95.75, buyWorkmanship=52.75
+  - Karat 18: sellWorkmanship=82, buyWorkmanship=45.25
+  - Gold Pound: sellWorkmanship=766, buyWorkmanship=422
+- Lint passes with no errors
+
+Stage Summary:
+- Website now displays identical information to iSagha: sell/buy prices + workmanship + change values for all karats
+- Gold pound (جنيه الذهب) is now stored, displayed, and included in Telegram notifications
+- Database schema updated with 3 new fields (sellWorkmanship, buyWorkmanship, changeAmount)
+- All API routes updated to handle workmanship and gold pound data
+- UI enhanced with workmanship display (wrench icons), change indicators (colored arrows), and gold pound card
+- Telegram notifications now show workmanship values for each karat and gold pound
