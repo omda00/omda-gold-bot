@@ -388,7 +388,6 @@ export function SettingsTab({
                     <Input
                       value={plan.action}
                       onChange={(e) => updatePlanField(index, "action", e.target.value)}
-                      dir="rtl"
                       className="h-9 text-sm rounded-lg font-semibold"
                     />
                   </div>

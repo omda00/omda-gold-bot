@@ -263,7 +263,7 @@ export function InvestmentPlanTable({
               </div>
               <div>
                 <h4 className="text-sm font-bold text-amber-800 dark:text-amber-300 mb-1">الخلاصة التنفيذية</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed" dir="rtl">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   التصحيح الحالي (%12 من القمة) يمثل فرصة شراء حقيقية مدعومة باستمرار البنك المركزي في الشراء والتوترات الجيوسياسية. 
                   ارتفاع 88% في عام واحد ثم تصحيح طبيعي — التزام بمنهج الشراء التدريجي (DCA) يقلل المخاطر بشكل كبير مقارنة بالشراء بدفعة واحدة.
                 </p>
@@ -350,7 +350,7 @@ export function InvestmentPlanTable({
                           )}
                         </td>
                         <td className="py-2.5 px-3">
-                          <span className={`${config.badgeBg} text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1`} dir="rtl">
+                          <span className={`${config.badgeBg} text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1`}>
                             {config.icon}
                             {plan.action}
                           </span>
@@ -716,7 +716,7 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
         </div>
         <CardContent className="p-5">
           <div className="flex flex-col gap-4">
-            <div className={`${config.badgeBg} text-white text-base font-bold px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2 justify-center`} dir="rtl">
+            <div className={`${config.badgeBg} text-white text-base font-bold px-4 py-2.5 rounded-xl shadow-md flex items-center gap-2 justify-center`}>
               {config.icon}
               {signal.action}
             </div>
@@ -738,7 +738,7 @@ export function CurrentSignalCard({ signal, currentPrice }: CurrentSignalCardPro
                 {signal.expectedReturn}%
               </p>
             </div>
-            <p className="text-sm text-muted-foreground text-center" dir="rtl">
+            <p className="text-sm text-muted-foreground text-center">
               {signal.label}
             </p>
           </div>
