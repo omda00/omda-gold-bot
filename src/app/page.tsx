@@ -47,12 +47,12 @@ export default function Home() {
     try {
       const result = await triggerFetchPrices();
       if (result) {
-        toast.success("تم جلب الأسعار بنجاح");
+        toast.success("تم جلب الأسعار بنجاح", { duration: 3000 });
+      } else {
+        toast.error("فشل جلب أسعار جديدة — الأسعار المعروضة من آخر تحديث ناجح", { duration: 5000 });
       }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "فشل في جلب الأسعار"
-      );
+    } catch {
+      toast.error("حدث خطأ في الاتصال", { duration: 5000 });
     }
   }, [triggerFetchPrices]);
 

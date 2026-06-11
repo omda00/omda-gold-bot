@@ -163,9 +163,20 @@ export function useDashboardData() {
         setPrices({ gold: data.gold, usdEgp: data.usdEgp });
         return data;
       } else {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to fetch prices");
+        // Don't throw - just log the error and return null
+        // The 1-second polling will keep showing existing prices
+        try {
+          const errorData = await res.json();
+          console.error("Fetch prices error:", errorData.error);
+        } catch {
+          console.error("Fetch prices error: Unknown error");
+        }
+        return null;
       }
+    } catch (err) {
+      // Network error - don't crash, just log
+      console.error("Network error fetching prices:", err);
+      return null;
     } finally {
       setLoading((prev) => ({ ...prev, fetching: false }));
     }
@@ -323,12 +334,12 @@ export function useDashboardData() {
     detectCurrentSignal(prices.gold?.price ?? null);
   }, [prices.gold?.price, plans, detectCurrentSignal]);
 
-  // Poll for prices every 60 seconds
+  // Poll for prices every 1 second (reads from database - fast)
   const startPolling = useCallback(() => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = setInterval(() => {
       fetchPrices();
-    }, 60000);
+    }, 1000);
   }, [fetchPrices]);
 
   const stopPolling = useCallback(() => {

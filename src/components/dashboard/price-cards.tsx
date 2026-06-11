@@ -9,6 +9,7 @@ import {
   Gem,
   ArrowRightLeft,
   ArrowDownUp,
+  Radio,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,7 +77,13 @@ function PriceCard({
                 {icon}
               </div>
               <div>
-                <h3 className="text-base font-bold text-foreground">{title}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-foreground">{title}</h3>
+                  <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-lg">
+                    <Radio className="w-3 h-3 text-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">مباشر</span>
+                  </div>
+                </div>
                 <p className="text-sm text-muted-foreground">{subtitle}</p>
               </div>
             </div>
@@ -191,6 +198,7 @@ function PriceCard({
                   day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
+                  second: "2-digit",
                 })}
                 {price.source && hasBuySell && (
                   <span className="mr-1">• {price.source}</span>
