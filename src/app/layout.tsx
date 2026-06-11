@@ -14,21 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Workflow Automation Platform",
+  title: "منصة متابعة الذهب والعملات | Omda",
   description:
-    "Smart automation platform for gold price monitoring in Egypt and Telegram notifications",
+    "منصة ذكية لمتابعة أسعار الذهب في مصر وإشعارات تيليجرام",
   keywords: [
-    "Z.ai",
-    "Automation",
-    "Gold",
-    "Egypt",
-    "Telegram",
-    "AI",
-    "USD/EGP",
+    "Omda",
+    "ذهب",
+    "مصر",
+    "أسعار الذهب",
+    "تيليجرام",
+    "دولار",
   ],
-  authors: [{ name: "Z.ai Team" }],
+  authors: [{ name: "Omda" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.jpg",
   },
 };
 
