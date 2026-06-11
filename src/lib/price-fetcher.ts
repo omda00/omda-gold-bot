@@ -311,12 +311,10 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
         );
       }
 
+      // Note: We do NOT use iSagha's USD/EGP rate — user wants Google Finance as primary source
+      // Store iSagha USD/EGP rate only as fallback info
       if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
-        combinedResult.usdEgp = {
-          price: isaghaPrices.usdEgpRate,
-          source: "iSagha.com",
-        };
-        console.log(`[price-fetcher] Got USD/EGP from iSagha: ${isaghaPrices.usdEgpRate}`);
+        console.log(`[price-fetcher] iSagha USD/EGP rate available (${isaghaPrices.usdEgpRate}) but using Google Finance as primary source`);
       }
     }
   } catch (pageError) {
@@ -325,16 +323,17 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
 
   // ==========================================
   // PRIMARY: Google Finance for USD/EGP
+  // User specifically requested Google Finance
+  // as the source for USD/EGP exchange rate
   // ==========================================
-  if (!combinedResult.usdEgp) {
-    try {
-      const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
-      if (gfResult) {
-        combinedResult.usdEgp = gfResult;
-      }
-    } catch (error) {
-      console.error("[price-fetcher] Google Finance fetch failed:", error);
+  try {
+    const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
+    if (gfResult) {
+      combinedResult.usdEgp = gfResult;
+      console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance: ${gfResult.price}`);
     }
+  } catch (error) {
+    console.error("[price-fetcher] Google Finance fetch failed:", error);
   }
 
   // If we have both from primary sources, return immediately

@@ -73,3 +73,28 @@ Stage Summary:
 - Bug fix: clicking refresh during auto-fetch no longer shows error toast (shows info toast instead)
 - Auto-refresh: 1s DB polling + 30s web fetch already in place
 - Lint passed with no errors
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Change USD/EGP source from iSagha.com to Google Finance
+
+Work Log:
+- Analyzed user request: the screenshot showed USD/EGP card displaying "iSagha.com" as source — user wants Google Finance instead
+- Modified fetchAllPrices() in price-fetcher.ts:
+  - Removed code that set combinedResult.usdEgp from iSagha extraction
+  - Added log message noting iSagha USD/EGP rate is available but Google Finance is preferred
+  - Changed Google Finance from conditional (if !usdEgp) to ALWAYS being called as the primary USD/EGP source
+- The fetchUsdEgpFromGoogleFinance() function already existed and uses 3 strategies:
+  1. web_search for "site:google.com finance USD EGP exchange rate"
+  2. Regex match for google.com/finance/beta/quote/USD-EGP
+  3. page_reader for https://www.google.com/finance/quote/USD-EGP
+- Fallbacks (banklive.net, web_search+LLM) only activate if Google Finance fails
+- Verified with lint: no errors
+- Verified with browser agent: page loads correctly
+
+Stage Summary:
+- USD/EGP source is now Google Finance (primary), not iSagha.com
+- Gold source remains iSagha.com (unchanged)
+- On next successful web fetch, the USD/EGP price card will show "Google Finance" as source
+- Fallback chain: Google Finance → banklive.net → web_search+LLM
