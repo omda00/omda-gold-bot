@@ -1,12 +1,10 @@
 {
-  "crons": [
+  "headers": [
     {
-      "path": "/api/automation/run",
-      "schedule": "1 * * * *"
-    },
-    {
-      "path": "/api/cron/refresh-prices",
-      "schedule": "0,30 * * * *"
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
     }
   ]
 }
