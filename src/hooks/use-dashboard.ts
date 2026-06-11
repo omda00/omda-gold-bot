@@ -405,9 +405,32 @@ export function useDashboardData() {
         config: false,
         calculator: false,
       }));
+
+      // Auto-fetch fresh prices if data is stale (> 30 min old)
+      // This ensures the deployed site always has fresh prices on visit
+      try {
+        const pricesRes = await fetch("/api/prices");
+        if (pricesRes.ok) {
+          const pricesData = await prices.json() as { gold?: { createdAt?: string }; usdEgp?: { createdAt?: string } };
+          const lastGoldUpdate = pricesData.gold?.createdAt;
+          if (lastGoldUpdate) {
+            const ageMinutes = (Date.now() - new Date(lastGoldUpdate).getTime()) / 60000;
+            if (ageMinutes > 30) {
+              console.log(`[auto-refresh] Prices are ${ageMinutes.toFixed(0)} min old, refreshing...`);
+              triggerFetchPrices();
+            }
+          } else {
+            // No prices at all — fetch immediately
+            console.log("[auto-refresh] No prices found, fetching...");
+            triggerFetchPrices();
+          }
+        }
+      } catch {
+        // Ignore auto-refresh errors
+      }
     };
     init();
-  }, [seedData, fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData, checkAdminAuth]);
+  }, [seedData, fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData, checkAdminAuth, triggerFetchPrices]);
 
   // Fetch telegram users when admin status changes
   useEffect(() => {
