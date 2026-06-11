@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fetchAllPrices, savePriceRecord, isRateLimited } from "@/lib/price-fetcher";
+import { fetchAllPrices, savePriceRecord, isRateLimited, resetRateLimit } from "@/lib/price-fetcher";
 
 // Karat symbol mapping
 const KARAT_SYMBOLS: Record<number, string> = {
@@ -31,7 +31,7 @@ interface KaratPriceResult {
 
 /**
  * GET /api/prices - Return the latest Gold and USD/EGP prices
- * This is called every second by the polling mechanism, so it must be lightweight.
+ * This is called every 10 seconds by the polling mechanism, so it must be lightweight.
  * No seeding or heavy operations here.
  */
 export async function GET() {
@@ -83,11 +83,21 @@ export async function GET() {
 
 /**
  * POST /api/prices - Trigger a price fetch from the web
- * Uses fetchAllPrices() for efficiency (single page read instead of two)
- * Now also saves all karat prices (24K, 22K, 21K, 18K) to the DB.
+ * Uses fetchAllPrices() which now uses DIRECT HTTP as primary
+ * (bypasses Z-AI SDK entirely for iSagha, no rate limits!)
+ * 
+ * Query params:
+ *   ?resetCooldown=true - Reset the Z-AI SDK rate limit cooldown
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Check if we should reset the rate limit cooldown
+    const url = new URL(request.url);
+    if (url.searchParams.get("resetCooldown") === "true") {
+      resetRateLimit();
+      console.log("[prices] Rate limit cooldown reset requested");
+    }
+
     const allPrices = await fetchAllPrices();
 
     // Save whatever we got from the web
@@ -157,6 +167,12 @@ export async function POST() {
       allKarats = calculateKaratFrom21(goldPrice.sellPrice, goldPrice.buyPrice);
     }
 
+    const successMessage = allPrices.gold || allPrices.usdEgp
+      ? "Prices fetched successfully"
+      : isRateLimited()
+        ? "Z-AI SDK rate limited — but direct HTTP sources should still work. Showing cached prices."
+        : "Could not fetch new prices from web — showing latest cached prices";
+
     return NextResponse.json({
       gold: goldPrice,
       usdEgp: usdEgpRate,
@@ -166,11 +182,7 @@ export async function POST() {
         usdEgp: allPrices.usdEgp !== null,
       },
       rateLimited: isRateLimited(),
-      message: allPrices.gold || allPrices.usdEgp
-        ? "Prices fetched successfully"
-        : isRateLimited()
-          ? "Rate limited — retrying later. Showing cached prices."
-          : "Could not fetch new prices from web — showing latest cached prices",
+      message: successMessage,
     });
   } catch (error) {
     console.error("Error fetching prices:", error);

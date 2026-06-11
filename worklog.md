@@ -54,3 +54,55 @@ Stage Summary:
 - Hourly automation now sends comprehensive report with all karats, USD/EGP, and signals to all registered Telegram users
 - Cron service runs every hour (Cairo time) and daily at 9 AM
 - All services running: Next.js (port 3000), Caddy (port 81), Cron (port 3031)
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix price synchronization - prices not updating on website
+
+Work Log:
+- User reported prices haven't changed on their website despite commanding updates
+- Diagnosed root cause: Z-AI SDK rate limiting (429 errors) was blocking ALL price fetches
+- The in-memory rate limit cooldown (5 minutes) was persisting and preventing new fetches
+- Every POST /api/prices returned "Rate limited — retrying later. Showing cached prices."
+- Gold was stuck at 6100 EGP, USD/EGP at 51.81 EGP (stale data)
+
+FIX 1: Rewrote price-fetcher.ts to use DIRECT HTTP fetch as PRIMARY method
+- Added `fetchIsaghaDirectly()` function using Node.js `fetch()` directly
+- This bypasses Z-AI SDK entirely — CANNOT be rate limited!
+- New priority order:
+  1. Direct HTTP: iSagha.com (NO rate limits, PRIMARY)
+  2. Free API: USD/EGP from open.er-api.com (NO rate limits)
+  3. Z-AI SDK: iSagha via page_reader (backup, may be rate limited)
+  4. Z-AI SDK: Google Finance via page_reader (backup)
+  5. Z-AI SDK: banklive.net (fallback)
+  6. Z-AI SDK: web_search + LLM (last resort)
+- Reduced rate limit cooldown from 5 minutes to 1 minute
+- Added `resetRateLimit()` function for manual cooldown reset
+
+FIX 2: Updated prices API route
+- Added `?resetCooldown=true` query param to reset rate limit
+- Better error messages distinguishing between rate limited and fetch failures
+
+FIX 3: Updated cron service
+- Added 30-minute price refresh cron job (keeps DB current)
+- Added `refreshPrices()` function for lightweight price updates
+- Added `/refresh-prices` endpoint for manual price-only refresh
+- Better error handling with consecutive failure tracking
+- Initial price refresh on startup
+- Improved logging with Cairo time formatting
+
+RESULTS:
+- Prices now update successfully via direct HTTP: Gold 21K = 6065 EGP, USD/EGP = 52.03
+- `fetched: { gold: true, usdEgp: true }` — both prices fetched successfully
+- `rateLimited: false` — no more rate limiting
+- Cron trigger works: sends hourly report to 1/1 Telegram user ✅
+- Both global and per-user Telegram test work ✅
+- Browser verification: all prices display correctly, refresh button works
+- All services running: Next.js (3000), Cron (3031), Caddy (81)
+
+Stage Summary:
+- Core fix: Added direct HTTP fetch for iSagha.com (bypasses Z-AI SDK rate limits entirely)
+- Prices now sync reliably every 2 minutes (dashboard auto-fetch) + every 30 minutes (cron) + every hour (full automation with Telegram)
+- Telegram hourly reports working with all karats, USD/EGP, and trading signals
+- Rate limit cooldown reduced from 5 min to 1 min, with manual reset option

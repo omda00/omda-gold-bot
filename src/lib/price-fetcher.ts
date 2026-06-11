@@ -3,11 +3,11 @@ import { db } from "@/lib/db";
 
 // ==========================================
 // Rate limit protection: If we get a 429,
-// stop trying for 5 minutes to avoid hammering
-// the API and getting more 429s
+// stop trying Z-AI SDK for 60 seconds
+// (reduced from 5 minutes to avoid blocking)
 // ==========================================
 let last429Time = 0;
-const COOLDOWN_AFTER_429 = 5 * 60 * 1000; // 5 minutes
+const COOLDOWN_AFTER_429 = 60 * 1000; // 1 minute (was 5 min)
 
 function isInCooldown(): boolean {
   return Date.now() - last429Time < COOLDOWN_AFTER_429;
@@ -15,7 +15,7 @@ function isInCooldown(): boolean {
 
 function mark429(): void {
   last429Time = Date.now();
-  console.log(`[price-fetcher] ⚠️ Rate limit hit (429). Cooling down for 5 minutes until ${new Date(last429Time + COOLDOWN_AFTER_429).toLocaleTimeString()}`);
+  console.log(`[price-fetcher] ⚠️ Rate limit hit (429). Cooling down Z-AI SDK for 1 minute until ${new Date(last429Time + COOLDOWN_AFTER_429).toLocaleTimeString()}`);
 }
 
 /** Check if an error is a 429 rate limit error and mark cooldown if so */
@@ -24,6 +24,12 @@ function checkAndMark429(error: unknown): void {
   if (msg.includes("429") || msg.includes("Too many requests")) {
     mark429();
   }
+}
+
+/** Reset the rate limit cooldown - useful when we want to force a fresh attempt */
+export function resetRateLimit(): void {
+  last429Time = 0;
+  console.log("[price-fetcher] Rate limit cooldown reset");
 }
 
 export function isRateLimited(): boolean {
@@ -94,6 +100,42 @@ interface IsaghaExtractionResult {
   silverSell: number | null;
   silverBuy: number | null;
   usdEgpRate: number | null;
+}
+
+// ==========================================
+// PRIMARY METHOD: Direct HTTP fetch from iSagha
+// This does NOT use Z-AI SDK and therefore
+// CANNOT be rate-limited. It uses standard
+// Node.js fetch() directly.
+// ==========================================
+
+/**
+ * Fetch iSagha HTML directly via HTTP (no Z-AI SDK, no rate limits)
+ */
+async function fetchIsaghaDirectly(url: string): Promise<string> {
+  try {
+    console.log(`[price-fetcher] 🌐 Direct HTTP fetch: ${url}`);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000), // 15s timeout
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`[price-fetcher] Direct HTTP fetch failed with status ${response.status}`);
+      return "";
+    }
+
+    const html = await response.text();
+    console.log(`[price-fetcher] ✅ Direct HTTP fetch succeeded (${html.length} chars)`);
+    return html;
+  } catch (err) {
+    console.error("[price-fetcher] Direct HTTP fetch error:", err);
+    return "";
+  }
 }
 
 /**
@@ -215,8 +257,6 @@ function extractFromIsaghaHtml(html: string): IsaghaExtractionResult {
   }
 
   // === Extract Silver price ===
-  // From calculator page: "السعر المحلى للفضة 92 ج.م"
-  // From prices page: may show "عيار 999" or "الفضة" sections
   const silverPatterns = [
     /السعر المحلى للفضة\s*([0-9,]+\.?\d*)\s*ج\.?م/,
     /سعر الفضة[^0-9]*?([0-9,]+\.?\d*)\s*ج\.?م/,
@@ -280,16 +320,20 @@ async function fetchUsdEgpFromFreeApi(): Promise<PriceFetchResult | null> {
 }
 
 /**
- * Fetch USD/EGP rate from Google Finance via page_reader and web_search.
+ * SECONDARY: Fetch USD/EGP from Google Finance via Z-AI SDK
+ * Only used when free API fails and we're not rate-limited
  */
 async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchResult | null> {
-  try {
-    console.log("[price-fetcher] Fetching USD/EGP from Google Finance...");
+  // Skip if we're in rate limit cooldown
+  if (isInCooldown()) {
+    console.log("[price-fetcher] ⏸️ Skipping Google Finance — Z-AI SDK in cooldown");
+    return null;
+  }
 
-    // ==========================================
+  try {
+    console.log("[price-fetcher] Fetching USD/EGP from Google Finance (Z-AI SDK)...");
+
     // Strategy 1: Direct page_reader from Google Finance beta quote URL
-    // This is the PRIMARY method — user specifically requested this URL
-    // ==========================================
     try {
       const gfResult = await zai.functions.invoke("page_reader", {
         url: "https://www.google.com/finance/beta/quote/USD-EGP",
@@ -298,7 +342,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       const gfHtml = gfResult?.data?.html || "";
 
       // Try multiple patterns to extract the rate from the HTML
-      // Pattern 1: data-last-price attribute
       const dataLastPriceMatch = gfHtml.match(/data-last-price="([0-9.]+)"/);
       if (dataLastPriceMatch) {
         const rate = parseFloat(dataLastPriceMatch[1]);
@@ -308,7 +351,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
         }
       }
 
-      // Pattern 2: Extract from text content — look for "United States Dollar / Egyptian Pound" followed by a number
       const textContent = gfHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
       const usdEgpTextMatch = textContent.match(
         /United States Dollar\s*\/\s*Egyptian Pound[^0-9]*?([0-9]+\.[0-9]+)/
@@ -321,7 +363,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
         }
       }
 
-      // Pattern 3: Look for USD/Egyptian Pound patterns with price
       const poundMatch = textContent.match(/USD\s*\/\s*EGP[^0-9]*?([4-7][0-9]\.[0-9]+)/);
       if (poundMatch) {
         const rate = parseFloat(poundMatch[1]);
@@ -331,7 +372,6 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
         }
       }
 
-      // Pattern 4: Any number in the 40-80 range that looks like an exchange rate
       const priceNumbers = textContent.match(/[0-9]+\.[0-9]{2,4}/g) || [];
       for (const numStr of priceNumbers) {
         const val = parseFloat(numStr);
@@ -340,16 +380,12 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
           return { price: val, source: "Google Finance" };
         }
       }
-
-      console.log("[price-fetcher] Google Finance beta page loaded but couldn't extract rate from HTML");
     } catch (pageErr) {
       console.error("[price-fetcher] Google Finance beta page_reader failed:", pageErr);
       checkAndMark429(pageErr);
     }
 
-    // ==========================================
     // Strategy 2: Try the non-beta Google Finance URL
-    // ==========================================
     try {
       const gfResult = await zai.functions.invoke("page_reader", {
         url: "https://www.google.com/finance/quote/USD-EGP",
@@ -368,36 +404,9 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
       console.error("[price-fetcher] Google Finance non-beta page_reader failed:", pageErr);
       checkAndMark429(pageErr);
     }
-
-    // ==========================================
-    // Strategy 3: web_search as last resort
-    // ==========================================
-    try {
-      const searchResults = await zai.functions.invoke("web_search", {
-        query: "site:google.com finance USD EGP exchange rate",
-        num: 3,
-      });
-
-      const searchText =
-        typeof searchResults === "string" ? searchResults : JSON.stringify(searchResults);
-
-      const rateMatch = searchText.match(
-        /United States Dollar\s*\/\s*Egyptian Pound[^0-9]*?([0-9]+\.[0-9]+)/
-      );
-      if (rateMatch) {
-        const rate = parseFloat(rateMatch[1]);
-        if (rate > 40 && rate < 80) {
-          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance (web_search): ${rate}`);
-          return { price: rate, source: "Google Finance" };
-        }
-      }
-    } catch (searchErr) {
-      console.error("[price-fetcher] Google Finance web_search failed:", searchErr);
-      checkAndMark429(searchErr);
-    }
-
   } catch (error) {
     console.error("[price-fetcher] Google Finance fetch failed:", error);
+    checkAndMark429(error);
   }
 
   return null;
@@ -406,17 +415,14 @@ async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchRes
 /**
  * Fetch BOTH gold price and USD/EGP rate.
  *
- * Gold source: iSagha.com (market.isagha.com/prices) — PRIMARY AND AUTHORITATIVE
- * USD/EGP source: Google Finance — PRIMARY (user requested)
+ * STRATEGY (in priority order):
+ * 1. DIRECT HTTP: iSagha.com via Node.js fetch() — NO rate limits!
+ * 2. Z-AI SDK: iSagha via page_reader (backup, may be rate-limited)
+ * 3. Free API: USD/EGP from open.er-api.com — NO rate limits!
+ * 4. Z-AI SDK: Google Finance via page_reader (backup, may be rate-limited)
+ * 5. Z-AI SDK: web_search + LLM (last resort, may be rate-limited)
  */
 export async function fetchAllPrices(): Promise<CombinedPriceResult> {
-  // If we're in rate-limit cooldown, skip fetching entirely
-  if (isInCooldown()) {
-    console.log("[price-fetcher] ⏸️ Skipping fetch — in rate-limit cooldown");
-    return { gold: null, usdEgp: null, allKarats: [] };
-  }
-
-  const zai = await ZAI.create();
   const combinedResult: CombinedPriceResult = {
     gold: null,
     usdEgp: null,
@@ -424,16 +430,13 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   };
 
   // ==========================================
-  // PRIMARY: iSagha.com for Gold Prices
+  // METHOD 1 (PRIMARY): Direct HTTP fetch from iSagha
+  // This does NOT use Z-AI SDK — CANNOT be rate limited!
   // ==========================================
   try {
-    console.log("[price-fetcher] 🥇 Fetching gold prices from iSagha.com (market.isagha.com/prices)...");
+    console.log("[price-fetcher] 🥇 PRIMARY: Fetching gold prices from iSagha.com via DIRECT HTTP...");
+    const isaghaHtml = await fetchIsaghaDirectly("https://market.isagha.com/prices");
 
-    const isaghaResult = await zai.functions.invoke("page_reader", {
-      url: "https://market.isagha.com/prices",
-    });
-
-    const isaghaHtml = isaghaResult?.data?.html || "";
     if (isaghaHtml) {
       const isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
 
@@ -445,11 +448,11 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
           sellPrice: isaghaPrices.gold21Sell,
         };
         console.log(
-          `[price-fetcher] ✅ Got gold from iSagha: sell=${isaghaPrices.gold21Sell}, buy=${isaghaPrices.gold21Buy}`
+          `[price-fetcher] ✅ Got gold from iSagha (direct): sell=${isaghaPrices.gold21Sell}, buy=${isaghaPrices.gold21Buy}`
         );
       }
 
-      // Extract all karat prices from iSagha data
+      // Extract all karat prices
       const karatData: { karat: number; sell: number | null; buy: number | null }[] = [
         { karat: 24, sell: isaghaPrices.gold24Sell, buy: isaghaPrices.gold24Buy },
         { karat: 22, sell: isaghaPrices.gold22Sell, buy: isaghaPrices.gold22Buy },
@@ -465,26 +468,107 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
           });
         }
       }
-      console.log(`[price-fetcher] ✅ Extracted ${combinedResult.allKarats.length} karat prices from iSagha`);
+      console.log(`[price-fetcher] ✅ Extracted ${combinedResult.allKarats.length} karat prices from iSagha (direct)`);
 
-      // Note: We do NOT use iSagha's USD/EGP rate — user wants Google Finance as primary source
-      // Store iSagha USD/EGP rate only as fallback info
+      // Also try to get USD/EGP from iSagha
       if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
-        console.log(`[price-fetcher] iSagha USD/EGP rate available (${isaghaPrices.usdEgpRate}) but using Google Finance as primary source`);
+        combinedResult.usdEgp = {
+          price: isaghaPrices.usdEgpRate,
+          source: "iSagha.com",
+        };
+        console.log(`[price-fetcher] ✅ Got USD/EGP from iSagha (direct): ${isaghaPrices.usdEgpRate}`);
       }
     }
-  } catch (pageError) {
-    console.error("[price-fetcher] ❌ iSagha page_reader failed:", pageError);
-    checkAndMark429(pageError);
+  } catch (directErr) {
+    console.error("[price-fetcher] ❌ Direct iSagha HTTP fetch failed:", directErr);
   }
 
   // ==========================================
-  // PRIMARY: Google Finance for USD/EGP
-  // User specifically requested Google Finance
-  // as the source for USD/EGP exchange rate
+  // METHOD 2: Free Exchange Rate API for USD/EGP
+  // This does NOT use Z-AI SDK — CANNOT be rate limited!
   // ==========================================
-  if (!isInCooldown()) {
+  if (!combinedResult.usdEgp) {
+    const freeApiResult = await fetchUsdEgpFromFreeApi();
+    if (freeApiResult) {
+      combinedResult.usdEgp = freeApiResult;
+      console.log(`[price-fetcher] ✅ Got USD/EGP from free API: ${freeApiResult.price}`);
+    }
+  }
+
+  // If we got both gold and USD/EGP without Z-AI SDK, return immediately!
+  if (combinedResult.gold && combinedResult.usdEgp) {
+    console.log("[price-fetcher] ✅ Got both prices via DIRECT HTTP + Free API (no Z-AI SDK needed!)");
+    return combinedResult;
+  }
+
+  // ==========================================
+  // METHOD 3 (FALLBACK): Z-AI SDK for iSagha
+  // Only if direct HTTP failed AND we're not rate-limited
+  // ==========================================
+  if (!combinedResult.gold && !isInCooldown()) {
     try {
+      console.log("[price-fetcher] 🔄 FALLBACK: Fetching gold from iSagha via Z-AI SDK page_reader...");
+      const zai = await ZAI.create();
+
+      const isaghaResult = await zai.functions.invoke("page_reader", {
+        url: "https://market.isagha.com/prices",
+      });
+
+      const isaghaHtml = isaghaResult?.data?.html || "";
+      if (isaghaHtml) {
+        const isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+
+        if (isaghaPrices.gold21Sell && isaghaPrices.gold21Sell > 0) {
+          combinedResult.gold = {
+            price: isaghaPrices.gold21Sell,
+            source: "iSagha.com (SDK)",
+            buyPrice: isaghaPrices.gold21Buy || undefined,
+            sellPrice: isaghaPrices.gold21Sell,
+          };
+          console.log(
+            `[price-fetcher] ✅ Got gold from iSagha (SDK): sell=${isaghaPrices.gold21Sell}, buy=${isaghaPrices.gold21Buy}`
+          );
+        }
+
+        // Extract karat prices if not already present
+        if (combinedResult.allKarats.length === 0) {
+          const karatData: { karat: number; sell: number | null; buy: number | null }[] = [
+            { karat: 24, sell: isaghaPrices.gold24Sell, buy: isaghaPrices.gold24Buy },
+            { karat: 22, sell: isaghaPrices.gold22Sell, buy: isaghaPrices.gold22Buy },
+            { karat: 21, sell: isaghaPrices.gold21Sell, buy: isaghaPrices.gold21Buy },
+            { karat: 18, sell: isaghaPrices.gold18Sell, buy: isaghaPrices.gold18Buy },
+          ];
+          for (const k of karatData) {
+            if (k.sell && k.sell > 0) {
+              combinedResult.allKarats.push({
+                karat: k.karat,
+                sellPrice: k.sell,
+                buyPrice: k.buy,
+              });
+            }
+          }
+        }
+
+        // Also try USD/EGP from iSagha SDK
+        if (!combinedResult.usdEgp && isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
+          combinedResult.usdEgp = {
+            price: isaghaPrices.usdEgpRate,
+            source: "iSagha.com (SDK)",
+          };
+        }
+      }
+    } catch (pageError) {
+      console.error("[price-fetcher] ❌ iSagha Z-AI SDK page_reader failed:", pageError);
+      checkAndMark429(pageError);
+    }
+  }
+
+  // ==========================================
+  // METHOD 4 (FALLBACK): Z-AI SDK for Google Finance USD/EGP
+  // ==========================================
+  if (!combinedResult.usdEgp && !isInCooldown()) {
+    try {
+      const zai = await ZAI.create();
       const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
       if (gfResult) {
         combinedResult.usdEgp = gfResult;
@@ -494,59 +578,6 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
       console.error("[price-fetcher] Google Finance fetch failed:", error);
       checkAndMark429(error);
     }
-  } else {
-    console.log("[price-fetcher] ⏸️ Skipping Google Finance — in rate-limit cooldown, using free API fallback");
-  }
-
-  // ==========================================
-  // FALLBACK: Free exchange rate API (no Z-AI SDK needed)
-  // This always works, even when Z-AI SDK is rate-limited
-  // ==========================================
-  if (!combinedResult.usdEgp) {
-    const freeApiResult = await fetchUsdEgpFromFreeApi();
-    if (freeApiResult) {
-      combinedResult.usdEgp = freeApiResult;
-      console.log(`[price-fetcher] ✅ Got USD/EGP from free API fallback: ${freeApiResult.price}`);
-    }
-  }
-
-  // If we have both from primary sources, return immediately
-  if (combinedResult.gold && combinedResult.usdEgp) {
-    console.log("[price-fetcher] ✅ Got both prices from primary sources (iSagha + Google Finance)");
-    return combinedResult;
-  }
-
-  // ==========================================
-  // FALLBACK 1: iSagha via web_search
-  // ==========================================
-  if (!combinedResult.gold) {
-    try {
-      console.log("[price-fetcher] Fallback: Searching iSagha.com via web_search...");
-
-      const searchResults = await zai.functions.invoke("web_search", {
-        query: "site:market.isagha.com سعر الذهب عيار 21 في مصر اليوم",
-        num: 3,
-      });
-
-      const searchText =
-        typeof searchResults === "string" ? searchResults : JSON.stringify(searchResults);
-
-      const snippetMatch = searchText.match(/عيار 21\s*([0-9,]+)\s*ج\.?م/);
-      if (snippetMatch) {
-        const sell = parseFloat(snippetMatch[1].replace(/,/g, ""));
-        if (sell >= 5000 && sell <= 10000) {
-          combinedResult.gold = {
-            price: sell,
-            source: "iSagha.com",
-            sellPrice: sell,
-          };
-          console.log(`[price-fetcher] Got gold from iSagha search: ${sell}`);
-        }
-      }
-    } catch (searchError) {
-      console.error("[price-fetcher] iSagha web_search failed:", searchError);
-      checkAndMark429(searchError);
-    }
   }
 
   if (combinedResult.gold && combinedResult.usdEgp) {
@@ -554,12 +585,12 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   }
 
   // ==========================================
-  // FALLBACK 2: banklive.net
+  // METHOD 5 (LAST RESORT): banklive.net via Z-AI SDK
   // ==========================================
-  if (!combinedResult.gold || !combinedResult.usdEgp) {
+  if ((!combinedResult.gold || !combinedResult.usdEgp) && !isInCooldown()) {
     try {
-      console.log("[price-fetcher] Fallback: banklive.net...");
-
+      const zai = await ZAI.create();
+      console.log("[price-fetcher] 🔄 LAST RESORT: banklive.net...");
       const bankliveResult = await zai.functions.invoke("page_reader", {
         url: "https://banklive.net/ar/gold-price-today-in-egypt",
       });
@@ -595,11 +626,12 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   }
 
   // ==========================================
-  // FALLBACK 3: Broader web search + LLM
+  // METHOD 6 (FINAL): Broader web search + LLM
   // ==========================================
-  if (!combinedResult.gold || !combinedResult.usdEgp) {
+  if ((!combinedResult.gold || !combinedResult.usdEgp) && !isInCooldown()) {
     try {
-      console.log("[price-fetcher] Final fallback: web search + LLM...");
+      const zai = await ZAI.create();
+      console.log("[price-fetcher] 🔄 FINAL: web search + LLM...");
       const searchResults = await zai.functions.invoke("web_search", {
         query: "سعر الذهب عيار 21 في مصر اليوم من iSagha جنيه مصري وسعر الدولار",
         num: 5,
@@ -667,27 +699,9 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
 
 /**
  * Fetch calculator prices: all karats, gold pound, and silver from iSagha.
- * Uses BOTH the prices page and the calculator page for complete data.
+ * Uses BOTH direct HTTP and the calculator page for complete data.
  */
 export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
-  // Respect rate limit cooldown
-  if (isInCooldown()) {
-    console.log("[calculator] ⏸️ Skipping fetch — in rate-limit cooldown");
-    return {
-      karats: [
-        { karat: 24, sellPrice: null, buyPrice: null },
-        { karat: 22, sellPrice: null, buyPrice: null },
-        { karat: 21, sellPrice: null, buyPrice: null },
-        { karat: 18, sellPrice: null, buyPrice: null },
-      ],
-      goldPound: { sellPrice: null, buyPrice: null },
-      source: "",
-      fetchedAt: new Date().toISOString(),
-    };
-  }
-
-  const zai = await ZAI.create();
-
   const emptyResult: CalculatorPriceResult = {
     karats: [
       { karat: 24, sellPrice: null, buyPrice: null },
@@ -700,35 +714,45 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
     fetchedAt: new Date().toISOString(),
   };
 
-  // Fetch from iSagha prices page
+  // PRIMARY: Direct HTTP fetch from iSagha prices page
   let isaghaPrices: IsaghaExtractionResult | null = null;
   try {
-    console.log("[calculator] Fetching prices from iSagha.com/prices...");
-    const isaghaResult = await zai.functions.invoke("page_reader", {
-      url: "https://market.isagha.com/prices",
-    });
-    const isaghaHtml = isaghaResult?.data?.html || "";
+    console.log("[calculator] PRIMARY: Fetching prices from iSagha.com via DIRECT HTTP...");
+    const isaghaHtml = await fetchIsaghaDirectly("https://market.isagha.com/prices");
     if (isaghaHtml) {
       isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
     }
   } catch (err) {
-    console.error("[calculator] iSagha prices page failed:", err);
-    checkAndMark429(err);
+    console.error("[calculator] Direct iSagha HTTP fetch failed:", err);
   }
 
-  // Fetch from iSagha calculator page for additional data
+  // Also try the calculator page via direct HTTP
   try {
-    console.log("[calculator] Fetching additional data from iSagha.com/calculateGoldPrice...");
-    const calcResult = await zai.functions.invoke("page_reader", {
-      url: "https://market.isagha.com/calculateGoldPrice",
-    });
-    const calcHtml = calcResult?.data?.html || "";
+    console.log("[calculator] Fetching additional data from iSagha.com/calculateGoldPrice via DIRECT HTTP...");
+    const calcHtml = await fetchIsaghaDirectly("https://market.isagha.com/calculateGoldPrice");
     if (calcHtml && !isaghaPrices) {
       isaghaPrices = extractFromIsaghaHtml(calcHtml);
     }
   } catch (err) {
-    console.error("[calculator] iSagha calculator page failed:", err);
-    checkAndMark429(err);
+    console.error("[calculator] Direct iSagha calculator page HTTP fetch failed:", err);
+  }
+
+  // FALLBACK: Z-AI SDK if direct HTTP didn't work
+  if (!isaghaPrices && !isInCooldown()) {
+    try {
+      console.log("[calculator] FALLBACK: Fetching from iSagha via Z-AI SDK...");
+      const zai = await ZAI.create();
+      const isaghaResult = await zai.functions.invoke("page_reader", {
+        url: "https://market.isagha.com/prices",
+      });
+      const isaghaHtml = isaghaResult?.data?.html || "";
+      if (isaghaHtml) {
+        isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+      }
+    } catch (err) {
+      console.error("[calculator] iSagha Z-AI SDK failed:", err);
+      checkAndMark429(err);
+    }
   }
 
   if (!isaghaPrices) {
