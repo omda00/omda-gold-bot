@@ -70,7 +70,7 @@ function buildHourlyReport(params: {
   const goldArrow = goldChange >= 0 ? "▲" : "▼";
   const usdArrow = usdEgpChange >= 0 ? "▲" : "▼";
 
-  let report = "📊 <b>تحديث ساعي — أسعار الذهب والعملات</b>\n";
+  let report = "📊 <b>تحديث ساعة — أسعار الذهب والعملات</b>\n";
   report += `🕐 ${new Date().toLocaleString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" })} بتوقيت مصر\n\n`;
 
   // Gold prices for all karats

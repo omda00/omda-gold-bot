@@ -106,3 +106,31 @@ Stage Summary:
 - Prices now sync reliably every 2 minutes (dashboard auto-fetch) + every 30 minutes (cron) + every hour (full automation with Telegram)
 - Telegram hourly reports working with all karats, USD/EGP, and trading signals
 - Rate limit cooldown reduced from 5 min to 1 min, with manual reset option
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Change "تحديث ساعي" to "تحديث ساعة" and make USD/EGP come from Google Finance
+
+Work Log:
+- Changed "تحديث ساعي" to "تحديث ساعة" in Telegram hourly report (automation/run/route.ts)
+- Added direct HTTP fetch for Google Finance USD/EGP (no Z-AI SDK, no rate limits!)
+  - fetchUsdEgpFromGoogleFinanceDirect() — fetches Google Finance page directly
+  - Tries both /finance/quote/USD-EGP and /finance/beta/quote/USD-EGP
+  - Also tries Google Search "USD to EGP" as additional fallback
+  - Extracts rate from data-last-price attribute, text content, and pattern matching
+- Restructured USD/EGP source priority:
+  1. Google Finance Direct HTTP (PRIMARY - no rate limits!)
+  2. Google Finance via Z-AI SDK (backup)
+  3. Free Exchange Rate API (fallback when Google completely unavailable)
+  4. iSagha is NO LONGER used for USD/EGP (only for gold)
+- Updated price-cards component to show Google Finance as USD/EGP source
+- Verified website shows: Gold = "iSagha.com", USD/EGP = "Google Finance"
+- Verified Telegram hourly report shows "تحديث ساعة" instead of "تحديث ساعي"
+- Browser verification: all source badges correct, prices accurate
+
+Stage Summary:
+- Text changed: "تحديث ساعي" → "تحديث ساعة"
+- USD/EGP now comes from Google Finance (direct HTTP, no rate limits)
+- Website and Telegram both show Google Finance as USD/EGP source
+- Gold continues to come from iSagha.com as before
