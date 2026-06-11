@@ -237,7 +237,7 @@ export function PriceCards({
             </span>
             <span className="inline-flex items-center gap-1 bg-white/80 dark:bg-background/60 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30">
               <DollarSign className="w-3 h-3" />
-              Google Finance
+              {prices.usdEgp?.source || "Google Finance"}
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-lg">

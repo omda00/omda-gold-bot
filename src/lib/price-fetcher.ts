@@ -246,7 +246,34 @@ function extractFromIsaghaHtml(html: string): IsaghaExtractionResult {
 }
 
 /**
- * Fetch USD/EGP rate from Google Finance via web_search.
+ * Fallback: Fetch USD/EGP from a free exchange rate API.
+ * This doesn't use Z-AI SDK so it's not subject to rate limiting.
+ * Used when Google Finance is unavailable due to rate limits.
+ */
+async function fetchUsdEgpFromFreeApi(): Promise<PriceFetchResult | null> {
+  try {
+    console.log("[price-fetcher] Fetching USD/EGP from free exchange rate API (open.er-api.com)...");
+    const response = await fetch("https://open.er-api.com/v6/latest/USD", {
+      signal: AbortSignal.timeout(10000), // 10s timeout
+    });
+    if (!response.ok) {
+      console.error(`[price-fetcher] Free API returned status ${response.status}`);
+      return null;
+    }
+    const data = await response.json() as { rates?: Record<string, number>; result?: string };
+    const egpRate = data?.rates?.EGP;
+    if (egpRate && egpRate > 40 && egpRate < 80) {
+      console.log(`[price-fetcher] ✅ Got USD/EGP from free exchange API: ${egpRate}`);
+      return { price: Math.round(egpRate * 100) / 100, source: "Exchange Rate API" };
+    }
+  } catch (err) {
+    console.error("[price-fetcher] Free exchange API failed:", err);
+  }
+  return null;
+}
+
+/**
+ * Fetch USD/EGP rate from Google Finance via page_reader and web_search.
  */
 async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchResult | null> {
   try {
@@ -430,15 +457,31 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   // User specifically requested Google Finance
   // as the source for USD/EGP exchange rate
   // ==========================================
-  try {
-    const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
-    if (gfResult) {
-      combinedResult.usdEgp = gfResult;
-      console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance: ${gfResult.price}`);
+  if (!isInCooldown()) {
+    try {
+      const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
+      if (gfResult) {
+        combinedResult.usdEgp = gfResult;
+        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance: ${gfResult.price}`);
+      }
+    } catch (error) {
+      console.error("[price-fetcher] Google Finance fetch failed:", error);
+      checkAndMark429(error);
     }
-  } catch (error) {
-    console.error("[price-fetcher] Google Finance fetch failed:", error);
-    checkAndMark429(error);
+  } else {
+    console.log("[price-fetcher] ⏸️ Skipping Google Finance — in rate-limit cooldown, using free API fallback");
+  }
+
+  // ==========================================
+  // FALLBACK: Free exchange rate API (no Z-AI SDK needed)
+  // This always works, even when Z-AI SDK is rate-limited
+  // ==========================================
+  if (!combinedResult.usdEgp) {
+    const freeApiResult = await fetchUsdEgpFromFreeApi();
+    if (freeApiResult) {
+      combinedResult.usdEgp = freeApiResult;
+      console.log(`[price-fetcher] ✅ Got USD/EGP from free API fallback: ${freeApiResult.price}`);
+    }
   }
 
   // If we have both from primary sources, return immediately

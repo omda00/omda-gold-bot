@@ -98,3 +98,29 @@ Stage Summary:
 - Gold source remains iSagha.com (unchanged)
 - On next successful web fetch, the USD/EGP price card will show "Google Finance" as source
 - Fallback chain: Google Finance → banklive.net → web_search+LLM
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Fix USD/EGP price fetching from Google Finance and handle Z-AI SDK rate limiting (429)
+
+Work Log:
+- Identified root cause: Z-AI SDK rate limit (429) was blocking ALL price fetch attempts due to previous excessive auto-fetch (every 60 seconds creating 3370+ failed requests)
+- Changed auto-fetch interval from 60 seconds to 5 minutes (300000ms) in use-dashboard.ts to prevent future rate limit issues
+- Added free Exchange Rate API (open.er-api.com) as a reliable fallback for USD/EGP that doesn't use Z-AI SDK
+- Updated fetchAllPrices() in price-fetcher.ts:
+  - Google Finance is still the primary source (tried first when not rate-limited)
+  - When in cooldown (429 detected), Google Finance is skipped entirely to avoid wasting quota
+  - Free Exchange Rate API (open.er-api.com) is used as fallback when Google Finance fails or is in cooldown
+  - This ensures USD/EGP price is ALWAYS available, even when Z-AI SDK is rate-limited
+- Updated price-cards.tsx: USD/EGP source badge now dynamically shows the actual source used (e.g., "Exchange Rate API" or "Google Finance")
+- Successfully fetched USD/EGP = 51.81 EGP from the free Exchange Rate API
+- Price is now showing on the dashboard with correct source label
+
+Stage Summary:
+- USD/EGP price is now displaying: 51.81 EGP from "Exchange Rate API"
+- Auto-fetch interval: 5 minutes (was 1 minute) — prevents rate limiting
+- Fallback chain for USD/EGP: Google Finance (primary, Z-AI SDK) → Exchange Rate API (free, no Z-AI SDK) → banklive.net → web_search+LLM
+- Z-AI SDK rate limit (429) is still active on all functions — need to wait for reset (likely hourly)
+- Once rate limit clears: Google Finance will automatically become primary source again
+- Gold price still uses iSagha.com (requires Z-AI SDK) — cached at 6100 EGP until rate limit clears

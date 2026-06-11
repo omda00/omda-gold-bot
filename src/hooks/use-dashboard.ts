@@ -376,18 +376,20 @@ export function useDashboardData() {
 
   // =============================================
   // Auto-fetch: Fetch fresh prices from the web
-  // every 1 minute in the background
+  // every 5 minutes in the background
   // This keeps the database updated so the 1-second
   // polling always shows relatively fresh data
+  // NOTE: Changed from 1 minute to 5 minutes to avoid
+  // hitting Z-AI SDK rate limits (429 errors)
   // =============================================
   const startAutoFetch = useCallback(() => {
     if (autoFetchIntervalRef.current) clearInterval(autoFetchIntervalRef.current);
     // Fetch immediately on start
     triggerFetchPrices();
-    // Then every 1 minute (60000ms)
+    // Then every 5 minutes (300000ms) — avoids rate limiting
     autoFetchIntervalRef.current = setInterval(() => {
       triggerFetchPrices();
-    }, 60000);
+    }, 300000);
   }, [triggerFetchPrices]);
 
   const stopAutoFetch = useCallback(() => {
