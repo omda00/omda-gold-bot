@@ -39,7 +39,6 @@ export default function Home() {
     deleteTelegramUser,
     toggleTelegramUser,
     testTelegramUser,
-    registerTelegramBot,
     adminLogin,
     adminLogout,
   } = useDashboardData();
@@ -109,10 +108,10 @@ export default function Home() {
               </TabsTrigger>
               <TabsTrigger
                 value="register-bot"
-                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-400 data-[state=active]:to-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-teal-400/20 px-3 py-1.5 text-xs font-bold transition-all"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#229ED9] data-[state=active]:to-[#1a8bc4] data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-[#229ED9]/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
                 <Bot className="w-3.5 h-3.5" />
-                <span>تسجيل بوت</span>
+                <span>بوت التيليجرام</span>
               </TabsTrigger>
               <TabsTrigger
                 value="settings"
@@ -178,9 +177,9 @@ export default function Home() {
             />
           </TabsContent>
 
-          {/* TAB 4: Register Bot (Public) */}
+          {/* TAB 4: Telegram Bot (Public) */}
           <TabsContent value="register-bot">
-            <BotRegistration onRegister={registerTelegramBot} />
+            <BotRegistration />
           </TabsContent>
 
           {/* TAB 5: Settings (Admin) */}

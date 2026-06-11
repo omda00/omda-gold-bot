@@ -1,205 +1,200 @@
 "use client";
 
-import { useState } from "react";
 import {
-  Bot,
-  Key,
-  Send,
-  RefreshCw,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  MessageCircle,
+  Bell,
+  TrendingDown,
+  Clock,
   Shield,
+  ExternalLink,
+  Sparkles,
+  Zap,
+  ArrowLeft,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 
-interface BotRegistrationProps {
-  onRegister: (name: string, botToken: string, chatId: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
-}
+const BOT_LINK = "https://t.me/gold_investmentbot";
 
-export function BotRegistration({ onRegister }: BotRegistrationProps) {
-  const [name, setName] = useState("");
-  const [botToken, setBotToken] = useState("");
-  const [chatId, setChatId] = useState("");
-  const [showToken, setShowToken] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  const handleRegister = async () => {
-    if (!name.trim() || !botToken.trim() || !chatId.trim()) {
-      toast.error("يرجى ملء جميع الحقول");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await onRegister(name.trim(), botToken.trim(), chatId.trim());
-      if (result.ok) {
-        setSuccess(true);
-        toast.success("تم تسجيل البوت بنجاح — سيصلك التحديث كل ساعة 🎉");
-        setName("");
-        setBotToken("");
-        setChatId("");
-      } else {
-        toast.error(result.error || "فشل في تسجيل البوت");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export function BotRegistration() {
   return (
-    <div className="space-y-3">
-      {/* How it works card */}
-      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-500" />
-        <CardContent className="p-5">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-sky-500 flex items-center justify-center flex-shrink-0 shadow-sm shadow-teal-400/20">
-              <MessageCircle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold mb-1">كيف يعمل؟</h3>
-              <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
-                <p>
-                  🔔 ستصلك أسعار الذهب والذهب عيار 21 والدولار كل ساعة بتوقيت مصر على بوت التيليجرام الخاص بك
-                </p>
-                <p>
-                  📉 تنبيه فوري عند انخفاض الدولار بنسبة معينة
-                </p>
-                <p>
-                  🔒 بياناتك خاصة — لا يمكن لأي شخص آخر الوصول إليها
-                </p>
+    <div className="space-y-4">
+      {/* Hero Card - Telegram Bot Join */}
+      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-[#229ED9] via-[#2AABEE] to-[#27B0E6]" />
+        <CardContent className="p-0">
+          {/* Hero Section with gradient background */}
+          <div className="relative bg-gradient-to-br from-[#229ED9]/10 via-[#2AABEE]/5 to-amber-50/10 dark:from-[#229ED9]/20 dark:via-[#2AABEE]/10 dark:to-amber-950/10 px-6 pt-8 pb-6 text-center">
+            {/* Decorative circles */}
+            <div className="absolute top-4 left-4 w-20 h-20 rounded-full bg-[#229ED9]/5 blur-xl" />
+            <div className="absolute bottom-2 right-6 w-24 h-24 rounded-full bg-amber-400/5 blur-xl" />
+
+            {/* Telegram Logo */}
+            <div className="relative mx-auto mb-5">
+              <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-[#229ED9] to-[#1a8bc4] flex items-center justify-center shadow-lg shadow-[#229ED9]/30 ring-4 ring-white/20 dark:ring-white/5">
+                <svg
+                  viewBox="0 0 240 240"
+                  className="w-14 h-14"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    <linearGradient id="tgGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+                      <stop offset="0%" stopColor="#fff" stopOpacity="1" />
+                      <stop offset="100%" stopColor="#e8f4fd" stopOpacity="1" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M98.175 180.345C94.305 180.345 94.95 188.88 91.695 188.88C88.44 188.88 82.74 181.5 79.86 178.62L56.22 152.94C54.09 150.6 54.39 146.94 57.015 145.11L161.52 71.46C164.55 69.36 167.82 73.38 165.57 76.26L105.375 157.23C103.8 159.27 104.25 162.15 106.35 163.65L120.45 174.45C123.45 176.7 121.8 181.38 118.05 181.38H100.5C99.225 181.38 98.55 180.87 98.175 180.345Z"
+                    fill="url(#tgGrad)"
+                  />
+                  <path
+                    d="M57.0 144.0C54.6 145.8 54.3 149.4 56.4 151.65L80.1 177.3C81.0 178.2 82.2 178.8 83.4 178.8C84.6 178.8 85.8 178.2 86.7 177.3C87.6 176.4 88.05 175.2 88.05 173.85C88.05 172.5 87.6 171.3 86.7 170.4L63.0 144.75C62.1 143.85 60.9 143.25 59.7 143.25C58.5 143.25 57.6 143.55 57.0 144.0Z"
+                    fill="white"
+                    opacity="0.3"
+                  />
+                </svg>
               </div>
+              {/* Glow ring */}
+              <div className="absolute inset-0 w-24 h-24 mx-auto rounded-3xl bg-[#229ED9]/20 animate-pulse" style={{ animationDuration: '3s' }} />
             </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-black mb-1.5 bg-gradient-to-r from-[#229ED9] to-[#1a8bc4] bg-clip-text text-transparent">
+              بوت الذهب والعملات
+            </h2>
+            <p className="text-sm text-muted-foreground font-medium mb-1">
+              @gold_investmentbot
+            </p>
+            <p className="text-xs text-muted-foreground/70 mb-5">
+              احصل على أسعار الذهب والدولار فوراً على تيليجرام
+            </p>
+
+            {/* Join Button */}
+            <a href={BOT_LINK} target="_blank" rel="noopener noreferrer">
+              <Button
+                className="bg-gradient-to-r from-[#229ED9] to-[#1a8bc4] hover:from-[#1a8bc4] hover:to-[#1580b0] gap-2.5 rounded-2xl h-12 px-8 text-sm font-bold shadow-lg shadow-[#229ED9]/25 transition-all hover:shadow-xl hover:shadow-[#229ED9]/30 hover:scale-[1.02] active:scale-[0.98]"
+                size="lg"
+              >
+                <svg viewBox="0 0 240 240" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M98.175 180.345C94.305 180.345 94.95 188.88 91.695 188.88C88.44 188.88 82.74 181.5 79.86 178.62L56.22 152.94C54.09 150.6 54.39 146.94 57.015 145.11L161.52 71.46C164.55 69.36 167.82 73.38 165.57 76.26L105.375 157.23C103.8 159.27 104.25 162.15 106.35 163.65L120.45 174.45C123.45 176.7 121.8 181.38 118.05 181.38H100.5C99.225 181.38 98.55 180.87 98.175 180.345Z"
+                    fill="white"
+                  />
+                </svg>
+                انضمام للبوت
+                <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+              </Button>
+            </a>
           </div>
         </CardContent>
       </Card>
 
-      {/* Registration form */}
+      {/* Features Grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+          <CardContent className="p-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-2.5">
+              <Bell className="w-5 h-5 text-amber-500" />
+            </div>
+            <p className="text-xs font-bold mb-0.5">تحديث كل ساعة</p>
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              أسعار الذهب والدولار كل ساعة بتوقيت مصر
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+          <CardContent className="p-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-2.5">
+              <TrendingDown className="w-5 h-5 text-red-500" />
+            </div>
+            <p className="text-xs font-bold mb-0.5">تنبيه انخفاض</p>
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              إشعار فوري عند انخفاض الدولار
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+          <CardContent className="p-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-2.5">
+              <Clock className="w-5 h-5 text-emerald-500" />
+            </div>
+            <p className="text-xs font-bold mb-0.5">يعمل 24/7</p>
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              تحديثات تلقائية على مدار الساعة
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+          <CardContent className="p-4 text-center">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center mx-auto mb-2.5">
+              <Shield className="w-5 h-5 text-sky-500" />
+            </div>
+            <p className="text-xs font-bold mb-0.5">آمن ومجاني</p>
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              بياناتك محمية بالكامل ومشفره
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* How to join - Steps */}
       <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-green-500" />
-        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-950/20 dark:to-emerald-950/20 px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-green-500 flex items-center justify-center shadow-sm shadow-teal-400/20">
-            <Bot className="w-4 h-4 text-white" />
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+        <div className="bg-gradient-to-r from-amber-50/80 to-yellow-50/80 dark:from-amber-950/20 dark:to-yellow-950/20 px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h3 className="text-sm font-bold">تسجيل بوت جديد</h3>
-            <p className="text-xs text-muted-foreground">سجّل بوتك لتصلك التحديثات كل ساعة</p>
+            <h3 className="text-sm font-bold">كيف تنضم؟</h3>
+            <p className="text-xs text-muted-foreground">3 خطوات بسيطة فقط</p>
           </div>
         </div>
-        <CardContent className="p-4 space-y-4">
-          {success ? (
-            <div className="text-center py-6 space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+        <CardContent className="p-4">
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-[#229ED9]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-xs font-black text-[#229ED9]">1</span>
               </div>
               <div>
-                <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">تم التسجيل بنجاح! 🎉</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  سيصلك أول تحديث في الساعة القادمة بتوقيت مصر
-                </p>
+                <p className="text-sm font-bold">اضغط على زر &quot;انضمام للبوت&quot;</p>
+                <p className="text-xs text-muted-foreground">سيتم فتح تيليجرام تلقائياً</p>
               </div>
-              <Button
-                onClick={() => setSuccess(false)}
-                variant="outline"
-                className="rounded-xl text-xs gap-1.5"
-              >
-                تسجيل بوت آخر
-              </Button>
             </div>
-          ) : (
-            <>
-              <div className="bg-teal-50 dark:bg-teal-950/30 rounded-xl p-3 ring-1 ring-teal-200 dark:ring-teal-800">
-                <p className="text-xs font-medium text-teal-700 dark:text-teal-300 leading-relaxed">
-                  📌 الخطوات:
-                  <br />1. أنشئ بوت من @BotFather على تيليجرام وانسخ التوكن
-                  <br />2. ابحث عن Chat ID الخاص بك من @userinfobot
-                  <br />3. أدخل البيانات بالأسفل واضغط تسجيل
-                </p>
+
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-[#229ED9]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-xs font-black text-[#229ED9]">2</span>
               </div>
-
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-muted-foreground">الاسم</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="اسمك أو اسم البوت"
-                    className="rounded-xl h-11 text-sm"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5" /> Bot Token
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showToken ? "text" : "password"}
-                      value={botToken}
-                      onChange={(e) => setBotToken(e.target.value)}
-                      placeholder="مثال: 123456789:ABCdefGHI..."
-                      className="pr-4 pl-10 rounded-xl h-11 text-sm"
-                      disabled={loading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute left-0 top-0 h-full px-3"
-                      onClick={() => setShowToken(!showToken)}
-                    >
-                      {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                    <Bot className="w-3.5 h-3.5" /> Chat ID
-                  </Label>
-                  <Input
-                    value={chatId}
-                    onChange={(e) => setChatId(e.target.value)}
-                    placeholder="مثال: 123456789"
-                    className="rounded-xl h-11 text-sm"
-                    disabled={loading}
-                  />
-                </div>
+              <div>
+                <p className="text-sm font-bold">اضغط &quot;Start&quot; في البوت</p>
+                <p className="text-xs text-muted-foreground">لبدء الاستقبال والتفعيل</p>
               </div>
+            </div>
 
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-xs font-black text-emerald-500">3</span>
+              </div>
+              <div>
+                <p className="text-sm font-bold">استلم التحديثات! 🎉</p>
+                <p className="text-xs text-muted-foreground">ستصلك الأسعار كل ساعة تلقائياً</p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA Button again at bottom */}
+          <div className="mt-5 pt-4 border-t border-border/20">
+            <a href={BOT_LINK} target="_blank" rel="noopener noreferrer" className="block">
               <Button
-                onClick={handleRegister}
-                disabled={loading || !name.trim() || !botToken.trim() || !chatId.trim()}
-                className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 gap-2 rounded-xl h-11 text-sm font-bold shadow-sm shadow-teal-500/20"
+                className="w-full bg-gradient-to-r from-[#229ED9] to-[#1a8bc4] hover:from-[#1a8bc4] hover:to-[#1580b0] gap-2 rounded-xl h-11 text-sm font-bold shadow-md shadow-[#229ED9]/20 transition-all hover:shadow-lg hover:shadow-[#229ED9]/25"
               >
-                {loading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                تسجيل البوت
+                <Zap className="w-4 h-4" />
+                انضم الآن — مجاناً
               </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Security note */}
-      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
-        <CardContent className="p-3 flex items-center gap-2.5">
-          <Shield className="w-4 h-4 text-muted-foreground/50 flex-shrink-0" />
-          <p className="text-[10px] text-muted-foreground/60 leading-relaxed">
-            بيانات البوت مشفرة ومحمية — لا يمكن لأي شخص آخر الوصول إليها أو التحكم فيها
-          </p>
+            </a>
+          </div>
         </CardContent>
       </Card>
     </div>
