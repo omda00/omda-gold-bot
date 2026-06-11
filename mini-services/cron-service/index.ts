@@ -2,7 +2,7 @@ import http from "http";
 import cron from "node-cron";
 
 const PORT = 3031;
-const MAIN_APP_URL = "http://localhost:3000";
+const MAIN_APP_URL = process.env.MAIN_APP_URL || "http://localhost:3000";
 
 // Store last run info
 let lastRunResult: {
@@ -37,14 +37,21 @@ async function runAutomation(): Promise<void> {
           notifications: data.notifications,
         }),
       };
-      console.log(`[${time}] Automation completed successfully:`, JSON.stringify(data, null, 2));
+      console.log(`[${time}] ✅ Automation completed successfully`);
+
+      // Log notification details
+      if (data.notifications && Array.isArray(data.notifications)) {
+        for (const n of data.notifications) {
+          console.log(`[${time}] 📤 ${n.type}: ${n.sent ? "✅" : "❌"} ${n.details || n.error || ""}`);
+        }
+      }
     } else {
       lastRunResult = {
         time,
         status: "error",
         details: data.error || "Unknown error",
       };
-      console.error(`[${time}] Automation failed:`, data.error);
+      console.error(`[${time}] ❌ Automation failed:`, data.error);
     }
   } catch (error) {
     lastRunResult = {
@@ -52,7 +59,7 @@ async function runAutomation(): Promise<void> {
       status: "error",
       details: error instanceof Error ? error.message : "Network error",
     };
-    console.error(`[${time}] Automation network error:`, error);
+    console.error(`[${time}] ❌ Automation network error:`, error);
   }
 }
 
@@ -71,41 +78,14 @@ async function getConfig(): Promise<Record<string, string>> {
   return {};
 }
 
-// Schedule daily automation at 9:00 AM Cairo time (Africa/Cairo = UTC+2)
-// Cron: minute hour day month weekday
-// "0 7 * * *" = UTC 7:00 = Cairo 9:00 AM
-let dailyJob: cron.ScheduledTask | null = null;
-
-function setupDailyCron() {
-  // Clean up existing job
-  if (dailyJob) {
-    dailyJob.stop();
-  }
-
-  // Default: 9:00 AM Cairo time (UTC+2) = 7:00 AM UTC
-  dailyJob = cron.schedule("0 7 * * *", async () => {
-    console.log("⏰ Daily automation triggered at", new Date().toISOString());
-    const config = await getConfig();
-
-    if (config.AUTOMATION_ENABLED === "true") {
-      await runAutomation();
-    } else {
-      console.log("Automation is disabled. Skipping daily run.");
-    }
-  }, {
-    timezone: "Africa/Cairo",
-  });
-
-  console.log("✅ Daily cron job scheduled at 9:00 AM Cairo time");
-}
-
 // =============================================
 // HOURLY automation: Every hour on the hour
-// Cairo time. This sends updates to ALL
-// registered Telegram users with:
-// - Gold buy/sell prices
+// Cairo time (Africa/Cairo = UTC+2 or UTC+3 in summer)
+// This sends updates to ALL registered Telegram users with:
+// - Gold prices (all karats: 24, 22, 21, 18)
 // - USD/EGP exchange rate
 // - Investment signals (if any)
+// - USD drop alerts (if any)
 // =============================================
 let hourlyJob: cron.ScheduledTask | null = null;
 
@@ -116,19 +96,46 @@ function setupHourlyCron() {
 
   // Every hour at minute 0: 00:00, 01:00, 02:00, ..., 23:00 Cairo time
   hourlyJob = cron.schedule("0 * * * *", async () => {
-    console.log("🔄 Hourly update triggered at", new Date().toISOString());
+    const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
+    console.log(`⏰ [${cairoTime}] Hourly update triggered (Cairo time)`);
     const config = await getConfig();
 
     if (config.AUTOMATION_ENABLED === "true") {
       await runAutomation();
     } else {
-      console.log("Automation is disabled. Skipping hourly update.");
+      console.log("⏸️ Automation is disabled. Skipping hourly update.");
     }
   }, {
     timezone: "Africa/Cairo",
   });
 
-  console.log("✅ Hourly cron job scheduled (every hour Cairo time - Africa/Cairo)");
+  console.log("✅ Hourly cron job scheduled (every hour on the hour — Africa/Cairo timezone)");
+}
+
+// Daily report at 9:00 AM Cairo time
+let dailyJob: cron.ScheduledTask | null = null;
+
+function setupDailyCron() {
+  if (dailyJob) {
+    dailyJob.stop();
+  }
+
+  // 9:00 AM Cairo time
+  dailyJob = cron.schedule("0 9 * * *", async () => {
+    const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
+    console.log(`🌅 [${cairoTime}] Daily report triggered (Cairo time)`);
+    const config = await getConfig();
+
+    if (config.AUTOMATION_ENABLED === "true") {
+      await runAutomation();
+    } else {
+      console.log("⏸️ Automation is disabled. Skipping daily report.");
+    }
+  }, {
+    timezone: "Africa/Cairo",
+  });
+
+  console.log("✅ Daily cron job scheduled at 9:00 AM Cairo time");
 }
 
 // HTTP server for health check and manual triggers
@@ -154,12 +161,12 @@ const server = http.createServer(async (req, res) => {
       lastRun: lastRunResult,
       uptime: process.uptime(),
       cronJobs: {
-        daily: dailyJob ? "active" : "inactive",
         hourly: hourlyJob ? "active" : "inactive",
+        daily: dailyJob ? "active" : "inactive",
       },
       schedule: {
-        daily: "9:00 AM Cairo time",
         hourly: "Every hour on the hour (Cairo time)",
+        daily: "9:00 AM Cairo time",
       },
     }));
     return;
@@ -190,30 +197,31 @@ const server = http.createServer(async (req, res) => {
 // Start everything
 server.listen(PORT, () => {
   console.log(`🚀 Cron Service running on port ${PORT}`);
-  setupDailyCron();
+  console.log(`📡 Main app URL: ${MAIN_APP_URL}`);
   setupHourlyCron();
+  setupDailyCron();
   console.log(`📋 Endpoints:`);
   console.log(`   GET  /health  - Service health check`);
   console.log(`   POST /trigger - Manually trigger automation`);
   console.log(`   GET  /config  - Get current config`);
   console.log(`⏰ Schedules:`);
+  console.log(`   Hourly: Every hour on the hour (Cairo time - Africa/Cairo)`);
   console.log(`   Daily:  9:00 AM Cairo time`);
-  console.log(`   Hourly: Every hour on the hour (Cairo time)`);
 });
 
 // Graceful shutdown
 process.on("SIGINT", () => {
   console.log("\n🛑 Shutting down cron service...");
-  if (dailyJob) dailyJob.stop();
   if (hourlyJob) hourlyJob.stop();
+  if (dailyJob) dailyJob.stop();
   server.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
   console.log("\n🛑 Shutting down cron service...");
-  if (dailyJob) dailyJob.stop();
   if (hourlyJob) hourlyJob.stop();
+  if (dailyJob) dailyJob.stop();
   server.close();
   process.exit(0);
 });

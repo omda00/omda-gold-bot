@@ -48,8 +48,67 @@ async function notifyAllUsers(
 }
 
 /**
+ * Build a comprehensive hourly Telegram report with all karats, USD/EGP, and signals
+ */
+function buildHourlyReport(params: {
+  goldPrice: number;
+  goldBuyPrice: number | null;
+  goldSellPrice: number | null;
+  goldChange: number;
+  goldSource: string;
+  allKarats: { karat: number; sellPrice: number; buyPrice: number | null }[];
+  usdEgpPrice: number;
+  usdEgpChange: number;
+  usdEgpSource: string;
+  signal: { action: string; label: string; plan: { label: string; expectedReturn: number } } | null;
+}): string {
+  const {
+    goldPrice, goldBuyPrice, goldSellPrice, goldChange, goldSource,
+    allKarats, usdEgpPrice, usdEgpChange, usdEgpSource, signal,
+  } = params;
+
+  const goldArrow = goldChange >= 0 ? "▲" : "▼";
+  const usdArrow = usdEgpChange >= 0 ? "▲" : "▼";
+
+  let report = "📊 <b>تحديث ساعي — أسعار الذهب والعملات</b>\n";
+  report += `🕐 ${new Date().toLocaleString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" })} بتوقيت مصر\n\n`;
+
+  // Gold prices for all karats
+  report += "🥇 <b>أسعار الذهب (ج.م/جرام):</b>\n";
+  report += "━━━━━━━━━━━━━━━━━━\n";
+
+  for (const kp of allKarats) {
+    const sell = kp.sellPrice?.toLocaleString() || "—";
+    const buy = kp.buyPrice?.toLocaleString() || "—";
+    report += `  عيار ${kp.karat}: بيع ${sell} | شراء ${buy}\n`;
+  }
+
+  // Gold 21 change indicator
+  if (goldChange !== 0) {
+    report += `\n📈 التغيير (عيار 21): ${goldArrow} ${Math.abs(goldChange).toFixed(2)}%\n`;
+  }
+
+  // USD/EGP
+  report += `\n💱 <b>USD/EGP:</b> ${usdEgpPrice.toFixed(2)} ج.م ${usdArrow} ${Math.abs(usdEgpChange).toFixed(2)}%\n`;
+
+  // Trading signal
+  if (signal) {
+    const isBuy = signal.action.includes("شراء");
+    const emoji = isBuy ? "🟢" : "🔴";
+    report += `\n${emoji} <b>الإشارة: ${signal.action}</b>\n`;
+    report += `📋 ${signal.plan.label}\n`;
+    report += `💰 العائد المتوقع: ${signal.plan.expectedReturn > 0 ? "+" : ""}${signal.plan.expectedReturn}%\n`;
+  }
+
+  // Sources
+  report += `\n📌 المصادر: ${goldSource} + ${usdEgpSource}`;
+
+  return report;
+}
+
+/**
  * POST /api/automation/run - Run the full automation cycle:
- * 1. Fetch current prices (Gold EGP + USD/EGP)
+ * 1. Fetch current prices (Gold EGP + USD/EGP + all karats)
  * 2. Check if any buy/sell signals are triggered based on the investment plan
  * 3. Check if USD/EGP has a significant drop
  * 4. Send Telegram notifications to ALL registered users (each via their own bot)
@@ -79,6 +138,7 @@ export async function POST() {
     // Step 1: Fetch current prices (single call for efficiency)
     let goldRecord;
     let usdEgpRecord;
+    let allKaratsData: { karat: number; sellPrice: number; buyPrice: number | null }[] = [];
 
     try {
       const allPrices = await fetchAllPrices();
@@ -86,6 +146,9 @@ export async function POST() {
       if (!allPrices.gold && !allPrices.usdEgp) {
         throw new Error("Could not fetch any prices from any source");
       }
+
+      // Save karat data for the report
+      allKaratsData = allPrices.allKarats || [];
 
       const savePromises: Promise<unknown>[] = [];
       if (allPrices.gold) {
@@ -107,13 +170,20 @@ export async function POST() {
       usdEgpRecord = allPrices.usdEgp ? saved[allPrices.gold ? 1 : 0] as Awaited<ReturnType<typeof savePriceRecord>> : undefined;
 
       results.prices = {
-        gold: { price: goldRecord.price, change: goldRecord.change ?? 0 },
-        usdEgp: { price: usdEgpRecord.price, change: usdEgpRecord.change ?? 0 },
+        gold: goldRecord ? { price: goldRecord.price, change: goldRecord.change ?? 0 } : undefined,
+        usdEgp: usdEgpRecord ? { price: usdEgpRecord.price, change: usdEgpRecord.change ?? 0 } : undefined,
       };
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error fetching prices";
       results.errors?.push(`Price fetch failed: ${msg}`);
       return NextResponse.json({ ...results, error: "Price fetch failed" }, { status: 500 });
+    }
+
+    if (!goldRecord || !usdEgpRecord) {
+      return NextResponse.json(
+        { ...results, error: "Missing price data" },
+        { status: 500 }
+      );
     }
 
     // Step 2: Check investment plan signals (now based on gold price)
@@ -144,25 +214,24 @@ export async function POST() {
     results.usdDrop = usdDropDetected;
 
     // Step 4: Send Telegram notifications to ALL registered users
-    // Each user gets notifications via their OWN bot token and chat ID
     const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
 
     if (activeUsers.length > 0) {
-      // Build the daily report message
-      const goldBuySell = goldRecord.buyPrice && goldRecord.sellPrice
-        ? `\n   بيع: ${goldRecord.sellPrice.toLocaleString()} | شراء: ${goldRecord.buyPrice.toLocaleString()}`
-        : "";
-      const goldSource = goldRecord.source || "multi-source";
-      const usdSource = usdEgpRecord.source || "multi-source";
-      const dailyReport = "📊 <b>تحديث ساعي - أسعار الذهب والعملات</b>\n\n" +
-        `🥇 <b>ذهب عيار 21:</b> ${goldRecord.price.toLocaleString()} ج.م/جرام` +
-        `${goldBuySell}` +
-        `${goldRecord.change ? (goldRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(goldRecord.change).toFixed(2) + "%" : ""}\n` +
-        `💱 <b>USD/EGP:</b> ${usdEgpRecord.price.toFixed(2)} ج.م` +
-        `${usdEgpRecord.change ? (usdEgpRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(usdEgpRecord.change).toFixed(2) + "%" : ""}\n\n` +
-        `📌 المصدر: ${goldSource} + ${usdSource}`;
+      // Build the comprehensive hourly report with all karats
+      const hourlyReport = buildHourlyReport({
+        goldPrice: goldRecord.price,
+        goldBuyPrice: goldRecord.buyPrice,
+        goldSellPrice: goldRecord.sellPrice,
+        goldChange: goldRecord.change ?? 0,
+        goldSource: goldRecord.source || "multi-source",
+        allKarats: allKaratsData,
+        usdEgpPrice: usdEgpRecord.price,
+        usdEgpChange: usdEgpRecord.change ?? 0,
+        usdEgpSource: usdEgpRecord.source || "multi-source",
+        signal,
+      });
 
-      const dailyResult = await notifyAllUsers(dailyReport, "hourly_report", "Hourly Price Report");
+      const dailyResult = await notifyAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
       results.notifications?.push({
         type: "hourly_report",
         sent: dailyResult.sent > 0,
@@ -189,6 +258,7 @@ export async function POST() {
 
       // Send USD drop alert
       if (usdDropDetected) {
+        const usdSource = usdEgpRecord.source || "multi-source";
         const dropMessage = "⚠️ <b>تنبيه نزول قوي لسعر الدولار</b>\n\n" +
           `💱 USD/EGP: ${usdEgpRecord.price.toFixed(2)} ج.م\n` +
           `📉 السابق: ${previousUsdEgp?.price.toFixed(2)} ج.م\n` +
@@ -209,20 +279,20 @@ export async function POST() {
       const chatId = await getConfig("TELEGRAM_CHAT_ID");
 
       if (botToken && chatId) {
-        const goldBuySell = goldRecord.buyPrice && goldRecord.sellPrice
-          ? `\n   بيع: ${goldRecord.sellPrice.toLocaleString()} | شراء: ${goldRecord.buyPrice.toLocaleString()}`
-          : "";
-        const goldSource = goldRecord.source || "multi-source";
-        const usdSource = usdEgpRecord.source || "multi-source";
-        const dailyReport = "📊 <b>تحديث ساعي - أسعار الذهب والعملات</b>\n\n" +
-          `🥇 <b>ذهب عيار 21:</b> ${goldRecord.price.toLocaleString()} ج.م/جرام` +
-          `${goldBuySell}` +
-          `${goldRecord.change ? (goldRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(goldRecord.change).toFixed(2) + "%" : ""}\n` +
-          `💱 <b>USD/EGP:</b> ${usdEgpRecord.price.toFixed(2)} ج.م` +
-          `${usdEgpRecord.change ? (usdEgpRecord.change >= 0 ? " ▲" : " ▼") + Math.abs(usdEgpRecord.change).toFixed(2) + "%" : ""}\n\n` +
-          `📌 المصدر: ${goldSource} + ${usdSource}`;
+        const hourlyReport = buildHourlyReport({
+          goldPrice: goldRecord.price,
+          goldBuyPrice: goldRecord.buyPrice,
+          goldSellPrice: goldRecord.sellPrice,
+          goldChange: goldRecord.change ?? 0,
+          goldSource: goldRecord.source || "multi-source",
+          allKarats: allKaratsData,
+          usdEgpPrice: usdEgpRecord.price,
+          usdEgpChange: usdEgpRecord.change ?? 0,
+          usdEgpSource: usdEgpRecord.source || "multi-source",
+          signal,
+        });
 
-        const dailySendResult = await sendTelegramMessage(botToken, chatId, dailyReport);
+        const dailySendResult = await sendTelegramMessage(botToken, chatId, hourlyReport);
         results.notifications?.push({
           type: "hourly_report",
           sent: dailySendResult.ok,
@@ -234,7 +304,7 @@ export async function POST() {
           data: {
             type: "hourly_report",
             title: "Hourly Price Report (Global Config)",
-            message: dailyReport,
+            message: hourlyReport,
             success: dailySendResult.ok,
             error: dailySendResult.error,
           },
@@ -268,6 +338,7 @@ export async function POST() {
         }
 
         if (usdDropDetected) {
+          const usdSource = usdEgpRecord.source || "multi-source";
           const dropMessage = "⚠️ <b>تنبيه نزول قوي لسعر الدولار</b>\n\n" +
             `💱 USD/EGP: ${usdEgpRecord.price.toFixed(2)} ج.م\n` +
             `📉 السابق: ${previousUsdEgp?.price.toFixed(2)} ج.م\n` +
