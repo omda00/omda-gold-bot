@@ -46,7 +46,7 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
             <div className="relative">
               <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black shadow-md shadow-amber-400/25 overflow-hidden">
                 <Image
-                  src="/images/omda-logo.png"
+                  src="/images/omda-logo.jpg"
                   alt="Gold Investment Logo"
                   width={40}
                   height={40}
