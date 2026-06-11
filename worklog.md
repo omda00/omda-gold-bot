@@ -475,3 +475,25 @@ Stage Summary:
   1. "بوت التيليجرام" tab: Shows "١ مشترك نشط" with total if different
   2. "الإعدادات" tab (admin): Full stats card with active/total/progress bar
 - Current stats: 1 active subscriber out of 1 total (100% active rate)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix hourly Telegram report not being sent
+
+Work Log:
+- Investigated: Found that last hourly report was at 22:38 UTC (12:38 AM Cairo), nothing after that
+- Root cause: UptimeRobot monitor for /api/automation/run was not triggering
+- Solution: Merged auto-reporting into /api/cron/refresh-prices endpoint
+  - Now checks if 55+ minutes since last hourly report
+  - If so, automatically builds and sends Telegram report to all active users
+  - Only needs ONE UptimeRobot monitor (price refresh every 30 min)
+- Updated Vercel cron from /api/automation/run (daily at 9 AM) to /api/cron/refresh-prices (hourly)
+- Pushed both changes to GitHub/Vercel
+- Verified production deployment: hourlyReport field appears in response
+- Manually triggered automation to send the missed 2 AM report (sent to 3/3 users)
+
+Stage Summary:
+- Hourly reports now auto-sent via price refresh cron (no separate automation cron needed)
+- Vercel cron updated to hourly (0 * * * *) as backup trigger
+- System now has 3 redundancy layers for reporting: UptimeRobot price refresh, UptimeRobot automation, Vercel cron
