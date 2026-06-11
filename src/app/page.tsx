@@ -9,10 +9,6 @@ import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/use-dashboard";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { PriceCards } from "@/components/dashboard/price-cards";
-import {
-  InvestmentPlanTable,
-  CurrentSignalCard,
-} from "@/components/dashboard/investment-plan";
 import { PriceHistoryTab } from "@/components/dashboard/price-history";
 import { SettingsTab } from "@/components/dashboard/settings";
 import { LogsTab } from "@/components/dashboard/logs";
@@ -22,12 +18,9 @@ import { DashboardFooter } from "@/components/dashboard/footer";
 export default function Home() {
   const {
     prices,
-    plans,
     logs,
     config,
     priceHistory,
-    signal,
-    smartSignal,
     calculatorData,
     telegramUsers,
     loading,
@@ -37,8 +30,6 @@ export default function Home() {
     triggerFetchPrices,
     updateConfig,
     testTelegram,
-    seedPlan,
-    savePlans,
     runAutomation,
     fetchCalculatorData,
     addTelegramUser,
@@ -152,22 +143,6 @@ export default function Home() {
               fetching={loading.fetching}
               onFetchPrices={handleFetchPrices}
             />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              <div className="lg:col-span-2">
-                <InvestmentPlanTable
-                  plans={plans}
-                  signal={signal}
-                  currentPrice={prices.gold?.price ?? null}
-                />
-              </div>
-              <div>
-                <CurrentSignalCard
-                  signal={signal}
-                  smartSignal={smartSignal}
-                  currentPrice={prices.gold?.price ?? null}
-                />
-              </div>
-            </div>
           </TabsContent>
 
           {/* TAB 2: Gold Calculator */}
@@ -192,11 +167,8 @@ export default function Home() {
           <TabsContent value="settings">
             <SettingsTab
               config={config}
-              plans={plans}
               onUpdateConfig={updateConfig}
               onTestTelegram={testTelegram}
-              onSeedPlan={seedPlan}
-              onSavePlans={savePlans}
               telegramUsers={telegramUsers}
               onAddTelegramUser={addTelegramUser}
               onDeleteTelegramUser={deleteTelegramUser}

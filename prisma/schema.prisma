@@ -31,17 +31,6 @@ model AppConfig {
   value String
 }
 
-model InvestmentPlan {
-  id             String  @id @default(cuid())
-  priceRangeMin  Float
-  priceRangeMax  Float?  // null means > priceRangeMin (e.g., > 7500)
-  action         String  // "شراء" (Buy), "بيع 70%" (Sell 70%), "لا شراء" (No Buy), etc.
-  expectedReturn Float   // percentage (e.g., 40, 30, 0, -30, -50)
-  label          String  // description in Arabic
-  order          Int     // display order
-  active         Boolean @default(true)
-}
-
 model NotificationLog {
   id        String   @id @default(cuid())
   type      String   // "daily_report", "buy_signal", "usd_drop_alert", "test"

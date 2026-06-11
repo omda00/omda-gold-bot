@@ -3,30 +3,23 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   PricesResponse,
-  InvestmentPlan,
   NotificationLog,
   AppConfig,
   PriceHistoryResponse,
-  SignalResult,
-  SmartSignalResult,
   CalculatorPriceResult,
   TelegramUser,
 } from "@/lib/dashboard-types";
 
 export function useDashboardData() {
   const [prices, setPrices] = useState<PricesResponse>({ gold: null, usdEgp: null, allKarats: [], goldPound: null });
-  const [plans, setPlans] = useState<InvestmentPlan[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryResponse>({ records: [], count: 0 });
-  const [signal, setSignal] = useState<SignalResult | null>(null);
-  const [smartSignal, setSmartSignal] = useState<SmartSignalResult | null>(null);
   const [calculatorData, setCalculatorData] = useState<CalculatorPriceResult | null>(null);
   const [telegramUsers, setTelegramUsers] = useState<TelegramUser[]>([]);
 
   const [loading, setLoading] = useState({
     prices: true,
-    plans: true,
     logs: true,
     config: true,
     history: false,
@@ -47,14 +40,7 @@ export function useDashboardData() {
   const seedData = useCallback(async () => {
     if (seededRef.current) return;
     try {
-      // Seed config
       await fetch("/api/config");
-      // Seed investment plan if none exist
-      const planRes = await fetch("/api/plan");
-      const planData = await planRes.json();
-      if (Array.isArray(planData) && planData.length === 0) {
-        await fetch("/api/plan/seed", { method: "POST" });
-      }
       seededRef.current = true;
     } catch (err) {
       console.error("Seed error:", err);
@@ -74,21 +60,6 @@ export function useDashboardData() {
       console.error("Fetch prices error:", err);
     }
     return null;
-  }, []);
-
-  // Fetch plans
-  const fetchPlans = useCallback(async () => {
-    try {
-      const res = await fetch("/api/plan");
-      if (res.ok) {
-        const data = await res.json();
-        setPlans(Array.isArray(data) ? data : []);
-        return data;
-      }
-    } catch (err) {
-      console.error("Fetch plans error:", err);
-    }
-    return [];
   }, []);
 
   // Fetch config
@@ -163,10 +134,7 @@ export function useDashboardData() {
 
   // Trigger manual price fetch from the web (POST)
   const triggerFetchPrices = useCallback(async () => {
-    // Prevent concurrent fetches — if one is already running,
-    // wait briefly and return latest prices from DB instead
     if (isFetchingRef.current) {
-      // Don't show error, just refresh from DB
       await fetchPrices();
       return null;
     }
@@ -181,10 +149,8 @@ export function useDashboardData() {
         setLastWebFetch(new Date().toISOString());
         return data;
       } else {
-        // Even on error, try to get the latest prices from the response
         try {
           const errorData = await res.json();
-          // The API might still return cached prices
           if (errorData.gold || errorData.usdEgp) {
             setPrices({ gold: errorData.gold, usdEgp: errorData.usdEgp, allKarats: errorData.allKarats || [], goldPound: errorData.goldPound || null });
           }
@@ -192,13 +158,11 @@ export function useDashboardData() {
         } catch {
           console.error("Fetch prices error: Unknown error");
         }
-        // Refresh from DB as fallback
         await fetchPrices();
         return null;
       }
     } catch (err) {
       console.error("Network error fetching prices:", err);
-      // Refresh from DB as fallback
       await fetchPrices();
       return null;
     } finally {
@@ -237,54 +201,6 @@ export function useDashboardData() {
     }
   }, []);
 
-  // Send telegram message
-  const sendTelegramMessage = useCallback(async (message: string) => {
-    try {
-      const res = await fetch("/api/telegram/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.error("Send telegram error:", err);
-      return { ok: false, error: "Network error" };
-    }
-  }, []);
-
-  // Seed default plan
-  const seedPlan = useCallback(async () => {
-    try {
-      const res = await fetch("/api/plan/seed", { method: "POST" });
-      if (res.ok) {
-        await fetchPlans();
-        return true;
-      }
-    } catch (err) {
-      console.error("Seed plan error:", err);
-    }
-    return false;
-  }, [fetchPlans]);
-
-  // Save plans
-  const savePlans = useCallback(async (updatedPlans: InvestmentPlan[]) => {
-    try {
-      const res = await fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedPlans),
-      });
-      if (res.ok) {
-        await fetchPlans();
-        return true;
-      }
-    } catch (err) {
-      console.error("Save plans error:", err);
-    }
-    return false;
-  }, [fetchPlans]);
-
   // Run automation
   const runAutomation = useCallback(async () => {
     setLoading((prev) => ({ ...prev, automation: true }));
@@ -293,8 +209,7 @@ export function useDashboardData() {
       const data = await res.json();
       if (res.ok) {
         setLastAutomationRun(new Date().toISOString());
-        // Refresh prices and logs
-        await Promise.all([fetchPrices(), fetchLogs(), fetchPlans()]);
+        await Promise.all([fetchPrices(), fetchLogs()]);
         return data;
       } else {
         throw new Error(data.error || "Automation failed");
@@ -302,49 +217,7 @@ export function useDashboardData() {
     } finally {
       setLoading((prev) => ({ ...prev, automation: false }));
     }
-  }, [fetchPrices, fetchLogs, fetchPlans]);
-
-  // Detect current signal (simple plan-based)
-  const detectCurrentSignal = useCallback(
-    (goldPrice: number | null) => {
-      if (goldPrice === null || !plans.length) {
-        setSignal(null);
-        return;
-      }
-      const activePlans = plans.filter((p) => p.active).sort((a, b) => a.order - b.order);
-      for (const p of activePlans) {
-        const minOk = goldPrice >= p.priceRangeMin;
-        const maxOk = p.priceRangeMax === null || goldPrice <= p.priceRangeMax;
-        if (minOk && maxOk) {
-          setSignal({
-            action: p.action,
-            label: p.label,
-            priceRangeMin: p.priceRangeMin,
-            priceRangeMax: p.priceRangeMax,
-            expectedReturn: p.expectedReturn,
-          });
-          return;
-        }
-      }
-      setSignal(null);
-    },
-    [plans]
-  );
-
-  // Fetch smart signal from API (analyzes price history + trends)
-  const fetchSmartSignal = useCallback(async () => {
-    try {
-      const res = await fetch("/api/signal");
-      if (res.ok) {
-        const data = await res.json();
-        setSmartSignal(data);
-        return data;
-      }
-    } catch (err) {
-      console.error("Fetch smart signal error:", err);
-    }
-    return null;
-  }, []);
+  }, [fetchPrices, fetchLogs]);
 
   // ==========================================
   // Telegram Users Management
@@ -435,9 +308,8 @@ export function useDashboardData() {
   useEffect(() => {
     const init = async () => {
       await seedData();
-      const [, planData, configData] = await Promise.all([
+      await Promise.all([
         fetchPrices(),
-        fetchPlans(),
         fetchConfig(),
         fetchLogs(),
         fetchCalculatorData(),
@@ -446,31 +318,16 @@ export function useDashboardData() {
       setLoading((prev) => ({
         ...prev,
         prices: false,
-        plans: false,
         logs: false,
         config: false,
         calculator: false,
       }));
     };
     init();
-  }, [seedData, fetchPrices, fetchPlans, fetchConfig, fetchLogs, fetchCalculatorData]);
-
-  // Update signal when prices or plans change
-  useEffect(() => {
-    detectCurrentSignal(prices.gold?.price ?? null);
-  }, [prices.gold?.price, plans, detectCurrentSignal]);
-
-  // Fetch smart signal when gold price changes
-  useEffect(() => {
-    if (prices.gold?.price) {
-      fetchSmartSignal();
-    }
-  }, [prices.gold?.price, fetchSmartSignal]);
+  }, [seedData, fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData]);
 
   // =============================================
   // Polling: Read DB prices every 10 seconds
-  // This is lightweight and ensures the UI always
-  // shows the latest data from the database
   // =============================================
   const startPolling = useCallback(() => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -489,14 +346,9 @@ export function useDashboardData() {
   // =============================================
   // Auto-fetch: Fetch fresh prices from the web
   // every 2 minutes in the background
-  // This keeps the database updated so the 5-second
-  // polling always shows relatively fresh data
   // =============================================
   const startAutoFetch = useCallback(() => {
     if (autoFetchIntervalRef.current) clearInterval(autoFetchIntervalRef.current);
-    // Don't fetch immediately on start - wait for first interval
-    // triggerFetchPrices();
-    // Then every 2 minutes (120000ms)
     autoFetchIntervalRef.current = setInterval(() => {
       triggerFetchPrices();
     }, 120000);
@@ -521,32 +373,23 @@ export function useDashboardData() {
 
   return {
     prices,
-    plans,
     logs,
     config,
     priceHistory,
-    signal,
-    smartSignal,
     calculatorData,
     telegramUsers,
     loading,
     lastAutomationRun,
     lastWebFetch,
     fetchPrices,
-    fetchPlans,
     fetchConfig,
     fetchLogs,
     fetchPriceHistory,
     triggerFetchPrices,
     updateConfig,
     testTelegram,
-    sendTelegramMessage,
-    seedPlan,
-    savePlans,
     runAutomation,
     fetchCalculatorData,
-    detectCurrentSignal,
-    fetchSmartSignal,
     fetchTelegramUsers,
     addTelegramUser,
     deleteTelegramUser,

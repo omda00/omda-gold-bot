@@ -41,17 +41,6 @@ export interface PricesResponse {
   goldPound: GoldPoundRecord | null;
 }
 
-export interface InvestmentPlan {
-  id: string;
-  priceRangeMin: number;
-  priceRangeMax: number | null;
-  action: string;
-  expectedReturn: number;
-  label: string;
-  order: number;
-  active: boolean;
-}
-
 export interface NotificationLog {
   id: string;
   type: string;
@@ -76,37 +65,11 @@ export interface PriceHistoryResponse {
   count: number;
 }
 
-export interface SignalResult {
-  action: string;
-  label: string;
-  priceRangeMin: number;
-  priceRangeMax: number | null;
-  expectedReturn: number;
-}
-
-export interface SmartSignalResult {
-  action: string;
-  confidence: number;
-  reason: string;
-  pricePosition: number;
-  trend: "up" | "down" | "sideways";
-  trendStrength: number;
-  usdEgpTrend: "up" | "down" | "stable";
-  currentPrice: number;
-  averagePrice: number;
-  recentHigh: number;
-  recentLow: number;
-  budgetAllocation: number;
-  expectedReturn: number;
-  label: string;
-}
-
 export interface AutomationResult {
   prices?: {
     gold?: { price: number; change: number };
     usdEgp?: { price: number; change: number };
   };
-  signals?: { action: string; label: string } | null;
   usdDrop?: boolean;
   notifications?: { type: string; sent: boolean; error?: string }[];
   errors?: string[];

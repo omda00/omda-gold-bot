@@ -12,10 +12,8 @@ import {
   Bot,
   Clock,
   AlertTriangle,
-  ShoppingCart,
   Zap,
   Key,
-  MessageSquare,
   UserPlus,
   Trash2,
   Power,
@@ -40,16 +38,13 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import type { AppConfig, InvestmentPlan, TelegramUser } from "@/lib/dashboard-types";
+import type { AppConfig, TelegramUser } from "@/lib/dashboard-types";
 import { toast } from "sonner";
 
 interface SettingsTabProps {
   config: AppConfig | null;
-  plans: InvestmentPlan[];
   onUpdateConfig: (key: string, value: string) => Promise<boolean>;
   onTestTelegram: () => Promise<{ ok?: boolean; message?: string; error?: string }>;
-  onSeedPlan: () => Promise<boolean>;
-  onSavePlans: (plans: InvestmentPlan[]) => Promise<boolean>;
   telegramUsers: TelegramUser[];
   onAddTelegramUser: (name: string, botToken: string, chatId: string) => Promise<{ ok: boolean; error?: string; data?: TelegramUser }>;
   onDeleteTelegramUser: (id: string) => Promise<boolean>;
@@ -59,11 +54,8 @@ interface SettingsTabProps {
 
 export function SettingsTab({
   config,
-  plans,
   onUpdateConfig,
   onTestTelegram,
-  onSeedPlan,
-  onSavePlans,
   telegramUsers,
   onAddTelegramUser,
   onDeleteTelegramUser,
@@ -74,9 +66,6 @@ export function SettingsTab({
   const [dailyReportTime, setDailyReportTime] = useState("09:00");
   const [usdDropThreshold, setUsdDropThreshold] = useState("2");
   const [savingConfig, setSavingConfig] = useState(false);
-  const [seedingPlan, setSeedingPlan] = useState(false);
-  const [savingPlans, setSavingPlans] = useState(false);
-  const [editablePlans, setEditablePlans] = useState<InvestmentPlan[]>([]);
 
   // New Telegram user form
   const [newName, setNewName] = useState("");
@@ -101,10 +90,6 @@ export function SettingsTab({
     }
   }, [config]);
 
-  useEffect(() => {
-    setEditablePlans(plans.map((p) => ({ ...p })));
-  }, [plans]);
-
   const handleSaveConfig = async () => {
     setSavingConfig(true);
     try {
@@ -120,44 +105,6 @@ export function SettingsTab({
     } finally {
       setSavingConfig(false);
     }
-  };
-
-  const handleSeedPlan = async () => {
-    setSeedingPlan(true);
-    try {
-      const success = await onSeedPlan();
-      if (success) {
-        toast.success("تم إنشاء خطة الاستثمار الافتراضية");
-      } else {
-        toast.error("فشل في إنشاء الخطة");
-      }
-    } finally {
-      setSeedingPlan(false);
-    }
-  };
-
-  const handleSavePlans = async () => {
-    setSavingPlans(true);
-    try {
-      const success = await onSavePlans(editablePlans);
-      if (success) {
-        toast.success("تم حفظ خطة الاستثمار بنجاح");
-      } else {
-        toast.error("فشل في حفظ الخطة");
-      }
-    } finally {
-      setSavingPlans(false);
-    }
-  };
-
-  const updatePlanField = (
-    index: number,
-    field: keyof InvestmentPlan,
-    value: string | number | boolean | null
-  ) => {
-    setEditablePlans((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
-    );
   };
 
   const handleAddUser = async () => {
@@ -259,7 +206,7 @@ export function SettingsTab({
                 <div className="bg-sky-50 dark:bg-sky-950/30 rounded-xl p-3 ring-1 ring-sky-200 dark:ring-sky-800">
                   <p className="text-xs font-medium text-sky-700 dark:text-sky-300 leading-relaxed">
                     📌 كل عميل يسجل بوته الخاص — البيانات خاصة ولا يمكن لأي شخص آخر الوصول إليها.
-                    <br />✅ سيتم إرسال أسعار الذهب والدولار والإشارات كل ساعة بتوقيت مصر.
+                    <br />✅ سيتم إرسال أسعار الذهب والدولار كل ساعة بتوقيت مصر.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -507,109 +454,6 @@ export function SettingsTab({
             )}
             <span className="text-xs font-bold">حفظ الإعدادات</span>
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Investment Plan Management */}
-      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-4 py-3 flex items-center justify-between border-b border-border/30">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
-              <ShoppingCart className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold">إدارة خطة الاستثمار</h3>
-              <p className="text-xs text-muted-foreground">Investment Plan Management</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="default"
-              onClick={handleSeedPlan}
-              disabled={seedingPlan}
-              className="gap-2 rounded-lg h-8 text-xs"
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${seedingPlan ? "animate-spin" : ""}`}
-              />
-              إنشاء افتراضي
-            </Button>
-            <Button
-              size="default"
-              onClick={handleSavePlans}
-              disabled={savingPlans}
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-2 rounded-lg shadow-sm shadow-amber-500/20 h-8 text-xs"
-            >
-              <Save className="w-3.5 h-3.5" />
-              حفظ التغييرات
-            </Button>
-          </div>
-        </div>
-        <CardContent className="p-4">
-          <div className="space-y-3">
-            {editablePlans.map((plan, index) => (
-              <div
-                key={plan.id || index}
-                className="bg-muted/20 rounded-lg p-3 ring-1 ring-border/20 hover:bg-muted/30 transition-colors"
-              >
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-center">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">الحد الأدنى</label>
-                    <Input
-                      type="number"
-                      value={plan.priceRangeMin}
-                      onChange={(e) =>
-                        updatePlanField(index, "priceRangeMin", parseFloat(e.target.value) || 0)
-                      }
-                      className="h-8 text-xs rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">الحد الأقصى</label>
-                    <Input
-                      type="number"
-                      value={plan.priceRangeMax ?? ""}
-                      onChange={(e) =>
-                        updatePlanField(index, "priceRangeMax", e.target.value ? parseFloat(e.target.value) : null)
-                      }
-                      placeholder="∞"
-                      className="h-8 text-xs rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">الإجراء</label>
-                    <Input
-                      value={plan.action}
-                      onChange={(e) => updatePlanField(index, "action", e.target.value)}
-                      className="h-8 text-xs rounded-lg font-semibold"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">العائد %</label>
-                    <Input
-                      type="number"
-                      value={plan.expectedReturn}
-                      onChange={(e) =>
-                        updatePlanField(index, "expectedReturn", parseFloat(e.target.value) || 0)
-                      }
-                      className="h-8 text-xs rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">نشط</label>
-                    <div className="flex items-center h-8">
-                      <Switch
-                        checked={plan.active}
-                        onCheckedChange={(checked) => updatePlanField(index, "active", checked)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </CardContent>
       </Card>
     </div>

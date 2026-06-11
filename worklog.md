@@ -283,3 +283,62 @@ Stage Summary:
 - UI shows comprehensive analysis: confidence, position, trends, allocation, reasoning
 - Telegram notifications include smart analysis data
 - Investment plans now have continuous ranges (no price gap issues)
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Remove investment plan (خطة الاستثمار) and current signal (الإشارة الحالية) from website and Telegram completely
+
+Work Log:
+- Deleted component file: `src/components/dashboard/investment-plan.tsx` (InvestmentPlanTable + CurrentSignalCard)
+- Deleted logic file: `src/lib/signal-detector.ts` (detectSignal, generateSmartSignal, detectUsdDrop)
+- Deleted API routes: `src/app/api/plan/route.ts`, `src/app/api/plan/seed/route.ts`, `src/app/api/signal/route.ts`
+- Updated `src/app/page.tsx`:
+  - Removed imports for InvestmentPlanTable and CurrentSignalCard
+  - Removed plan/signal/smartSignal from destructured hook values
+  - Removed the grid layout containing InvestmentPlanTable (2/3) + CurrentSignalCard (1/3)
+  - Dashboard tab now shows PriceCards only
+  - Removed plans/signal-related props from SettingsTab
+- Updated `src/hooks/use-dashboard.ts`:
+  - Removed state: plans, signal, smartSignal
+  - Removed functions: fetchPlans, seedPlan, savePlans, detectCurrentSignal, fetchSmartSignal
+  - Removed loading.plans state
+  - Removed effects for signal detection and smart signal fetching
+  - Removed all plan/signal values from return object
+  - Simplified runAutomation to not refresh plans
+  - Simplified seedData to not seed investment plans
+- Updated `src/components/dashboard/settings.tsx`:
+  - Removed plan-related props: plans, onSeedPlan, onSavePlans
+  - Removed plan-related state: seedingPlan, savingPlans, editablePlans
+  - Removed plan-related handlers: handleSeedPlan, handleSavePlans, updatePlanField
+  - Removed entire "Investment Plan Management" card section
+  - Updated Telegram user registration dialog text: removed "والإشارات" reference
+  - Removed InvestmentPlan import from types
+- Updated `src/app/api/automation/run/route.ts`:
+  - Removed imports: detectSignal, generateSmartSignal from signal-detector
+  - Inlined detectUsdDrop function (kept for USD drop alert feature)
+  - Removed signal parameter from buildHourlyReport function
+  - Removed signal section from Telegram hourly report messages
+  - Removed separate signal notification messages (buy/sell signal Telegram messages)
+  - Removed smart signal generation code (fetching price history, calling generateSmartSignal)
+  - Removed investment plan fetching from database
+  - Kept USD drop alert functionality intact
+- Updated `src/lib/dashboard-types.ts`:
+  - Removed InvestmentPlan interface
+  - Removed SignalResult interface
+  - Removed SmartSignalResult interface
+  - Updated AutomationResult to remove signals field
+- Updated `prisma/schema.prisma`:
+  - Removed InvestmentPlan model
+  - Ran `bun run db:push --accept-data-loss` to drop the InvestmentPlan table
+  - Regenerated Prisma client
+- Ran lint: no errors
+- Browser verification: all tabs working, no investment plan or signal visible anywhere
+
+Stage Summary:
+- خطة الاستثمار (Investment Plan) completely removed from website UI, settings, API routes, and database
+- الإشارة الحالية (Current Signal) completely removed from website UI and Telegram notifications
+- Telegram hourly report now shows prices only (no signal section)
+- USD drop alert feature preserved (detectUsdDrop function inlined)
+- All related code cleaned up: components, hooks, types, API routes, database schema
+- No remaining references to investment-plan, InvestmentPlan, signal-detector, smartSignal in codebase
