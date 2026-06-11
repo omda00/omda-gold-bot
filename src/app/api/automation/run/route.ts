@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 /**
- * /api/automation/run — Now simply redirects to /api/cron/refresh-prices
+ * /api/automation/run — Redirects to /api/cron/refresh-prices
  *
- * Hourly reports are sent from ONE place only to prevent duplicates.
- * All reporting logic lives in /api/cron/refresh-prices with dedup.
+ * ALL reporting logic is in /api/cron/refresh-prices (single source of truth).
+ * This prevents duplicate hourly reports.
  */
 export async function GET() {
   return POST();
@@ -12,17 +12,16 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // Forward the request to the cron endpoint which handles everything
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    // Use the same origin to call the cron endpoint
+    const cronUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}/api/cron/refresh-prices`
+      : "http://localhost:3000/api/cron/refresh-prices";
 
-    const response = await fetch(`${baseUrl}/api/cron/refresh-prices`);
+    const response = await fetch(cronUrl);
     const data = await response.json();
-
     return NextResponse.json(data);
   } catch (error) {
-    console.error("[automation] Error forwarding to cron:", error);
+    console.error("[automation] Error:", error);
     return NextResponse.json(
       { error: "Failed to run automation" },
       { status: 500 }
