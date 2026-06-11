@@ -158,23 +158,23 @@ export function SettingsTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Telegram Configuration */}
-      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-sky-400 via-blue-400 to-sky-500" />
-        <div className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20 px-5 py-4 flex items-center gap-3 border-b border-border/30">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center shadow-md shadow-sky-400/20">
-            <MessageSquare className="w-5 h-5 text-white" />
+      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-sky-400 via-blue-400 to-sky-500" />
+        <div className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20 px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center shadow-sm shadow-sky-400/20">
+            <MessageSquare className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h3 className="text-base font-bold">إعدادات التيليجرام</h3>
-            <p className="text-sm text-muted-foreground">Telegram Configuration</p>
+            <h3 className="text-sm font-bold">إعدادات التيليجرام</h3>
+            <p className="text-xs text-muted-foreground">Telegram Configuration</p>
           </div>
         </div>
-        <CardContent className="p-5 space-y-5">
+        <CardContent className="p-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="botToken" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-              <Key className="w-4 h-4" /> Bot Token
+            <Label htmlFor="botToken" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5" /> Bot Token
             </Label>
             <div className="relative">
               <Input
@@ -183,7 +183,7 @@ export function SettingsTab({
                 value={botToken}
                 onChange={(e) => setBotToken(e.target.value)}
                 placeholder="أدخل Bot Token"
-                className="pr-10 rounded-xl h-11 text-sm"
+                className="pr-10 rounded-lg h-9 text-xs"
               />
               <Button
                 type="button"
@@ -201,8 +201,8 @@ export function SettingsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="chatId" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-              <Bot className="w-4 h-4" /> Chat ID
+            <Label htmlFor="chatId" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+              <Bot className="w-3.5 h-3.5" /> Chat ID
             </Label>
             <Input
               id="chatId"
@@ -210,7 +210,7 @@ export function SettingsTab({
               value={chatId}
               onChange={(e) => setChatId(e.target.value)}
               placeholder="أدخل Chat ID"
-              className="rounded-xl h-11 text-sm"
+              className="rounded-lg h-9 text-xs"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -219,22 +219,22 @@ export function SettingsTab({
               size="default"
               onClick={handleTestTelegram}
               disabled={testing}
-              className="gap-2 rounded-xl h-10"
+              className="gap-2 rounded-lg h-9 text-xs"
             >
               {testing ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <TestTube className="w-4 h-4" />
+                <TestTube className="w-3.5 h-3.5" />
               )}
-              <span className="text-sm font-semibold">اختبار الاتصال</span>
+              <span className="text-xs font-semibold">اختبار الاتصال</span>
             </Button>
             {testResult && (
               <Badge
                 variant={testResult.ok ? "default" : "destructive"}
                 className={
                   testResult.ok
-                    ? "bg-emerald-500 text-white rounded-lg px-3 py-1 text-sm font-bold"
-                    : "rounded-lg px-3 py-1 text-sm font-bold"
+                    ? "bg-emerald-500 text-white rounded-lg text-xs px-2 py-0.5 font-bold"
+                    : "rounded-lg text-xs px-2 py-0.5 font-bold"
                 }
               >
                 {testResult.ok ? "✓ متصل" : "✗ فشل"}
@@ -242,28 +242,28 @@ export function SettingsTab({
             )}
           </div>
           {testResult && !testResult.ok && (
-            <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/20 rounded-xl px-4 py-3 font-medium">{testResult.message}</p>
+            <p className="text-xs text-red-600 bg-red-50 dark:bg-red-950/20 rounded-lg px-3 py-2 font-medium">{testResult.message}</p>
           )}
         </CardContent>
       </Card>
 
       {/* Automation Settings */}
-      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500" />
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 px-5 py-4 flex items-center gap-3 border-b border-border/30">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-md shadow-emerald-400/20">
-            <Zap className="w-5 h-5 text-white" />
+      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500" />
+        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-sm shadow-emerald-400/20">
+            <Zap className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h3 className="text-base font-bold">إعدادات الأتمتة</h3>
-            <p className="text-sm text-muted-foreground">Automation Settings</p>
+            <h3 className="text-sm font-bold">إعدادات الأتمتة</h3>
+            <p className="text-xs text-muted-foreground">Automation Settings</p>
           </div>
         </div>
-        <CardContent className="p-5 space-y-5">
-          <div className="flex items-center justify-between bg-muted/30 rounded-xl p-4 ring-1 ring-border/20">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3 ring-1 ring-border/20">
             <div>
-              <Label className="font-bold text-base">تفعيل الأتمتة</Label>
-              <p className="text-sm text-muted-foreground">
+              <Label className="font-bold text-sm">تفعيل الأتمتة</Label>
+              <p className="text-xs text-muted-foreground">
                 تشغيل جلب الأسعار والإشعارات تلقائياً
               </p>
             </div>
@@ -272,22 +272,22 @@ export function SettingsTab({
               onCheckedChange={setAutomationEnabled}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="reportTime" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                <Clock className="w-4 h-4" /> وقت التقرير اليومي
+              <Label htmlFor="reportTime" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> وقت التقرير اليومي
               </Label>
               <Input
                 id="reportTime"
                 type="time"
                 value={dailyReportTime}
                 onChange={(e) => setDailyReportTime(e.target.value)}
-                className="rounded-xl h-11"
+                className="rounded-lg h-9 text-xs"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="threshold" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" /> حد انخفاض الدولار (%)
+              <Label htmlFor="threshold" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" /> حد انخفاض الدولار (%)
               </Label>
               <Input
                 id="threshold"
@@ -296,36 +296,36 @@ export function SettingsTab({
                 min="0"
                 value={usdDropThreshold}
                 onChange={(e) => setUsdDropThreshold(e.target.value)}
-                className="rounded-xl h-11"
+                className="rounded-lg h-9 text-xs"
               />
             </div>
           </div>
           <Button
             onClick={handleSaveConfig}
             disabled={savingConfig}
-            className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 gap-2 rounded-xl shadow-md shadow-emerald-500/20 h-11 px-5"
+            className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 gap-2 rounded-lg shadow-sm shadow-emerald-500/20 h-9 px-4 text-xs"
           >
             {savingConfig ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <Save className="w-4 h-4" />
+              <Save className="w-3.5 h-3.5" />
             )}
-            <span className="text-sm font-bold">حفظ الإعدادات</span>
+            <span className="text-xs font-bold">حفظ الإعدادات</span>
           </Button>
         </CardContent>
       </Card>
 
       {/* Investment Plan Management */}
-      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-4 flex items-center justify-between border-b border-border/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md shadow-amber-400/20">
-              <ShoppingCart className="w-5 h-5 text-white" />
+      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-4 py-3 flex items-center justify-between border-b border-border/30">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
+              <ShoppingCart className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold">إدارة خطة الاستثمار</h3>
-              <p className="text-sm text-muted-foreground">Investment Plan Management</p>
+              <h3 className="text-sm font-bold">إدارة خطة الاستثمار</h3>
+              <p className="text-xs text-muted-foreground">Investment Plan Management</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -334,10 +334,10 @@ export function SettingsTab({
               size="default"
               onClick={handleSeedPlan}
               disabled={seedingPlan}
-              className="gap-2 rounded-xl h-9 text-sm"
+              className="gap-2 rounded-lg h-8 text-xs"
             >
               <RefreshCw
-                className={`w-4 h-4 ${seedingPlan ? "animate-spin" : ""}`}
+                className={`w-3.5 h-3.5 ${seedingPlan ? "animate-spin" : ""}`}
               />
               إنشاء افتراضي
             </Button>
@@ -345,9 +345,9 @@ export function SettingsTab({
               size="default"
               onClick={handleSavePlans}
               disabled={savingPlans}
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-2 rounded-xl shadow-md shadow-amber-500/20 h-9 text-sm"
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-2 rounded-lg shadow-sm shadow-amber-500/20 h-8 text-xs"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-3.5 h-3.5" />
               حفظ التغييرات
             </Button>
           </div>
@@ -357,22 +357,22 @@ export function SettingsTab({
             {editablePlans.map((plan, index) => (
               <div
                 key={plan.id || index}
-                className="bg-muted/20 rounded-xl p-4 ring-1 ring-border/20 hover:bg-muted/30 transition-colors"
+                className="bg-muted/20 rounded-lg p-3 ring-1 ring-border/20 hover:bg-muted/30 transition-colors"
               >
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-center">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-muted-foreground">الحد الأدنى</label>
+                    <label className="text-xs font-bold text-muted-foreground">الحد الأدنى</label>
                     <Input
                       type="number"
                       value={plan.priceRangeMin}
                       onChange={(e) =>
                         updatePlanField(index, "priceRangeMin", parseFloat(e.target.value) || 0)
                       }
-                      className="h-9 text-sm rounded-lg"
+                      className="h-8 text-xs rounded-lg"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-muted-foreground">الحد الأقصى</label>
+                    <label className="text-xs font-bold text-muted-foreground">الحد الأقصى</label>
                     <Input
                       type="number"
                       value={plan.priceRangeMax ?? ""}
@@ -380,31 +380,31 @@ export function SettingsTab({
                         updatePlanField(index, "priceRangeMax", e.target.value ? parseFloat(e.target.value) : null)
                       }
                       placeholder="∞"
-                      className="h-9 text-sm rounded-lg"
+                      className="h-8 text-xs rounded-lg"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-muted-foreground">الإجراء</label>
+                    <label className="text-xs font-bold text-muted-foreground">الإجراء</label>
                     <Input
                       value={plan.action}
                       onChange={(e) => updatePlanField(index, "action", e.target.value)}
-                      className="h-9 text-sm rounded-lg font-semibold"
+                      className="h-8 text-xs rounded-lg font-semibold"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-muted-foreground">العائد %</label>
+                    <label className="text-xs font-bold text-muted-foreground">العائد %</label>
                     <Input
                       type="number"
                       value={plan.expectedReturn}
                       onChange={(e) =>
                         updatePlanField(index, "expectedReturn", parseFloat(e.target.value) || 0)
                       }
-                      className="h-9 text-sm rounded-lg"
+                      className="h-8 text-xs rounded-lg"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-muted-foreground">نشط</label>
-                    <div className="flex items-center h-9">
+                    <label className="text-xs font-bold text-muted-foreground">نشط</label>
+                    <div className="flex items-center h-8">
                       <Switch
                         checked={plan.active}
                         onCheckedChange={(checked) => updatePlanField(index, "active", checked)}

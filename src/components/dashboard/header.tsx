@@ -39,46 +39,46 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
             <div className="relative">
-              <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg shadow-amber-400/25">
-                <Bot className="w-6 h-6 text-white" />
+              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-md shadow-amber-400/25">
+                <Bot className="w-5 h-5 text-white" />
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-black text-foreground tracking-tight">
+              <h1 className="text-sm sm:text-base font-black text-foreground tracking-tight">
                 منصة متابعة الذهب والعملات
               </h1>
-              <p className="text-sm text-muted-foreground font-medium">
+              <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
                 AI Workflow Automation — Gold & Currency Monitor
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-muted-foreground" />
               <Badge
                 variant={automationEnabled ? "default" : "destructive"}
                 className={
                   automationEnabled
-                    ? "bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 rounded-lg px-3 py-1 text-sm font-bold"
-                    : "gap-1.5 rounded-lg px-3 py-1 text-sm font-bold"
+                    ? "bg-emerald-500 hover:bg-emerald-600 text-white gap-1 rounded-md px-2 py-0.5 text-xs font-bold"
+                    : "gap-1 rounded-md px-2 py-0.5 text-xs font-bold"
                 }
               >
                 <span
-                  className={`w-2 h-2 rounded-full ${
+                  className={`w-1.5 h-1.5 rounded-full ${
                     automationEnabled ? "bg-white animate-pulse" : "bg-white"
                   }`}
                 />
                 {automationEnabled ? "نشط" : "متوقف"}
               </Badge>
             </div>
-            <div className="text-right hidden sm:block bg-muted/40 rounded-xl px-4 py-2">
-              <p className="text-sm text-muted-foreground font-medium">{currentDate}</p>
-              <p className="text-base font-mono font-bold text-foreground tabular-nums">
+            <div className="text-right hidden sm:block bg-muted/40 rounded-lg px-3 py-1.5">
+              <p className="text-[10px] text-muted-foreground font-medium">{currentDate}</p>
+              <p className="text-xs font-mono font-bold text-foreground tabular-nums">
                 {currentTime}
               </p>
             </div>

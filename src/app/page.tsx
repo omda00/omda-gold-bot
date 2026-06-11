@@ -49,7 +49,6 @@ export default function Home() {
       if (result) {
         toast.success("تم تحديث الأسعار بنجاح", { duration: 3000 });
       } else {
-        // null result means a fetch is already in progress or DB was refreshed
         toast.info("جارِ التحديث بالفعل — يتم عرض آخر الأسعار المتاحة", { duration: 2000 });
       }
     } catch {
@@ -76,47 +75,47 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-amber-50/10 dark:to-amber-950/5">
       <DashboardHeader automationEnabled={automationEnabled} />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 py-3 sm:py-5">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="space-y-4"
+          className="space-y-3"
         >
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <TabsList className="bg-muted/40 backdrop-blur-sm rounded-2xl p-1 h-auto flex-wrap">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <TabsList className="bg-muted/40 backdrop-blur-sm rounded-xl p-0.5 h-auto flex-wrap">
               <TabsTrigger
                 value="dashboard"
-                className="gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-400/20 px-4 py-2 text-sm font-bold transition-all"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-amber-400/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
-                <LayoutDashboard className="w-4 h-4" />
+                <LayoutDashboard className="w-3.5 h-3.5" />
                 <span>لوحة التحكم</span>
               </TabsTrigger>
               <TabsTrigger
                 value="calculator"
-                className="gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-400/20 px-4 py-2 text-sm font-bold transition-all"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-yellow-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-amber-400/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
-                <Calculator className="w-4 h-4" />
+                <Calculator className="w-3.5 h-3.5" />
                 <span>حاسبة الذهب</span>
               </TabsTrigger>
               <TabsTrigger
                 value="prices"
-                className="gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-400 data-[state=active]:to-green-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-400/20 px-4 py-2 text-sm font-bold transition-all"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-400 data-[state=active]:to-green-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-emerald-400/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3.5 h-3.5" />
                 <span>الأسعار</span>
               </TabsTrigger>
               <TabsTrigger
                 value="settings"
-                className="gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-400 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sky-400/20 px-4 py-2 text-sm font-bold transition-all"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-400 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-sky-400/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-3.5 h-3.5" />
                 <span>الإعدادات</span>
               </TabsTrigger>
               <TabsTrigger
                 value="logs"
-                className="gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-400 data-[state=active]:to-violet-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-400/20 px-4 py-2 text-sm font-bold transition-all"
+                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-400 data-[state=active]:to-violet-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-purple-400/20 px-3 py-1.5 text-xs font-bold transition-all"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-3.5 h-3.5" />
                 <span>السجلات</span>
               </TabsTrigger>
             </TabsList>
@@ -124,13 +123,13 @@ export default function Home() {
             {activeTab === "dashboard" && (
               <Button
                 variant="outline"
-                size="default"
+                size="sm"
                 onClick={handleRunAutomation}
                 disabled={loading.automation}
-                className="gap-2 rounded-xl border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/30 h-10 text-sm font-bold"
+                className="gap-1.5 rounded-xl border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/30 h-8 text-xs font-bold"
               >
                 <Play
-                  className={`w-4 h-4 ${
+                  className={`w-3.5 h-3.5 ${
                     loading.automation ? "animate-pulse" : ""
                   }`}
                 />
@@ -140,14 +139,14 @@ export default function Home() {
           </div>
 
           {/* TAB 1: Dashboard */}
-          <TabsContent value="dashboard" className="space-y-4">
+          <TabsContent value="dashboard" className="space-y-3">
             <PriceCards
               prices={prices}
               loading={loading.prices}
               fetching={loading.fetching}
               onFetchPrices={handleFetchPrices}
             />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               <div className="lg:col-span-2">
                 <InvestmentPlanTable
                   plans={plans}
