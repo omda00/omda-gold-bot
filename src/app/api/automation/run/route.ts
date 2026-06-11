@@ -120,6 +120,14 @@ function buildHourlyReport(params: {
 }
 
 /**
+ * GET /api/automation/run - Triggered by Vercel Cron (hourly)
+ * Same as POST but accepts GET requests from Vercel's cron system.
+ */
+export async function GET() {
+  return POST();
+}
+
+/**
  * POST /api/automation/run - Run the full automation cycle:
  * 1. Fetch current prices (Gold EGP + USD/EGP + all karats)
  * 2. Check if USD/EGP has a significant drop

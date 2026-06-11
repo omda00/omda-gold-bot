@@ -6,22 +6,23 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model PriceRecord {
   id              String   @id @default(cuid())
   symbol          String   // "GOLD_EGP", "USD_EGP", "GOLD_POUND_EGP", "GOLD_24K_EGP", etc.
-  price           Float
+  price           Double
   currency        String   // "EGP"
-  change          Float?   // percentage change from previous
+  change          Double?  // percentage change from previous
   source          String?  // Where the price was fetched from
-  buyPrice        Float?   // Price the shop buys from you (for gold)
-  sellPrice       Float?   // Price the shop sells to you (for gold)
-  sellWorkmanship Float?   // Workmanship fee on sell (صنعة البيع)
-  buyWorkmanship  Float?   // Workmanship fee on buy (صنعة الشراء)
-  changeAmount    Float?   // Absolute change amount (e.g., -10.48)
+  buyPrice        Double?  // Price the shop buys from you (for gold)
+  sellPrice       Double?  // Price the shop sells to you (for gold)
+  sellWorkmanship Double?  // Workmanship fee on sell (صنعة البيع)
+  buyWorkmanship  Double?  // Workmanship fee on buy (صنعة الشراء)
+  changeAmount    Double?  // Absolute change amount (e.g., -10.48)
   createdAt       DateTime @default(now())
 }
 
@@ -32,21 +33,21 @@ model AppConfig {
 }
 
 model NotificationLog {
-  id        String   @id @default(cuid())
-  type      String   // "daily_report", "buy_signal", "usd_drop_alert", "test"
-  title     String
-  message   String
-  sentAt    DateTime @default(now())
-  success   Boolean
-  error     String?
+  id      String   @id @default(cuid())
+  type    String   // "daily_report", "buy_signal", "usd_drop_alert", "test"
+  title   String
+  message String
+  sentAt  DateTime @default(now())
+  success Boolean
+  error   String?
 }
 
 model TelegramUser {
-  id          String   @id @default(cuid())
-  name        String   // Display name for the user
-  botToken    String   // Unique Telegram Bot Token for this user
-  chatId      String   // Unique Chat ID for this user
-  active      Boolean  @default(true) // Whether to send notifications to this user
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String   // Display name for the user
+  botToken  String   // Unique Telegram Bot Token for this user
+  chatId    String   // Unique Chat ID for this user
+  active    Boolean  @default(true) // Whether to send notifications to this user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

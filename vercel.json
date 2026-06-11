@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/automation/run",
+      "schedule": "1 * * * *"
+    },
+    {
+      "path": "/api/prices",
+      "schedule": "0,30 * * * *"
+    }
+  ]
+}
