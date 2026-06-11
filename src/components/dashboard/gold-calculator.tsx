@@ -7,6 +7,8 @@ import {
   RefreshCw,
   Coins,
   CircleDollarSign,
+  ArrowDownUp,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import type { CalculatorPriceResult } from "@/lib/dashboard-types";
 
 interface GoldCalculatorProps {
@@ -32,46 +33,71 @@ function formatPrice(price: number | null): string {
   return price.toLocaleString("ar-EG", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-// Modern gradient themes for each karat
+// Modern color themes for each karat - rich, distinct, modern
 const karatThemes: Record<number, {
-  gradient: string;
-  glow: string;
-  iconBg: string;
+  badgeBg: string;
+  badgeText: string;
+  badgeBorder: string;
+  cardGlow: string;
+  sellBg: string;
+  buyBg: string;
+  sellIcon: string;
+  buyIcon: string;
+  accentLine: string;
   label: string;
-  accent: string;
-  ring: string;
+  number: string;
 }> = {
   24: {
-    gradient: "from-amber-300 via-yellow-200 to-amber-100",
-    glow: "shadow-amber-300/30",
-    iconBg: "bg-amber-400",
+    badgeBg: "bg-gradient-to-r from-amber-400 to-yellow-300",
+    badgeText: "text-amber-900",
+    badgeBorder: "border-amber-300",
+    cardGlow: "shadow-amber-200/40 dark:shadow-amber-900/20",
+    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
+    buyBg: "bg-sky-50 dark:bg-sky-950/30",
+    sellIcon: "text-emerald-600 dark:text-emerald-400",
+    buyIcon: "text-sky-600 dark:text-sky-400",
+    accentLine: "from-amber-400 via-yellow-300 to-amber-400",
     label: "عيار ٢٤",
-    accent: "text-amber-700",
-    ring: "ring-amber-300/50",
+    number: "text-amber-700 dark:text-amber-300",
   },
   22: {
-    gradient: "from-orange-200 via-amber-200 to-yellow-100",
-    glow: "shadow-orange-300/30",
-    iconBg: "bg-orange-400",
+    badgeBg: "bg-gradient-to-r from-orange-400 to-amber-300",
+    badgeText: "text-orange-900",
+    badgeBorder: "border-orange-300",
+    cardGlow: "shadow-orange-200/40 dark:shadow-orange-900/20",
+    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
+    buyBg: "bg-sky-50 dark:bg-sky-950/30",
+    sellIcon: "text-emerald-600 dark:text-emerald-400",
+    buyIcon: "text-sky-600 dark:text-sky-400",
+    accentLine: "from-orange-400 via-amber-300 to-orange-400",
     label: "عيار ٢٢",
-    accent: "text-orange-700",
-    ring: "ring-orange-300/50",
+    number: "text-orange-700 dark:text-orange-300",
   },
   21: {
-    gradient: "from-yellow-200 via-amber-200 to-orange-100",
-    glow: "shadow-yellow-300/30",
-    iconBg: "bg-yellow-500",
+    badgeBg: "bg-gradient-to-r from-yellow-500 to-amber-400",
+    badgeText: "text-yellow-950",
+    badgeBorder: "border-yellow-400",
+    cardGlow: "shadow-yellow-200/40 dark:shadow-yellow-900/20",
+    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
+    buyBg: "bg-sky-50 dark:bg-sky-950/30",
+    sellIcon: "text-emerald-600 dark:text-emerald-400",
+    buyIcon: "text-sky-600 dark:text-sky-400",
+    accentLine: "from-yellow-500 via-amber-400 to-yellow-500",
     label: "عيار ٢١",
-    accent: "text-yellow-700",
-    ring: "ring-yellow-300/50",
+    number: "text-yellow-700 dark:text-yellow-300",
   },
   18: {
-    gradient: "from-rose-200 via-amber-200 to-yellow-100",
-    glow: "shadow-rose-300/30",
-    iconBg: "bg-rose-400",
+    badgeBg: "bg-gradient-to-r from-rose-400 to-pink-300",
+    badgeText: "text-rose-900",
+    badgeBorder: "border-rose-300",
+    cardGlow: "shadow-rose-200/40 dark:shadow-rose-900/20",
+    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
+    buyBg: "bg-sky-50 dark:bg-sky-950/30",
+    sellIcon: "text-emerald-600 dark:text-emerald-400",
+    buyIcon: "text-sky-600 dark:text-sky-400",
+    accentLine: "from-rose-400 via-pink-300 to-rose-400",
     label: "عيار ١٨",
-    accent: "text-rose-700",
-    ring: "ring-rose-300/50",
+    number: "text-rose-700 dark:text-rose-300",
   },
 };
 
@@ -131,27 +157,27 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg shadow-amber-400/30">
-            <Calculator className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg shadow-amber-400/30">
+            <Calculator className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">
+            <h2 className="text-2xl font-black bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">
               حاسبة الذهب
             </h2>
             {calculatorData?.source && (
-              <p className="text-xs text-muted-foreground">الأسعار من {calculatorData.source}</p>
+              <p className="text-sm text-muted-foreground">الأسعار من {calculatorData.source}</p>
             )}
           </div>
         </div>
         <Button
           variant="outline"
-          size="sm"
+          size="default"
           onClick={handleFetch}
           disabled={fetching || loading}
-          className="gap-1.5 rounded-xl border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30"
+          className="gap-2 rounded-xl border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30 h-10 px-4"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${fetching ? "animate-spin" : ""}`} />
-          تحديث الأسعار
+          <RefreshCw className={`w-4 h-4 ${fetching ? "animate-spin" : ""}`} />
+          <span className="text-sm font-semibold">تحديث الأسعار</span>
         </Button>
       </div>
 
@@ -159,10 +185,10 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
       {(loading || fetching) && !calculatorData && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="animate-pulse rounded-2xl bg-muted/50 h-44 p-5 space-y-3">
-              <div className="h-4 bg-muted rounded-lg w-16" />
-              <div className="h-10 bg-muted rounded-lg w-28" />
-              <div className="h-3 bg-muted rounded-lg w-20" />
+            <div key={i} className="animate-pulse rounded-2xl bg-muted/50 h-52 p-5 space-y-4">
+              <div className="h-7 bg-muted rounded-lg w-24" />
+              <div className="h-12 bg-muted rounded-lg w-32" />
+              <div className="h-12 bg-muted rounded-lg w-28" />
             </div>
           ))}
         </div>
@@ -181,40 +207,46 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: idx * 0.08, type: "spring", stiffness: 200, damping: 20 }}
                 >
-                  <Card className={`relative overflow-hidden rounded-2xl border-0 shadow-lg ${theme.glow} ring-1 ${theme.ring} group hover:shadow-xl transition-all duration-300`}>
-                    {/* Background gradient */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-60 dark:opacity-20`} />
-                    
-                    <CardContent className="relative p-5 space-y-3">
-                      {/* Karat badge */}
-                      <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-xl ${theme.iconBg} flex items-center justify-center shadow-md`}>
-                          <span className="text-white text-xs font-bold">{karatPrice.karat}</span>
+                  <Card className={`relative overflow-hidden rounded-2xl border-0 shadow-xl ${theme.cardGlow} ring-1 ring-border/20 group hover:shadow-2xl transition-all duration-300 hover:-translate-y-1`}>
+                    {/* Top accent gradient line */}
+                    <div className={`h-1.5 bg-gradient-to-r ${theme.accentLine}`} />
+
+                    <CardContent className="relative p-5 space-y-4">
+                      {/* Karat badge - prominent colored box */}
+                      <div className="flex items-center justify-center">
+                        <div className={`${theme.badgeBg} px-5 py-2 rounded-xl shadow-md border ${theme.badgeBorder}`}>
+                          <span className={`text-base font-black ${theme.badgeText} tracking-wide`}>
+                            {theme.label}
+                          </span>
                         </div>
-                        <span className={`text-sm font-bold ${theme.accent} dark:text-amber-300`}>
-                          {theme.label}
-                        </span>
                       </div>
 
-                      {/* Sell price */}
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">بيع</p>
-                        <p className="text-2xl font-black tracking-tight text-foreground tabular-nums">
-                          {formatPrice(karatPrice.sellPrice)}
-                          <span className="text-xs font-medium text-muted-foreground mr-1">ج.م</span>
-                        </p>
+                      {/* Sell price section */}
+                      <div className={`${theme.sellBg} rounded-xl p-3.5 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30`}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <ArrowRightLeft className={`w-4 h-4 ${theme.sellIcon}`} />
+                          <span className="text-base font-bold text-emerald-700 dark:text-emerald-400">بيع</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground tabular-nums">
+                            {formatPrice(karatPrice.sellPrice)}
+                          </span>
+                          <span className="text-sm font-bold text-muted-foreground">ج.م/جرام</span>
+                        </div>
                       </div>
 
-                      {/* Divider */}
-                      <div className="h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent" />
-
-                      {/* Buy price */}
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">شراء</p>
-                        <p className="text-lg font-bold tracking-tight text-muted-foreground tabular-nums">
-                          {formatPrice(karatPrice.buyPrice)}
-                          <span className="text-xs font-normal mr-1">ج.م</span>
-                        </p>
+                      {/* Buy price section */}
+                      <div className={`${theme.buyBg} rounded-xl p-3.5 ring-1 ring-sky-200/50 dark:ring-sky-800/30`}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <ArrowDownUp className={`w-4 h-4 ${theme.buyIcon}`} />
+                          <span className="text-base font-bold text-sky-700 dark:text-sky-400">شراء</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xl sm:text-2xl font-bold tracking-tight text-muted-foreground tabular-nums">
+                            {formatPrice(karatPrice.buyPrice)}
+                          </span>
+                          <span className="text-sm font-semibold text-muted-foreground">ج.م/جرام</span>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -229,32 +261,46 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
           >
-            <Card className="relative overflow-hidden rounded-2xl border-0 shadow-lg shadow-amber-400/20 ring-1 ring-amber-300/40">
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-200 via-yellow-200 to-amber-100 opacity-50 dark:opacity-15" />
-              <CardContent className="relative p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-400 flex items-center justify-center shadow-lg shadow-amber-400/30">
-                    <Coins className="w-5 h-5 text-white" />
+            <Card className="relative overflow-hidden rounded-2xl border-0 shadow-xl shadow-amber-200/30 dark:shadow-amber-900/20 ring-1 ring-amber-300/30">
+              {/* Top accent */}
+              <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+
+              <CardContent className="relative p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-400 flex items-center justify-center shadow-lg shadow-amber-400/30">
+                    <Coins className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">الجنيه الذهب</h3>
-                    <p className="text-xs text-muted-foreground">= 8 جرام عيار 21</p>
+                    <div className="bg-gradient-to-r from-amber-400 to-yellow-300 px-5 py-2 rounded-xl shadow-md border border-amber-300 inline-block">
+                      <span className="text-base font-black text-amber-900">الجنيه الذهب</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1.5">= 8 جرام عيار 21</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white/60 dark:bg-black/20 rounded-xl p-3 backdrop-blur-sm">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">بيع</p>
-                    <p className="text-2xl font-black tracking-tight text-foreground tabular-nums">
-                      {formatPrice(calculatorData.goldPound.sellPrice)}
-                      <span className="text-xs font-medium text-muted-foreground mr-1">ج.م</span>
-                    </p>
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-4 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ArrowRightLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-base font-bold text-emerald-700 dark:text-emerald-400">بيع</span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground tabular-nums">
+                        {formatPrice(calculatorData.goldPound.sellPrice)}
+                      </span>
+                      <span className="text-sm font-bold text-muted-foreground">ج.م</span>
+                    </div>
                   </div>
-                  <div className="bg-white/60 dark:bg-black/20 rounded-xl p-3 backdrop-blur-sm">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">شراء</p>
-                    <p className="text-2xl font-black tracking-tight text-muted-foreground tabular-nums">
-                      {formatPrice(calculatorData.goldPound.buyPrice)}
-                      <span className="text-xs font-normal mr-1">ج.م</span>
-                    </p>
+                  <div className="bg-sky-50 dark:bg-sky-950/30 rounded-xl p-4 ring-1 ring-sky-200/50 dark:ring-sky-800/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ArrowDownUp className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                      <span className="text-base font-bold text-sky-700 dark:text-sky-400">شراء</span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xl sm:text-2xl font-bold tracking-tight text-muted-foreground tabular-nums">
+                        {formatPrice(calculatorData.goldPound.buyPrice)}
+                      </span>
+                      <span className="text-sm font-semibold text-muted-foreground">ج.م</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -269,17 +315,20 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/50 overflow-hidden">
-                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-3 flex items-center gap-2 border-b border-border/30">
-                  <CircleDollarSign className="w-4 h-4 text-amber-600" />
-                  <h3 className="font-bold text-sm">حساب قيمة الذهب</h3>
+              <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-amber-400 to-yellow-400" />
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-4 flex items-center gap-3 border-b border-border/30">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md">
+                    <CircleDollarSign className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="text-base font-bold">حساب قيمة الذهب</h3>
                 </div>
                 <CardContent className="p-5 space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">العيار</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-muted-foreground">العيار</label>
                       <Select value={calcKarat} onValueChange={setCalcKarat}>
-                        <SelectTrigger className="h-10 rounded-xl">
+                        <SelectTrigger className="h-11 rounded-xl text-base font-semibold">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -290,10 +339,10 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">النوع</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-muted-foreground">النوع</label>
                       <Select value={calcType} onValueChange={setCalcType}>
-                        <SelectTrigger className="h-10 rounded-xl">
+                        <SelectTrigger className="h-11 rounded-xl text-base font-semibold">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -303,14 +352,14 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">الوزن بالجرام</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-muted-foreground">الوزن بالجرام</label>
                     <Input
                       type="number"
                       placeholder="أدخل الوزن بالجرام"
                       value={calcGrams}
                       onChange={(e) => setCalcGrams(e.target.value)}
-                      className="h-10 rounded-xl text-lg font-semibold"
+                      className="h-11 rounded-xl text-base font-semibold"
                       min="0"
                       step="0.01"
                     />
@@ -324,9 +373,9 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 rounded-2xl p-4 border border-amber-200/60 dark:border-amber-800/40">
+                        <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 rounded-2xl p-5 border border-amber-200/60 dark:border-amber-800/40">
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-semibold text-muted-foreground">الإجمالي</span>
+                            <span className="text-base font-bold text-muted-foreground">الإجمالي</span>
                             <span className="text-3xl font-black bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent tabular-nums">
                               {formatPrice(calcResult.total)} ج.م
                             </span>
@@ -345,20 +394,23 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.45 }}
             >
-              <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/50 overflow-hidden">
-                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 px-5 py-3 flex items-center gap-2 border-b border-border/30">
-                  <Coins className="w-4 h-4 text-yellow-600" />
-                  <h3 className="font-bold text-sm">حساب الجنيه الذهب</h3>
+              <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-yellow-400 to-amber-400" />
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 px-5 py-4 flex items-center gap-3 border-b border-border/30">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-md">
+                    <Coins className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="text-base font-bold">حساب الجنيه الذهب</h3>
                 </div>
                 <CardContent className="p-5 space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">عدد الجنيهات</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-muted-foreground">عدد الجنيهات</label>
                     <Input
                       type="number"
                       placeholder="أدخل عدد الجنيهات"
                       value={poundCount}
                       onChange={(e) => setPoundCount(e.target.value)}
-                      className="h-10 rounded-xl text-lg font-semibold"
+                      className="h-11 rounded-xl text-base font-semibold"
                       min="0"
                       step="0.5"
                     />
@@ -372,9 +424,9 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-2xl p-4 border border-yellow-200/60 dark:border-yellow-800/40">
+                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-2xl p-5 border border-yellow-200/60 dark:border-yellow-800/40">
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-semibold text-muted-foreground">الإجمالي</span>
+                            <span className="text-base font-bold text-muted-foreground">الإجمالي</span>
                             <span className="text-3xl font-black bg-gradient-to-r from-yellow-600 to-amber-600 bg-clip-text text-transparent tabular-nums">
                               {formatPrice(poundResult.total)} ج.م
                             </span>
@@ -384,8 +436,8 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                     )}
                   </AnimatePresence>
 
-                  <div className="text-xs text-muted-foreground bg-muted/30 rounded-xl p-3 space-y-1">
-                    <p className="font-semibold">معلومة</p>
+                  <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4 space-y-1">
+                    <p className="font-bold text-foreground">معلومة</p>
                     <p>الجنيه الذهب = 8 جرام من عيار 21</p>
                   </div>
                 </CardContent>
@@ -395,7 +447,7 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
 
           {/* Last updated */}
           {calculatorData.fetchedAt && (
-            <div className="text-center text-xs text-muted-foreground pt-2">
+            <div className="text-center text-sm text-muted-foreground pt-2">
               آخر تحديث:{" "}
               {new Date(calculatorData.fetchedAt).toLocaleString("ar-EG", {
                 year: "numeric",

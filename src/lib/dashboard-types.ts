@@ -76,18 +76,9 @@ export interface KaratPrice {
   karat: number;
   sellPrice: number | null;
   buyPrice: number | null;
-  sellWorkmanship: number | null;
-  buyWorkmanship: number | null;
 }
 
 export interface GoldPoundPrice {
-  sellPrice: number | null;
-  buyPrice: number | null;
-  sellWorkmanship: number | null;
-  buyWorkmanship: number | null;
-}
-
-export interface SilverPrice {
   sellPrice: number | null;
   buyPrice: number | null;
 }
@@ -95,7 +86,6 @@ export interface SilverPrice {
 export interface CalculatorPriceResult {
   karats: KaratPrice[];
   goldPound: GoldPoundPrice;
-  silver: SilverPrice;
   source: string;
   fetchedAt: string;
 }

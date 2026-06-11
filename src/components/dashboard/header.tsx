@@ -24,7 +24,7 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
         })
       );
       setCurrentDate(
-        now.toLocaleDateString("en-US", {
+        now.toLocaleDateString("ar-EG", {
           weekday: "long",
           year: "numeric",
           month: "long",
@@ -43,42 +43,42 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg shadow-amber-400/25">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg shadow-amber-400/25">
+                <Bot className="w-6 h-6 text-white" />
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight">
+              <h1 className="text-lg sm:text-xl font-black text-foreground tracking-tight">
                 منصة متابعة الذهب والعملات
               </h1>
-              <p className="text-[11px] text-muted-foreground font-medium" dir="rtl">
+              <p className="text-sm text-muted-foreground font-medium" dir="rtl">
                 AI Workflow Automation — Gold & Currency Monitor
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+              <Activity className="w-4 h-4 text-muted-foreground" />
               <Badge
                 variant={automationEnabled ? "default" : "destructive"}
                 className={
                   automationEnabled
-                    ? "bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 rounded-lg px-3 py-0.5 text-xs font-semibold"
-                    : "gap-1.5 rounded-lg px-3 py-0.5 text-xs font-semibold"
+                    ? "bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 rounded-lg px-3 py-1 text-sm font-bold"
+                    : "gap-1.5 rounded-lg px-3 py-1 text-sm font-bold"
                 }
               >
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${
+                  className={`w-2 h-2 rounded-full ${
                     automationEnabled ? "bg-white animate-pulse" : "bg-white"
                   }`}
                 />
-                {automationEnabled ? "Active" : "Inactive"}
+                {automationEnabled ? "نشط" : "متوقف"}
               </Badge>
             </div>
-            <div className="text-right hidden sm:block bg-muted/40 rounded-xl px-3 py-1.5">
-              <p className="text-[10px] text-muted-foreground font-medium">{currentDate}</p>
-              <p className="text-sm font-mono font-bold text-foreground tabular-nums">
+            <div className="text-right hidden sm:block bg-muted/40 rounded-xl px-4 py-2">
+              <p className="text-sm text-muted-foreground font-medium">{currentDate}</p>
+              <p className="text-base font-mono font-bold text-foreground tabular-nums">
                 {currentTime}
               </p>
             </div>

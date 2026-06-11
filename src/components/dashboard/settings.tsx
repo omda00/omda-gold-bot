@@ -84,9 +84,9 @@ export function SettingsTab({
         onUpdateConfig("USD_DROP_THRESHOLD", usdDropThreshold),
       ];
       await Promise.all(updates);
-      toast.success("Configuration saved successfully");
+      toast.success("تم حفظ الإعدادات بنجاح");
     } catch {
-      toast.error("Failed to save configuration");
+      toast.error("فشل في حفظ الإعدادات");
     } finally {
       setSavingConfig(false);
     }
@@ -103,17 +103,17 @@ export function SettingsTab({
       const result = await onTestTelegram();
       if (result.ok) {
         setTestResult({ ok: true, message: result.message || "Test message sent!" });
-        toast.success("Telegram test message sent successfully");
+        toast.success("تم إرسال رسالة الاختبار بنجاح");
       } else {
         setTestResult({
           ok: false,
-          message: result.error || "Failed to send test message",
+          message: result.error || "فشل إرسال رسالة الاختبار",
         });
-        toast.error("Telegram test failed");
+        toast.error("فشل اختبار التيليجرام");
       }
     } catch {
-      setTestResult({ ok: false, message: "Network error" });
-      toast.error("Telegram test failed");
+      setTestResult({ ok: false, message: "خطأ في الاتصال" });
+      toast.error("فشل اختبار التيليجرام");
     } finally {
       setTesting(false);
     }
@@ -124,9 +124,9 @@ export function SettingsTab({
     try {
       const success = await onSeedPlan();
       if (success) {
-        toast.success("Default investment plan seeded");
+        toast.success("تم إنشاء خطة الاستثمار الافتراضية");
       } else {
-        toast.error("Failed to seed plan");
+        toast.error("فشل في إنشاء الخطة");
       }
     } finally {
       setSeedingPlan(false);
@@ -138,9 +138,9 @@ export function SettingsTab({
     try {
       const success = await onSavePlans(editablePlans);
       if (success) {
-        toast.success("Investment plan saved successfully");
+        toast.success("تم حفظ خطة الاستثمار بنجاح");
       } else {
-        toast.error("Failed to save plan");
+        toast.error("فشل في حفظ الخطة");
       }
     } finally {
       setSavingPlans(false);
@@ -160,20 +160,21 @@ export function SettingsTab({
   return (
     <div className="space-y-4">
       {/* Telegram Configuration */}
-      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
-        <div className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20 px-5 py-3 flex items-center gap-2 border-b border-border/30">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center shadow-md shadow-sky-400/20">
-            <MessageSquare className="w-4 h-4 text-white" />
+      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-sky-400 via-blue-400 to-sky-500" />
+        <div className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20 px-5 py-4 flex items-center gap-3 border-b border-border/30">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center shadow-md shadow-sky-400/20">
+            <MessageSquare className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-sm">Telegram Configuration</h3>
-            <p className="text-[10px] text-muted-foreground" dir="rtl">إعدادات التيليجرام</p>
+            <h3 className="text-base font-bold">إعدادات التيليجرام</h3>
+            <p className="text-sm text-muted-foreground">Telegram Configuration</p>
           </div>
         </div>
-        <CardContent className="p-5 space-y-4">
+        <CardContent className="p-5 space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="botToken" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Key className="w-3 h-3" /> Bot Token
+            <Label htmlFor="botToken" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+              <Key className="w-4 h-4" /> Bot Token
             </Label>
             <div className="relative">
               <Input
@@ -181,8 +182,8 @@ export function SettingsTab({
                 type={showToken ? "text" : "password"}
                 value={botToken}
                 onChange={(e) => setBotToken(e.target.value)}
-                placeholder="Enter your Telegram Bot Token"
-                className="pr-10 rounded-xl h-10"
+                placeholder="أدخل Bot Token"
+                className="pr-10 rounded-xl h-11 text-sm"
               />
               <Button
                 type="button"
@@ -200,69 +201,70 @@ export function SettingsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="chatId" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Bot className="w-3 h-3" /> Chat ID
+            <Label htmlFor="chatId" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+              <Bot className="w-4 h-4" /> Chat ID
             </Label>
             <Input
               id="chatId"
               type="text"
               value={chatId}
               onChange={(e) => setChatId(e.target.value)}
-              placeholder="Enter your Telegram Chat ID"
-              className="rounded-xl h-10"
+              placeholder="أدخل Chat ID"
+              className="rounded-xl h-11 text-sm"
             />
           </div>
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              size="sm"
+              size="default"
               onClick={handleTestTelegram}
               disabled={testing}
-              className="gap-1.5 rounded-xl"
+              className="gap-2 rounded-xl h-10"
             >
               {testing ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
-                <TestTube className="w-3.5 h-3.5" />
+                <TestTube className="w-4 h-4" />
               )}
-              Test Connection
+              <span className="text-sm font-semibold">اختبار الاتصال</span>
             </Button>
             {testResult && (
               <Badge
                 variant={testResult.ok ? "default" : "destructive"}
                 className={
                   testResult.ok
-                    ? "bg-emerald-500 text-white rounded-lg px-3"
-                    : "rounded-lg px-3"
+                    ? "bg-emerald-500 text-white rounded-lg px-3 py-1 text-sm font-bold"
+                    : "rounded-lg px-3 py-1 text-sm font-bold"
                 }
               >
-                {testResult.ok ? "✓ Connected" : "✗ Failed"}
+                {testResult.ok ? "✓ متصل" : "✗ فشل"}
               </Badge>
             )}
           </div>
           {testResult && !testResult.ok && (
-            <p className="text-xs text-red-600 bg-red-50 dark:bg-red-950/20 rounded-xl px-3 py-2">{testResult.message}</p>
+            <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/20 rounded-xl px-4 py-3 font-medium">{testResult.message}</p>
           )}
         </CardContent>
       </Card>
 
       {/* Automation Settings */}
-      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 px-5 py-3 flex items-center gap-2 border-b border-border/30">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-md shadow-emerald-400/20">
-            <Zap className="w-4 h-4 text-white" />
+      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500" />
+        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 px-5 py-4 flex items-center gap-3 border-b border-border/30">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-md shadow-emerald-400/20">
+            <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-sm">Automation Settings</h3>
-            <p className="text-[10px] text-muted-foreground" dir="rtl">إعدادات الأتمتة</p>
+            <h3 className="text-base font-bold">إعدادات الأتمتة</h3>
+            <p className="text-sm text-muted-foreground">Automation Settings</p>
           </div>
         </div>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between bg-muted/30 rounded-xl p-3">
+        <CardContent className="p-5 space-y-5">
+          <div className="flex items-center justify-between bg-muted/30 rounded-xl p-4 ring-1 ring-border/20">
             <div>
-              <Label className="font-semibold text-sm">Enable Automation</Label>
-              <p className="text-xs text-muted-foreground">
-                Run automated price fetching &amp; notifications
+              <Label className="font-bold text-base">تفعيل الأتمتة</Label>
+              <p className="text-sm text-muted-foreground">
+                تشغيل جلب الأسعار والإشعارات تلقائياً
               </p>
             </div>
             <Switch
@@ -272,20 +274,20 @@ export function SettingsTab({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="reportTime" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-3 h-3" /> Daily Report Time
+              <Label htmlFor="reportTime" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4" /> وقت التقرير اليومي
               </Label>
               <Input
                 id="reportTime"
                 type="time"
                 value={dailyReportTime}
                 onChange={(e) => setDailyReportTime(e.target.value)}
-                className="rounded-xl h-10"
+                className="rounded-xl h-11"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="threshold" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <AlertTriangle className="w-3 h-3" /> USD Drop Threshold (%)
+              <Label htmlFor="threshold" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" /> حد انخفاض الدولار (%)
               </Label>
               <Input
                 id="threshold"
@@ -294,82 +296,83 @@ export function SettingsTab({
                 min="0"
                 value={usdDropThreshold}
                 onChange={(e) => setUsdDropThreshold(e.target.value)}
-                className="rounded-xl h-10"
+                className="rounded-xl h-11"
               />
             </div>
           </div>
           <Button
             onClick={handleSaveConfig}
             disabled={savingConfig}
-            className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 gap-1.5 rounded-xl shadow-md shadow-emerald-500/20 h-10"
+            className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 gap-2 rounded-xl shadow-md shadow-emerald-500/20 h-11 px-5"
           >
             {savingConfig ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <Save className="w-3.5 h-3.5" />
+              <Save className="w-4 h-4" />
             )}
-            Save Configuration
+            <span className="text-sm font-bold">حفظ الإعدادات</span>
           </Button>
         </CardContent>
       </Card>
 
       {/* Investment Plan Management */}
-      <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/30 overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-3 flex items-center justify-between border-b border-border/30">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md shadow-amber-400/20">
-              <ShoppingCart className="w-4 h-4 text-white" />
+      <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-5 py-4 flex items-center justify-between border-b border-border/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md shadow-amber-400/20">
+              <ShoppingCart className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-sm">Investment Plan</h3>
-              <p className="text-[10px] text-muted-foreground" dir="rtl">إدارة خطة الاستثمار</p>
+              <h3 className="text-base font-bold">إدارة خطة الاستثمار</h3>
+              <p className="text-sm text-muted-foreground">Investment Plan Management</p>
             </div>
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="default"
               onClick={handleSeedPlan}
               disabled={seedingPlan}
-              className="gap-1.5 rounded-xl text-xs h-8"
+              className="gap-2 rounded-xl h-9 text-sm"
             >
               <RefreshCw
-                className={`w-3 h-3 ${seedingPlan ? "animate-spin" : ""}`}
+                className={`w-4 h-4 ${seedingPlan ? "animate-spin" : ""}`}
               />
-              Seed Default
+              إنشاء افتراضي
             </Button>
             <Button
-              size="sm"
+              size="default"
               onClick={handleSavePlans}
               disabled={savingPlans}
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-1.5 rounded-xl shadow-md shadow-amber-500/20 text-xs h-8"
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-2 rounded-xl shadow-md shadow-amber-500/20 h-9 text-sm"
             >
-              <Save className="w-3 h-3" />
-              Save Changes
+              <Save className="w-4 h-4" />
+              حفظ التغييرات
             </Button>
           </div>
         </div>
         <CardContent className="p-4">
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {editablePlans.map((plan, index) => (
               <div
                 key={plan.id || index}
-                className="bg-muted/20 rounded-xl p-3 ring-1 ring-border/20 hover:bg-muted/30 transition-colors"
+                className="bg-muted/20 rounded-xl p-4 ring-1 ring-border/20 hover:bg-muted/30 transition-colors"
               >
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-center">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Min Price</label>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-muted-foreground">الحد الأدنى</label>
                     <Input
                       type="number"
                       value={plan.priceRangeMin}
                       onChange={(e) =>
                         updatePlanField(index, "priceRangeMin", parseFloat(e.target.value) || 0)
                       }
-                      className="h-8 text-sm rounded-lg"
+                      className="h-9 text-sm rounded-lg"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Max Price</label>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-muted-foreground">الحد الأقصى</label>
                     <Input
                       type="number"
                       value={plan.priceRangeMax ?? ""}
@@ -377,32 +380,32 @@ export function SettingsTab({
                         updatePlanField(index, "priceRangeMax", e.target.value ? parseFloat(e.target.value) : null)
                       }
                       placeholder="∞"
-                      className="h-8 text-sm rounded-lg"
+                      className="h-9 text-sm rounded-lg"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Action</label>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-muted-foreground">الإجراء</label>
                     <Input
                       value={plan.action}
                       onChange={(e) => updatePlanField(index, "action", e.target.value)}
                       dir="rtl"
-                      className="h-8 text-sm rounded-lg"
+                      className="h-9 text-sm rounded-lg font-semibold"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Return %</label>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-muted-foreground">العائد %</label>
                     <Input
                       type="number"
                       value={plan.expectedReturn}
                       onChange={(e) =>
                         updatePlanField(index, "expectedReturn", parseFloat(e.target.value) || 0)
                       }
-                      className="h-8 text-sm rounded-lg"
+                      className="h-9 text-sm rounded-lg"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Active</label>
-                    <div className="flex items-center h-8">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-muted-foreground">نشط</label>
+                    <div className="flex items-center h-9">
                       <Switch
                         checked={plan.active}
                         onCheckedChange={(checked) => updatePlanField(index, "active", checked)}

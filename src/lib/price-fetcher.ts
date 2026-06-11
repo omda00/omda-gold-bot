@@ -17,18 +17,9 @@ export interface KaratPrice {
   karat: number;
   sellPrice: number | null;
   buyPrice: number | null;
-  sellWorkmanship: number | null;
-  buyWorkmanship: number | null;
 }
 
 export interface GoldPoundPrice {
-  sellPrice: number | null;
-  buyPrice: number | null;
-  sellWorkmanship: number | null;
-  buyWorkmanship: number | null;
-}
-
-export interface SilverPrice {
   sellPrice: number | null;
   buyPrice: number | null;
 }
@@ -36,7 +27,6 @@ export interface SilverPrice {
 export interface CalculatorPriceResult {
   karats: KaratPrice[];
   goldPound: GoldPoundPrice;
-  silver: SilverPrice;
   source: string;
   fetchedAt: string;
 }
@@ -508,13 +498,12 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
 
   const emptyResult: CalculatorPriceResult = {
     karats: [
-      { karat: 24, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
-      { karat: 22, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
-      { karat: 21, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
-      { karat: 18, sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
+      { karat: 24, sellPrice: null, buyPrice: null },
+      { karat: 22, sellPrice: null, buyPrice: null },
+      { karat: 21, sellPrice: null, buyPrice: null },
+      { karat: 18, sellPrice: null, buyPrice: null },
     ],
-    goldPound: { sellPrice: null, buyPrice: null, sellWorkmanship: null, buyWorkmanship: null },
-    silver: { sellPrice: null, buyPrice: null },
+    goldPound: { sellPrice: null, buyPrice: null },
     source: "",
     fetchedAt: new Date().toISOString(),
   };
@@ -534,24 +523,15 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
     console.error("[calculator] iSagha prices page failed:", err);
   }
 
-  // Fetch from iSagha calculator page for silver price
+  // Fetch from iSagha calculator page for additional data
   try {
-    console.log("[calculator] Fetching silver price from iSagha.com/calculateGoldPrice...");
+    console.log("[calculator] Fetching additional data from iSagha.com/calculateGoldPrice...");
     const calcResult = await zai.functions.invoke("page_reader", {
       url: "https://market.isagha.com/calculateGoldPrice",
     });
     const calcHtml = calcResult?.data?.html || "";
-    if (calcHtml) {
-      const calcPrices = extractFromIsaghaHtml(calcHtml);
-      // Silver price is more likely on the calculator page
-      if (calcPrices.silverSell && !isaghaPrices?.silverSell) {
-        if (isaghaPrices) {
-          isaghaPrices.silverSell = calcPrices.silverSell;
-          isaghaPrices.silverBuy = calcPrices.silverBuy;
-        } else {
-          isaghaPrices = calcPrices;
-        }
-      }
+    if (calcHtml && !isaghaPrices) {
+      isaghaPrices = extractFromIsaghaHtml(calcHtml);
     }
   } catch (err) {
     console.error("[calculator] iSagha calculator page failed:", err);
@@ -573,8 +553,6 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
     karat: k,
     sellPrice: karatMap[k]?.sell ?? null,
     buyPrice: karatMap[k]?.buy ?? null,
-    sellWorkmanship: karatMap[k]?.sellW ?? null,
-    buyWorkmanship: karatMap[k]?.buyW ?? null,
   }));
 
   return {
@@ -582,12 +560,6 @@ export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
     goldPound: {
       sellPrice: isaghaPrices.goldPoundSell,
       buyPrice: isaghaPrices.goldPoundBuy,
-      sellWorkmanship: isaghaPrices.goldPoundSellWorkmanship,
-      buyWorkmanship: isaghaPrices.goldPoundBuyWorkmanship,
-    },
-    silver: {
-      sellPrice: isaghaPrices.silverSell,
-      buyPrice: isaghaPrices.silverBuy,
     },
     source: "iSagha.com",
     fetchedAt: new Date().toISOString(),
