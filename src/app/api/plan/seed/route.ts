@@ -1,51 +1,52 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// Investment plan based on gold price per gram (21 karat) in EGP
-// As specified by the user's investment strategy
+// Gold Investment Strategy based on thorough PDF analysis (June 2026)
+// Strategy covers buy/sell levels, DCA phases, and risk management until end of 2026
+// 21 Karat gold price per gram in EGP
 const DEFAULT_PLANS = [
   {
     priceRangeMin: 5700,
     priceRangeMax: 5900,
     action: "شراء قوي",
     expectedReturn: 40,
-    label: "شراء قوي - ذهب 5,700-5,900 ج.م/جرام",
+    label: "فرصة شراء قوية — دعم نادر (40% من الميزانية)",
     order: 1,
     active: true,
   },
   {
     priceRangeMin: 6100,
     priceRangeMax: 6300,
-    action: "شراء",
+    action: "شراء تدريجي",
     expectedReturn: 30,
-    label: "شراء - ذهب 6,100-6,300 ج.م/جرام",
+    label: "منطقة الشراء التدريجي الحالية (30% من الميزانية)",
     order: 2,
     active: true,
   },
   {
     priceRangeMin: 6300,
     priceRangeMax: 6800,
-    action: "انتظار",
+    action: "مراقبة فقط",
     expectedReturn: 0,
-    label: "انتظار - ذهب 6,300-6,800 ج.م/جرام",
+    label: "منطقة المراقبة — عدم الشراء حتى تصحيح أعمق",
     order: 3,
     active: true,
   },
   {
     priceRangeMin: 7000,
     priceRangeMax: 7200,
-    action: "بيع 70%",
+    action: "بيع جزئي 30%",
     expectedReturn: -30,
-    label: "بيع 70% - ذهب 7,000-7,200 ج.م/جرام",
+    label: "بيع 30% من المحفظة — جني أرباح جزئي",
     order: 4,
     active: true,
   },
   {
     priceRangeMin: 7500,
     priceRangeMax: null,
-    action: "بيع 70%",
+    action: "بيع نشط 50%",
     expectedReturn: -50,
-    label: "بيع 70% - ذهب فوق 7,500 ج.م/جرام",
+    label: "بيع إضافي 50% — منطقة البيع النشط",
     order: 5,
     active: true,
   },
