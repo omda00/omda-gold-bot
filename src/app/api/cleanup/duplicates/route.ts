@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getAdminSession } from "@/lib/admin-auth";
 
 /**
- * POST /api/telegram-users/cleanup - Remove duplicate TelegramUser entries
+ * POST /api/cleanup/duplicates - Remove duplicate TelegramUser entries
  * 
  * ADMIN ONLY — requires admin session cookie
  * 
