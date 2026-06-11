@@ -9,7 +9,6 @@ import {
   ExternalLink,
   Sparkles,
   Zap,
-  Heart,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -186,12 +185,12 @@ export function BotRegistration() {
         </CardContent>
       </Card>
 
-      {/* Made With ❤️ By Omda */}
+      {/* Made With قلب By Omda */}
       <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
         <CardContent className="p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5">
+          <div dir="ltr" className="flex items-center justify-center gap-1.5">
             <span className="text-xs text-muted-foreground/60 font-medium">Made With</span>
-            <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+            <span className="text-xs text-red-500 font-bold animate-pulse">قلب</span>
             <span className="text-xs text-muted-foreground/60 font-medium">By</span>
             <span className="text-xs font-bold bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">
               Omda

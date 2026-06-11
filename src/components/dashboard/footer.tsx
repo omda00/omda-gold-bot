@@ -1,7 +1,5 @@
 "use client";
 
-import { Heart } from "lucide-react";
-
 interface DashboardFooterProps {
   automationEnabled: boolean;
   lastAutomationRun: string | null;
@@ -42,10 +40,10 @@ export function DashboardFooter({
             )}
           </div>
 
-          {/* Made With ❤️ By Omda */}
-          <div className="flex items-center gap-1.5">
+          {/* Made With قلب By Omda */}
+          <div dir="ltr" className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground font-medium">Made With</span>
-            <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500 animate-pulse" />
+            <span className="text-xs text-red-500 font-bold animate-pulse">قلب</span>
             <span className="text-xs text-muted-foreground font-medium">By</span>
             <span className="text-xs font-extrabold bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 bg-clip-text text-transparent">
               Omda
