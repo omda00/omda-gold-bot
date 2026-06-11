@@ -26,47 +26,11 @@ function formatPrice(price: number | null | undefined): string {
   });
 }
 
-// Karat row styling config
-const karatStyles: Record<number, {
-  label: string;
-  dotColor: string;
-  accentBg: string;
-  accentText: string;
-  badgeBg: string;
-  highlight: string;
-}> = {
-  24: {
-    label: "عيار ٢٤",
-    dotColor: "bg-amber-400",
-    accentBg: "bg-amber-50 dark:bg-amber-950/20",
-    accentText: "text-amber-700 dark:text-amber-300",
-    badgeBg: "bg-amber-100 dark:bg-amber-900/40",
-    highlight: "ring-amber-300/50 dark:ring-amber-700/40",
-  },
-  22: {
-    label: "عيار ٢٢",
-    dotColor: "bg-orange-400",
-    accentBg: "bg-orange-50 dark:bg-orange-950/20",
-    accentText: "text-orange-700 dark:text-orange-300",
-    badgeBg: "bg-orange-100 dark:bg-orange-900/40",
-    highlight: "ring-orange-300/50 dark:ring-orange-700/40",
-  },
-  21: {
-    label: "عيار ٢١",
-    dotColor: "bg-yellow-500",
-    accentBg: "bg-yellow-50 dark:bg-yellow-950/20",
-    accentText: "text-yellow-700 dark:text-yellow-300",
-    badgeBg: "bg-yellow-100 dark:bg-yellow-900/40",
-    highlight: "ring-yellow-300/50 dark:ring-yellow-700/40",
-  },
-  18: {
-    label: "عيار ١٨",
-    dotColor: "bg-rose-400",
-    accentBg: "bg-rose-50 dark:bg-rose-950/20",
-    accentText: "text-rose-700 dark:text-rose-300",
-    badgeBg: "bg-rose-100 dark:bg-rose-900/40",
-    highlight: "ring-rose-300/50 dark:ring-rose-700/40",
-  },
+const karatLabels: Record<number, string> = {
+  24: "عيار ٢٤",
+  22: "عيار ٢٢",
+  21: "عيار ٢١",
+  18: "عيار ١٨",
 };
 
 interface PriceCardsProps {
@@ -135,31 +99,31 @@ export function PriceCards({
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 200, damping: 20 }}
       >
-        <Card className="rounded-2xl border-0 shadow-xl ring-1 ring-amber-200/40 dark:ring-amber-800/20 overflow-hidden">
-          {/* Top gradient accent */}
-          <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+        <Card className="rounded-2xl border-0 shadow-xl overflow-hidden bg-neutral-950 dark:bg-neutral-950 ring-1 ring-neutral-800">
+          {/* Top gold accent line */}
+          <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400" />
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-amber-50/90 to-yellow-50/90 dark:from-amber-950/25 dark:to-yellow-950/25 px-4 sm:px-5 py-3 border-b border-amber-200/30 dark:border-amber-800/20">
+          <div className="px-4 sm:px-6 py-4 border-b border-neutral-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-400/25">
-                  <Gem className="w-5 h-5 text-white" />
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-400/30">
+                  <Gem className="w-6 h-6 text-neutral-950" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm sm:text-base font-black text-foreground">أسعار الذهب في مصر</h2>
-                    <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
-                      <Radio className="w-2.5 h-2.5 text-emerald-500 animate-pulse" />
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">مباشر</span>
+                    <h2 className="text-base sm:text-lg font-black text-white">أسعار الذهب في مصر</h2>
+                    <div className="flex items-center gap-1 bg-amber-400/10 px-1.5 py-0.5 rounded">
+                      <Radio className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
+                      <span className="text-[10px] font-bold text-amber-400">مباشر</span>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Gold Prices per Gram — EGP</p>
+                  <p className="text-xs text-neutral-500">Gold Prices per Gram — EGP</p>
                 </div>
               </div>
               {prices.gold && (
                 <div className="hidden sm:flex items-center gap-1.5">
-                  <div className={`flex items-center gap-1 text-sm font-bold ${isGoldPositive ? "text-emerald-600" : "text-red-600"}`}>
+                  <div className={`flex items-center gap-1 text-sm font-bold ${isGoldPositive ? "text-emerald-400" : "text-red-400"}`}>
                     {isGoldPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                     <span className="tabular-nums">{isGoldPositive ? "+" : ""}{goldChange.toFixed(2)}%</span>
                   </div>
@@ -171,62 +135,67 @@ export function PriceCards({
           <CardContent className="p-0">
             {/* ─── Karat Price Rows ─── */}
             {loading ? (
-              <div className="p-4 space-y-3">
+              <div className="p-5 space-y-4">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-6 w-16 rounded-lg" />
-                    <Skeleton className="h-8 flex-1 rounded-lg" />
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-8 w-24 rounded-lg bg-neutral-800" />
+                    <Skeleton className="h-10 flex-1 rounded-lg bg-neutral-800" />
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="divide-y divide-border/20">
+              <div className="divide-y divide-neutral-800/60">
                 {allKarats.map((kp, idx) => {
-                  const style = karatStyles[kp.karat];
-                  if (!style) return null;
+                  const label = karatLabels[kp.karat];
+                  if (!label) return null;
                   return (
                     <motion.div
                       key={kp.karat}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.07, type: "spring", stiffness: 180, damping: 18 }}
-                      className={`group hover:${style.accentBg} transition-colors duration-200`}
+                      className="group hover:bg-neutral-900/60 transition-colors duration-200"
                     >
-                      <div className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3">
-                        {/* Karat badge */}
-                        <div className="flex items-center gap-2 min-w-[70px] sm:min-w-[80px]">
-                          <span className={`w-2.5 h-2.5 rounded-full ${style.dotColor} shadow-sm ring-2 ring-white dark:ring-background`} />
-                          <span className={`text-xs sm:text-sm font-black ${style.accentText}`}>
-                            {style.label}
+                      <div className="flex items-center gap-3 sm:gap-5 px-4 sm:px-6 py-4 sm:py-5">
+                        {/* Karat label */}
+                        <div className="min-w-[90px] sm:min-w-[110px]">
+                          <span className="text-lg sm:text-xl font-black text-white tracking-tight">
+                            {label}
                           </span>
                         </div>
 
                         {/* Sell price */}
-                        <div className="flex-1 flex items-center justify-end gap-1.5">
-                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                            <ArrowRightLeft className="w-3 h-3 hidden sm:block" />
-                            <span className="text-[10px] sm:text-xs font-bold">بيع</span>
+                        <div className="flex-1 flex items-center justify-end gap-2 sm:gap-3">
+                          <div className="flex items-center gap-1.5 text-emerald-400">
+                            <ArrowRightLeft className="w-3.5 h-3.5 hidden sm:block" />
+                            <span className="text-xs sm:text-sm font-bold">بيع</span>
                           </div>
-                          <div className={`${style.badgeBg} rounded-lg px-2.5 sm:px-3 py-1.5 ring-1 ${style.highlight}`}>
-                            <span className="text-sm sm:text-base font-black text-foreground tabular-nums">
-                              {formatPrice(kp.sellPrice)}
-                            </span>
+                          <div className="bg-neutral-900 rounded-xl px-3 sm:px-4 py-2 ring-1 ring-neutral-700/60">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-lg sm:text-2xl font-black text-white tabular-nums tracking-tight">
+                                {formatPrice(kp.sellPrice)}
+                              </span>
+                              <span className="text-xs sm:text-sm text-neutral-500 font-bold">ج.م</span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Separator dot */}
-                        <div className="w-1 h-1 rounded-full bg-border/40 flex-shrink-0" />
+                        {/* Separator */}
+                        <div className="w-px h-8 bg-neutral-800 flex-shrink-0" />
 
                         {/* Buy price */}
-                        <div className="flex-1 flex items-center gap-1.5">
-                          <div className={`${style.badgeBg} rounded-lg px-2.5 sm:px-3 py-1.5 ring-1 ring-sky-200/40 dark:ring-sky-800/30`}>
-                            <span className="text-sm sm:text-base font-black text-foreground tabular-nums">
-                              {formatPrice(kp.buyPrice)}
-                            </span>
+                        <div className="flex-1 flex items-center gap-2 sm:gap-3">
+                          <div className="bg-neutral-900 rounded-xl px-3 sm:px-4 py-2 ring-1 ring-neutral-700/60">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-lg sm:text-2xl font-black text-white tabular-nums tracking-tight">
+                                {formatPrice(kp.buyPrice)}
+                              </span>
+                              <span className="text-xs sm:text-sm text-neutral-500 font-bold">ج.م</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-sky-600 dark:text-sky-400">
-                            <span className="text-[10px] sm:text-xs font-bold">شراء</span>
-                            <ArrowDownUp className="w-3 h-3 hidden sm:block" />
+                          <div className="flex items-center gap-1.5 text-sky-400">
+                            <span className="text-xs sm:text-sm font-bold">شراء</span>
+                            <ArrowDownUp className="w-3.5 h-3.5 hidden sm:block" />
                           </div>
                         </div>
                       </div>
@@ -238,21 +207,21 @@ export function PriceCards({
 
             {/* ─── Column headers (subtle) ─── */}
             {!loading && (
-              <div className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-1.5 bg-muted/20 border-t border-border/10">
-                <div className="min-w-[70px] sm:min-w-[80px]" />
+              <div className="flex items-center gap-3 sm:gap-5 px-4 sm:px-6 py-2 border-t border-neutral-800/60 bg-neutral-900/40">
+                <div className="min-w-[90px] sm:min-w-[110px]" />
                 <div className="flex-1 text-center">
-                  <span className="text-[10px] font-bold text-emerald-600/60 dark:text-emerald-400/60 tracking-wider uppercase">Sell · بيع</span>
+                  <span className="text-[10px] font-bold text-emerald-400/50 tracking-widest uppercase">Sell · بيع</span>
                 </div>
-                <div className="w-1" />
+                <div className="w-px" />
                 <div className="flex-1 text-center">
-                  <span className="text-[10px] font-bold text-sky-600/60 dark:text-sky-400/60 tracking-wider uppercase">Buy · شراء</span>
+                  <span className="text-[10px] font-bold text-sky-400/50 tracking-widest uppercase">Buy · شراء</span>
                 </div>
               </div>
             )}
 
             {/* ─── Footer: timestamp + update status ─── */}
-            <div className="flex items-center justify-between flex-wrap gap-2 px-4 sm:px-5 py-2.5 bg-muted/10 border-t border-border/10">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between flex-wrap gap-2 px-4 sm:px-6 py-3 border-t border-neutral-800/60 bg-neutral-900/30">
+              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
                 <Clock className="w-3 h-3" />
                 {prices.gold ? (
                   <span>
@@ -270,13 +239,13 @@ export function PriceCards({
                 )}
                 {prices.gold?.source && (
                   <>
-                    <span className="text-border/60">•</span>
+                    <span className="text-neutral-700">•</span>
                     <span>{prices.gold.source}</span>
                   </>
                 )}
               </div>
               {fetching && (
-                <span className="text-xs text-amber-600 dark:text-amber-400 font-bold animate-pulse flex items-center gap-1">
+                <span className="text-xs text-amber-400 font-bold animate-pulse flex items-center gap-1">
                   <RefreshCw className="w-3 h-3 animate-spin" />
                   جارِ التحديث...
                 </span>
