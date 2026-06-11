@@ -409,3 +409,45 @@ Stage Summary:
 - Reports will be sent every hour even when the website is closed
 - Removed in-process cron from Next.js (no longer needed)
 - Cron service uses supervisor script for auto-restart on crash
+
+---
+Task ID: 11
+Agent: Main Agent
+Task: Make Telegram bot names visible only to admin — add admin auth and isolate bot management
+
+Work Log:
+- Analyzed current security: all bot management (names, tokens, CRUD) was publicly accessible
+- Created admin authentication system:
+  - Added `src/lib/admin-auth.ts` — JWT-based auth with HTTP-only cookies
+  - Added `src/app/api/auth/admin/route.ts` — login (POST), check (GET), logout (DELETE)
+  - First login sets the admin password automatically
+  - JWT tokens expire after 7 days
+- Protected all sensitive API routes with `getAdminSession()`:
+  - `/api/telegram-users` (GET/POST) — admin only
+  - `/api/telegram-users/[id]` (GET/DELETE/PATCH) — admin only
+  - `/api/telegram-users/[id]/test` (POST) — admin only
+  - `/api/telegram/test` (POST) — admin only
+  - `/api/config` (POST) — admin only (GET is public but masks sensitive values)
+- Updated config API to mask sensitive values (TELEGRAM_BOT_TOKEN, ADMIN_PASSWORD) for all users
+- Added ADMIN_PASSWORD to default config seeder
+- Updated settings page:
+  - Non-admin: shows lock screen with password input only
+  - Admin: shows full dashboard with bot management, settings, logout button
+  - First time: any password becomes the admin password
+- Updated page.tsx:
+  - "السجلات" (Logs) tab only visible when admin is logged in
+  - Passed isAdmin/checkingAuth/onAdminLogin/onAdminLogout props to SettingsTab
+- Updated use-dashboard.ts hook:
+  - Added isAdmin, checkingAuth, adminLogin, adminLogout state/functions
+  - Auth check runs on mount
+  - Telegram users only fetched when admin
+  - Returns 401 handling for non-admin requests
+- Browser verification: all 6 steps passed (login, see bots, see admin mode, logs tab, logout)
+
+Stage Summary:
+- Bot management is now admin-only — requires password login
+- No bot names, tokens, or chat IDs are visible to public users
+- Clients cannot affect each other's bots (only admin can CRUD)
+- Admin password set on first login, stored in DB
+- JWT session with HTTP-only cookies for security
+- Public users see only: prices, calculator, price history, login prompt

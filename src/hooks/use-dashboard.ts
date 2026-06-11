@@ -18,6 +18,10 @@ export function useDashboardData() {
   const [calculatorData, setCalculatorData] = useState<CalculatorPriceResult | null>(null);
   const [telegramUsers, setTelegramUsers] = useState<TelegramUser[]>([]);
 
+  // Admin auth state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
   const [loading, setLoading] = useState({
     prices: true,
     logs: true,
@@ -34,7 +38,59 @@ export function useDashboardData() {
   const autoFetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const seededRef = useRef(false);
   const isFetchingRef = useRef(false);
-  const lastFetchAttemptRef = useRef<number>(0);
+
+  // ==========================================
+  // Admin Authentication
+  // ==========================================
+
+  // Check auth status on mount
+  const checkAdminAuth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/admin");
+      if (res.ok) {
+        const data = await res.json();
+        setIsAdmin(data.authenticated === true);
+        return data.authenticated;
+      }
+    } catch (err) {
+      console.error("Auth check error:", err);
+    }
+    setIsAdmin(false);
+    return false;
+  }, []);
+
+  // Admin login
+  const adminLogin = useCallback(async (password: string) => {
+    try {
+      const res = await fetch("/api/auth/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setIsAdmin(true);
+        // Now fetch admin-only data
+        await fetchTelegramUsers();
+        return { ok: true, firstTime: data.firstTime };
+      }
+      return { ok: false, error: data.error || "فشل تسجيل الدخول" };
+    } catch (err) {
+      console.error("Login error:", err);
+      return { ok: false, error: "خطأ في الاتصال" };
+    }
+  }, []);
+
+  // Admin logout
+  const adminLogout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/admin", { method: "DELETE" });
+    } catch {
+      // ignore
+    }
+    setIsAdmin(false);
+    setTelegramUsers([]);
+  }, []);
 
   // Seed data on first load
   const seedData = useCallback(async () => {
@@ -139,7 +195,6 @@ export function useDashboardData() {
       return null;
     }
     isFetchingRef.current = true;
-    lastFetchAttemptRef.current = Date.now();
     setLoading((prev) => ({ ...prev, fetching: true }));
     try {
       const res = await fetch("/api/prices", { method: "POST" });
@@ -171,7 +226,7 @@ export function useDashboardData() {
     }
   }, [fetchPrices]);
 
-  // Update config
+  // Update config (admin only)
   const updateConfig = useCallback(async (key: string, value: string) => {
     try {
       const res = await fetch("/api/config", {
@@ -220,7 +275,7 @@ export function useDashboardData() {
   }, [fetchPrices, fetchLogs]);
 
   // ==========================================
-  // Telegram Users Management
+  // Telegram Users Management (Admin Only)
   // ==========================================
 
   // Fetch telegram users
@@ -231,6 +286,9 @@ export function useDashboardData() {
         const data = await res.json();
         setTelegramUsers(Array.isArray(data) ? data : []);
         return data;
+      } else if (res.status === 401) {
+        // Not admin — expected, clear users
+        setTelegramUsers([]);
       }
     } catch (err) {
       console.error("Fetch telegram users error:", err);
@@ -307,13 +365,16 @@ export function useDashboardData() {
   // Initial data load
   useEffect(() => {
     const init = async () => {
+      // Check admin auth first
+      await checkAdminAuth();
+      setCheckingAuth(false);
+
       await seedData();
       await Promise.all([
         fetchPrices(),
         fetchConfig(),
         fetchLogs(),
         fetchCalculatorData(),
-        fetchTelegramUsers(),
       ]);
       setLoading((prev) => ({
         ...prev,
@@ -324,7 +385,14 @@ export function useDashboardData() {
       }));
     };
     init();
-  }, [seedData, fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData]);
+  }, [seedData, fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData, checkAdminAuth]);
+
+  // Fetch telegram users when admin status changes
+  useEffect(() => {
+    if (isAdmin) {
+      fetchTelegramUsers();
+    }
+  }, [isAdmin, fetchTelegramUsers]);
 
   // =============================================
   // Polling: Read DB prices every 10 seconds
@@ -381,6 +449,8 @@ export function useDashboardData() {
     loading,
     lastAutomationRun,
     lastWebFetch,
+    isAdmin,
+    checkingAuth,
     fetchPrices,
     fetchConfig,
     fetchLogs,
@@ -395,5 +465,7 @@ export function useDashboardData() {
     deleteTelegramUser,
     toggleTelegramUser,
     testTelegramUser,
+    adminLogin,
+    adminLogout,
   };
 }

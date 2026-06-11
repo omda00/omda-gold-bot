@@ -6,6 +6,7 @@ const DEFAULT_CONFIGS: Record<string, string> = {
   AUTOMATION_ENABLED: "false",
   DAILY_REPORT_TIME: "09:00",
   USD_DROP_THRESHOLD: "2",
+  ADMIN_PASSWORD: "", // Empty = first login sets it
 };
 
 /**

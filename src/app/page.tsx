@@ -25,6 +25,8 @@ export default function Home() {
     telegramUsers,
     loading,
     lastAutomationRun,
+    isAdmin,
+    checkingAuth,
     fetchLogs,
     fetchPriceHistory,
     triggerFetchPrices,
@@ -36,6 +38,8 @@ export default function Home() {
     deleteTelegramUser,
     toggleTelegramUser,
     testTelegramUser,
+    adminLogin,
+    adminLogout,
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -108,13 +112,15 @@ export default function Home() {
                 <Settings className="w-3.5 h-3.5" />
                 <span>الإعدادات</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="logs"
-                className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-400 data-[state=active]:to-violet-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-purple-400/20 px-3 py-1.5 text-xs font-bold transition-all"
-              >
-                <Bell className="w-3.5 h-3.5" />
-                <span>السجلات</span>
-              </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger
+                  value="logs"
+                  className="gap-1.5 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-400 data-[state=active]:to-violet-500 data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:shadow-purple-400/20 px-3 py-1.5 text-xs font-bold transition-all"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>السجلات</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {activeTab === "dashboard" && (
@@ -174,13 +180,19 @@ export default function Home() {
               onDeleteTelegramUser={deleteTelegramUser}
               onToggleTelegramUser={toggleTelegramUser}
               onTestTelegramUser={testTelegramUser}
+              isAdmin={isAdmin}
+              checkingAuth={checkingAuth}
+              onAdminLogin={adminLogin}
+              onAdminLogout={adminLogout}
             />
           </TabsContent>
 
-          {/* TAB 5: Logs */}
-          <TabsContent value="logs">
-            <LogsTab logs={logs} onFetchLogs={fetchLogs} />
-          </TabsContent>
+          {/* TAB 5: Logs (Admin Only) */}
+          {isAdmin && (
+            <TabsContent value="logs">
+              <LogsTab logs={logs} onFetchLogs={fetchLogs} />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 

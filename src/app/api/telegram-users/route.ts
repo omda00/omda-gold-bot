@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getAdminSession } from "@/lib/admin-auth";
 
 /**
  * GET /api/telegram-users - Return all registered Telegram users
- * (botToken is masked for security - each user only sees their own full token)
+ * ADMIN ONLY — requires admin session cookie
  */
 export async function GET() {
   try {
+    const isAdmin = await getAdminSession();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "غير مصرح — يرجى تسجيل الدخول كمسؤول" },
+        { status: 401 }
+      );
+    }
+
     const users = await db.telegramUser.findMany({
       orderBy: { createdAt: "desc" },
     });
 
-    // Mask bot tokens for security - only show last 5 chars
+    // Mask bot tokens for security
     const masked = users.map((u) => ({
       ...u,
       botToken: u.botToken
@@ -31,10 +40,18 @@ export async function GET() {
 
 /**
  * POST /api/telegram-users - Register a new Telegram user
- * Body: { name: string, botToken: string, chatId: string }
+ * ADMIN ONLY — requires admin session cookie
  */
 export async function POST(request: NextRequest) {
   try {
+    const isAdmin = await getAdminSession();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "غير مصرح — يرجى تسجيل الدخول كمسؤول" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { name, botToken, chatId } = body;
 

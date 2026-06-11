@@ -22,6 +22,9 @@ import {
   Users,
   CheckCircle2,
   XCircle,
+  Lock,
+  LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +53,10 @@ interface SettingsTabProps {
   onDeleteTelegramUser: (id: string) => Promise<boolean>;
   onToggleTelegramUser: (id: string, active: boolean) => Promise<boolean>;
   onTestTelegramUser: (id: string) => Promise<{ ok?: boolean; message?: string; error?: string }>;
+  isAdmin: boolean;
+  checkingAuth: boolean;
+  onAdminLogin: (password: string) => Promise<{ ok: boolean; error?: string; firstTime?: boolean }>;
+  onAdminLogout: () => Promise<void>;
 }
 
 export function SettingsTab({
@@ -61,6 +68,10 @@ export function SettingsTab({
   onDeleteTelegramUser,
   onToggleTelegramUser,
   onTestTelegramUser,
+  isAdmin,
+  checkingAuth,
+  onAdminLogin,
+  onAdminLogout,
 }: SettingsTabProps) {
   const [automationEnabled, setAutomationEnabled] = useState(false);
   const [dailyReportTime, setDailyReportTime] = useState("09:00");
@@ -81,6 +92,12 @@ export function SettingsTab({
 
   // Deleting state
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  // Admin login form
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
     if (config) {
@@ -168,8 +185,131 @@ export function SettingsTab({
     }
   };
 
+  const handleLogin = async () => {
+    if (!loginPassword.trim()) {
+      setLoginError("يرجى إدخال كلمة المرور");
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      const result = await onAdminLogin(loginPassword.trim());
+      if (result.ok) {
+        toast.success(result.firstTime ? "تم تعيين كلمة المرور وتسجيل الدخول" : "تم تسجيل الدخول بنجاح");
+        setLoginPassword("");
+      } else {
+        setLoginError(result.error || "كلمة المرور غير صحيحة");
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await onAdminLogout();
+    toast.success("تم تسجيل الخروج");
+  };
+
+  // =============================================
+  // ADMIN LOCK SCREEN — shown when not admin
+  // =============================================
+  if (!isAdmin) {
+    return (
+      <div className="space-y-3">
+        {/* Public info card */}
+        <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+          <CardContent className="p-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
+              <Settings className="w-8 h-8 text-amber-500" />
+            </div>
+            <h3 className="text-base font-bold mb-1">الإعدادات</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              لتعديل الإعدادات وإدارة البوتات، يرجى تسجيل الدخول كمسؤول
+            </p>
+
+            {/* Login form */}
+            <div className="max-w-xs mx-auto space-y-3">
+              <div className="relative">
+                <Input
+                  type={showLoginPassword ? "text" : "password"}
+                  value={loginPassword}
+                  onChange={(e) => { setLoginPassword(e.target.value); setLoginError(""); }}
+                  placeholder="كلمة مرور المسؤول"
+                  className="rounded-xl h-11 text-sm pr-4 pl-10"
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  disabled={loginLoading || checkingAuth}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute left-0 top-0 h-full px-3"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+              {loginError && (
+                <p className="text-xs text-red-500 font-medium">{loginError}</p>
+              )}
+              <Button
+                onClick={handleLogin}
+                disabled={loginLoading || checkingAuth || !loginPassword.trim()}
+                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-2 rounded-xl h-10 text-sm font-bold shadow-sm shadow-amber-500/20"
+              >
+                {loginLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Lock className="w-4 h-4" />
+                )}
+                تسجيل الدخول
+              </Button>
+              <p className="text-[10px] text-muted-foreground/60">
+                أول مرة؟ أدخل أي كلمة مرور وستكون كلمة المرور الخاصة بك
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // =============================================
+  // ADMIN VIEW — full access
+  // =============================================
   return (
     <div className="space-y-3">
+      {/* Admin badge / logout */}
+      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-500" />
+        <CardContent className="p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-sm shadow-emerald-400/20">
+              <ShieldCheck className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold">وضع المسؤول</p>
+                <Badge className="rounded-md text-[10px] px-1.5 py-0 font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  نشط
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">لديك صلاحية كاملة لإدارة البوتات والإعدادات</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLogout}
+            className="gap-1.5 rounded-lg h-8 text-xs border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30 text-red-600"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            خروج
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* ============================================ */}
       {/* Telegram Users Management (Per-User Bots) */}
       {/* ============================================ */}
@@ -181,8 +321,8 @@ export function SettingsTab({
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-bold">تسجيل بوت التيليجرام</h3>
-              <p className="text-xs text-muted-foreground">بوت خاص لكل عميل — خصوصية تامة</p>
+              <h3 className="text-sm font-bold">لوحة قيادة البوتات</h3>
+              <p className="text-xs text-muted-foreground">إدارة بوتات التيليجرام — المسؤول فقط</p>
             </div>
           </div>
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -214,7 +354,7 @@ export function SettingsTab({
                   <Input
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    placeholder="أدخل اسمك"
+                    placeholder="أدخل اسم العميل"
                     className="rounded-lg h-10 text-sm"
                   />
                 </div>
@@ -281,7 +421,7 @@ export function SettingsTab({
               </div>
               <p className="text-sm font-medium text-muted-foreground">لا يوجد بوتات مسجلة حتى الآن</p>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                اضغط &quot;تسجيل بوت جديد&quot; لإضافة بوت التيليجرام الخاص بك
+                اضغط &quot;تسجيل بوت جديد&quot; لإضافة بوت تيليجرام
               </p>
             </div>
           ) : (

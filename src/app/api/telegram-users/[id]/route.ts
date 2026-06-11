@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getAdminSession } from "@/lib/admin-auth";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -7,9 +8,18 @@ interface RouteParams {
 
 /**
  * GET /api/telegram-users/[id] - Get a specific Telegram user
+ * ADMIN ONLY
  */
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const isAdmin = await getAdminSession();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "غير مصرح" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const user = await db.telegramUser.findUnique({ where: { id } });
 
@@ -36,9 +46,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 /**
  * DELETE /api/telegram-users/[id] - Delete a Telegram user
+ * ADMIN ONLY
  */
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
+    const isAdmin = await getAdminSession();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "غير مصرح" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
 
     const existing = await db.telegramUser.findUnique({ where: { id } });
@@ -63,9 +82,18 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
 /**
  * PATCH /api/telegram-users/[id] - Update a Telegram user (toggle active, update name, etc.)
+ * ADMIN ONLY
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
+    const isAdmin = await getAdminSession();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: "غير مصرح" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { name, botToken, chatId, active } = body;
