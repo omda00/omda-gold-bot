@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSession, verifyAdminPassword, ADMIN_COOKIE_NAME_EXPORT } from "@/lib/admin-auth";
-import { getConfig, setConfig } from "@/lib/config-seeder";
+import { createAdminSession, ADMIN_COOKIE_NAME_EXPORT } from "@/lib/admin-auth";
 
 /**
  * POST /api/auth/admin - Login with admin password
  * Body: { password: string }
+ * Fixed password: 908070
  */
+const ADMIN_PASSWORD = "908070";
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -18,30 +20,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const storedPassword = await getConfig("ADMIN_PASSWORD");
-
-    // First time: no password set yet — set it and login
-    if (!storedPassword) {
-      await setConfig("ADMIN_PASSWORD", password.trim());
-      const token = await createAdminSession();
-      const response = NextResponse.json({
-        ok: true,
-        message: "تم تعيين كلمة المرور وتسجيل الدخول",
-        firstTime: true,
-      });
-      response.cookies.set(ADMIN_COOKIE_NAME_EXPORT, token, {
-        httpOnly: true,
-        secure: false, // local dev
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: "/",
-      });
-      return response;
-    }
-
-    // Verify password
-    const valid = password.trim() === storedPassword;
-    if (!valid) {
+    // Verify against fixed password
+    if (password.trim() !== ADMIN_PASSWORD) {
       return NextResponse.json(
         { error: "كلمة المرور غير صحيحة" },
         { status: 401 }
@@ -56,9 +36,9 @@ export async function POST(request: NextRequest) {
     });
     response.cookies.set(ADMIN_COOKIE_NAME_EXPORT, token, {
       httpOnly: true,
-      secure: false,
+      secure: false, // local dev
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/",
     });
     return response;

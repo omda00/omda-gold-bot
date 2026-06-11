@@ -55,7 +55,7 @@ interface SettingsTabProps {
   onTestTelegramUser: (id: string) => Promise<{ ok?: boolean; message?: string; error?: string }>;
   isAdmin: boolean;
   checkingAuth: boolean;
-  onAdminLogin: (password: string) => Promise<{ ok: boolean; error?: string; firstTime?: boolean }>;
+  onAdminLogin: (password: string) => Promise<{ ok: boolean; error?: string }>;
   onAdminLogout: () => Promise<void>;
 }
 
@@ -195,7 +195,7 @@ export function SettingsTab({
     try {
       const result = await onAdminLogin(loginPassword.trim());
       if (result.ok) {
-        toast.success(result.firstTime ? "تم تعيين كلمة المرور وتسجيل الدخول" : "تم تسجيل الدخول بنجاح");
+        toast.success("تم تسجيل الدخول بنجاح");
         setLoginPassword("");
       } else {
         setLoginError(result.error || "كلمة المرور غير صحيحة");
@@ -266,7 +266,7 @@ export function SettingsTab({
                 تسجيل الدخول
               </Button>
               <p className="text-[10px] text-muted-foreground/60">
-                أول مرة؟ أدخل أي كلمة مرور وستكون كلمة المرور الخاصة بك
+                أدخل كلمة مرور المسؤول للوصول إلى لوحة القيادة
               </p>
             </div>
           </CardContent>

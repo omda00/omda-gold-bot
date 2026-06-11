@@ -2,13 +2,12 @@
  * Admin Authentication System
  *
  * Simple password-based admin authentication using JWT tokens.
- * The admin password is stored in the AppConfig table.
+ * The admin password is fixed (908070).
  * JWT tokens are stored in HTTP-only cookies.
  */
 
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { getConfig } from "./config-seeder";
 
 const JWT_SECRET_KEY = "gold-dashboard-admin-secret-key-2024";
 const JWT_ALG = "HS256";
@@ -61,15 +60,11 @@ export async function getAdminSession(): Promise<boolean> {
 }
 
 /**
- * Verify admin password against stored config
+ * Verify admin password against fixed password
  */
+const ADMIN_PASSWORD = "908070";
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  const storedPassword = await getConfig("ADMIN_PASSWORD");
-  if (!storedPassword) {
-    // No password set — first time setup, any password works and becomes the password
-    return true;
-  }
-  return password === storedPassword;
+  return password === ADMIN_PASSWORD;
 }
 
 /**

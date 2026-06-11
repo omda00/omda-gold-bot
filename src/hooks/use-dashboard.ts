@@ -72,7 +72,7 @@ export function useDashboardData() {
         setIsAdmin(true);
         // Now fetch admin-only data
         await fetchTelegramUsers();
-        return { ok: true, firstTime: data.firstTime };
+        return { ok: true };
       }
       return { ok: false, error: data.error || "فشل تسجيل الدخول" };
     } catch (err) {
