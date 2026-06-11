@@ -9,6 +9,8 @@ import {
   CircleDollarSign,
   Timer,
   Radio,
+  Scale,
+  Gem,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import type { CalculatorPriceResult } from "@/lib/dashboard-types";
 
 interface GoldCalculatorProps {
@@ -35,6 +36,12 @@ function formatPrice(price: number | null): string {
 }
 
 const AUTO_REFRESH_INTERVAL = 30000;
+
+// Shared card style matching the site's design language
+const cardBase = "rounded-2xl border-0 shadow-lg overflow-hidden ring-1 ring-neutral-800 bg-neutral-950";
+const accentLine = "h-1 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400";
+const cardHeader = "px-4 sm:px-5 py-3 border-b border-neutral-800 flex items-center gap-2.5";
+const iconBox = "w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md shadow-amber-400/25";
 
 export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalculatorProps) {
   const [fetching, setFetching] = useState(false);
@@ -96,20 +103,18 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
   const poundResult = getPoundResult();
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2.5">
+    <div className="space-y-3">
+      {/* ─── Header Bar ─── */}
+      <div className="flex items-center justify-between flex-wrap gap-2.5 bg-gradient-to-r from-amber-50/80 to-yellow-50/80 dark:from-amber-950/20 dark:to-yellow-950/20 rounded-2xl px-3 sm:px-4 py-2.5 ring-1 ring-amber-200/40 dark:ring-amber-800/20">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-md shadow-amber-400/25">
-            <Calculator className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 shadow-md shadow-amber-400/25">
+            <Calculator className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-black bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">
-              حاسبة الذهب
-            </h2>
+            <h2 className="text-sm sm:text-base font-black text-foreground">حاسبة الذهب</h2>
             <div className="flex items-center gap-1.5 mt-0.5">
               {calculatorData?.source && (
-                <span className="text-xs text-muted-foreground">الأسعار من {calculatorData.source}</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">الأسعار من {calculatorData.source}</span>
               )}
               <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
                 <Radio className="w-2.5 h-2.5 text-emerald-500 animate-pulse" />
@@ -126,50 +131,55 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
             </span>
           </div>
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={handleFetch}
             disabled={fetching}
-            className="gap-1.5 rounded-xl border-amber-200 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30 h-9 px-3"
+            className="gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-md shadow-amber-400/20 h-9 px-4 text-xs font-bold transition-all active:scale-95"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${fetching ? "animate-spin" : ""}`} />
-            <span className="text-xs font-semibold">تحديث الآن</span>
+            تحديث الآن
           </Button>
         </div>
       </div>
 
-      {/* Loading skeleton */}
+      {/* ─── Loading ─── */}
       {(loading || fetching) && !calculatorData && (
-        <div className="animate-pulse rounded-2xl bg-muted/50 h-64 p-4 space-y-4">
-          <div className="h-10 bg-muted rounded-lg w-full" />
-          <div className="h-10 bg-muted rounded-lg w-full" />
-          <div className="h-16 bg-muted rounded-lg w-full" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse rounded-2xl bg-neutral-950 h-32 p-4 space-y-3">
+              <div className="h-6 bg-neutral-800 rounded-lg w-40" />
+              <div className="h-10 bg-neutral-800 rounded-lg w-full" />
+            </div>
+          ))}
         </div>
       )}
 
       {calculatorData && (
         <>
-          {/* Calculator Section */}
+          {/* ─── Card 1: Settings (Karat + Type) ─── */}
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
           >
-            <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/20 overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm">
-                  <CircleDollarSign className="w-4 h-4 text-white" />
+            <Card className={cardBase}>
+              <div className={accentLine} />
+              <div className={cardHeader}>
+                <div className={iconBox}>
+                  <Gem className="w-4 h-4 text-neutral-950" />
                 </div>
-                <h3 className="text-sm font-bold">حساب قيمة الذهب والجنيه الذهب</h3>
+                <div>
+                  <h3 className="text-sm font-black text-white">إعدادات الحساب</h3>
+                  <p className="text-[10px] text-neutral-500">اختر العيار ونوع السعر</p>
+                </div>
               </div>
-              <CardContent className="p-4 space-y-4">
-                {/* Shared: Karat + Type selectors */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">العيار</label>
+              <CardContent className="p-4 sm:p-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-neutral-400">العيار</label>
                     <Select value={calcKarat} onValueChange={setCalcKarat}>
-                      <SelectTrigger className="h-10 rounded-xl text-sm font-semibold">
+                      <SelectTrigger className="h-11 rounded-xl text-sm font-bold bg-neutral-900 border-neutral-700 text-white focus:ring-amber-400/50">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -180,10 +190,10 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">النوع</label>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-neutral-400">النوع</label>
                     <Select value={calcType} onValueChange={setCalcType}>
-                      <SelectTrigger className="h-10 rounded-xl text-sm font-semibold">
+                      <SelectTrigger className="h-11 rounded-xl text-sm font-bold bg-neutral-900 border-neutral-700 text-white focus:ring-amber-400/50">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -193,96 +203,123 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                     </Select>
                   </div>
                 </div>
-
-                {/* Section 1: Gold by Weight */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm">
-                      <CircleDollarSign className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="text-xs font-bold text-foreground">حساب قيمة الذهب بالوزن</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">الوزن بالجرام</label>
-                    <Input
-                      type="number"
-                      placeholder="أدخل الوزن بالجرام"
-                      value={calcGrams}
-                      onChange={(e) => setCalcGrams(e.target.value)}
-                      className="h-10 rounded-xl text-sm font-semibold"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <AnimatePresence>
-                    {calcResult && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 rounded-xl p-3 border border-amber-200/60 dark:border-amber-800/40">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-bold text-muted-foreground">الإجمالي</span>
-                            <span className="text-lg font-black bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent tabular-nums">
-                              {formatPrice(calcResult.total)} ج.م
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <Separator className="bg-border/30" />
-
-                {/* Section 2: Gold Pound Calculator */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-sm">
-                      <Coins className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="text-xs font-bold text-foreground">حساب الجنيه الذهب</span>
-                    <span className="text-[10px] text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">8 جرام — عيار 21</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground">عدد الجنيهات</label>
-                    <Input
-                      type="number"
-                      placeholder="أدخل عدد الجنيهات"
-                      value={poundCount}
-                      onChange={(e) => setPoundCount(e.target.value)}
-                      className="h-10 rounded-xl text-sm font-semibold"
-                      min="0"
-                      step="0.5"
-                    />
-                  </div>
-                  <AnimatePresence>
-                    {poundResult && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-xl p-3 border border-yellow-200/60 dark:border-yellow-800/40">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-bold text-muted-foreground">الإجمالي</span>
-                            <span className="text-lg font-black bg-gradient-to-r from-yellow-600 to-amber-600 bg-clip-text text-transparent tabular-nums">
-                              {formatPrice(poundResult.total)} ج.م
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          {/* Last updated + Live indicator */}
+          {/* ─── Card 2: Gold Weight Calculator ─── */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.07, type: "spring", stiffness: 200, damping: 20 }}
+          >
+            <Card className={cardBase}>
+              <div className={accentLine} />
+              <div className={cardHeader}>
+                <div className={iconBox}>
+                  <Scale className="w-4 h-4 text-neutral-950" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">حساب قيمة الذهب بالوزن</h3>
+                  <p className="text-[10px] text-neutral-500">أدخل الوزن بالجرام لحساب القيمة</p>
+                </div>
+              </div>
+              <CardContent className="p-4 sm:p-5 space-y-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-neutral-400">الوزن بالجرام</label>
+                  <Input
+                    type="number"
+                    placeholder="أدخل الوزن بالجرام"
+                    value={calcGrams}
+                    onChange={(e) => setCalcGrams(e.target.value)}
+                    className="h-11 rounded-xl text-sm font-bold bg-neutral-900 border-neutral-700 text-white placeholder:text-neutral-600 focus:ring-amber-400/50"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <AnimatePresence>
+                  {calcResult && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="bg-neutral-900 rounded-xl p-4 ring-1 ring-amber-400/20">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-bold text-neutral-400">الإجمالي</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl sm:text-3xl font-black text-white tabular-nums tracking-tight">
+                              {formatPrice(calcResult.total)}
+                            </span>
+                            <span className="text-sm font-bold text-neutral-500">ج.م</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ─── Card 3: Gold Pound Calculator ─── */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.14, type: "spring", stiffness: 200, damping: 20 }}
+          >
+            <Card className={cardBase}>
+              <div className={accentLine} />
+              <div className={cardHeader}>
+                <div className={iconBox}>
+                  <Coins className="w-4 h-4 text-neutral-950" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">حساب الجنيه الذهب</h3>
+                  <p className="text-[10px] text-neutral-500">8 جرام — عيار 21</p>
+                </div>
+              </div>
+              <CardContent className="p-4 sm:p-5 space-y-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-neutral-400">عدد الجنيهات</label>
+                  <Input
+                    type="number"
+                    placeholder="أدخل عدد الجنيهات"
+                    value={poundCount}
+                    onChange={(e) => setPoundCount(e.target.value)}
+                    className="h-11 rounded-xl text-sm font-bold bg-neutral-900 border-neutral-700 text-white placeholder:text-neutral-600 focus:ring-amber-400/50"
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
+                <AnimatePresence>
+                  {poundResult && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="bg-neutral-900 rounded-xl p-4 ring-1 ring-amber-400/20">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-bold text-neutral-400">الإجمالي</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl sm:text-3xl font-black text-white tabular-nums tracking-tight">
+                              {formatPrice(poundResult.total)}
+                            </span>
+                            <span className="text-sm font-bold text-neutral-500">ج.م</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ─── Footer: Live indicator ─── */}
           {calculatorData.fetchedAt && (
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-1">
               <div className="flex items-center gap-1">
@@ -293,12 +330,10 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
               <span>
                 آخر تحديث:{" "}
                 {new Date(calculatorData.fetchedAt).toLocaleString("ar-EG", {
-                  year: "numeric",
-                  month: "long",
+                  month: "short",
                   day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
-                  second: "2-digit",
                 })}
               </span>
               <span>•</span>
