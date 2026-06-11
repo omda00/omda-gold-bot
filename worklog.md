@@ -215,3 +215,27 @@ Stage Summary:
 - All API routes updated to handle workmanship and gold pound data
 - UI enhanced with workmanship display (wrench icons), change indicators (colored arrows), and gold pound card
 - Telegram notifications now show workmanship values for each karat and gold pound
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Remove المصنعية (workmanship/صنعة) from website and Telegram notifications
+
+Work Log:
+- User requested to remove المصنعية (workmanship/craftsmanship fee) from the website
+- Removed Wrench icon import from price-cards.tsx (no longer needed)
+- Removed sell workmanship display from karat cards (4 cards: عيار 24, 22, 21, 18)
+- Removed buy workmanship display from karat cards
+- Removed sell workmanship display from gold pound card
+- Removed buy workmanship display from gold pound card
+- Removed صنعة from Telegram hourly report messages (automation/run/route.ts)
+- Simplified karat line from "عيار 21: بيع 6,065 (صنعة 95.75) | شراء 6,010" to "عيار 21: بيع 6,065 | شراء 6,010"
+- Simplified gold pound line similarly
+- Backend still stores workmanship data in DB (no harm, just not displayed)
+- Browser verification confirmed: no صنعة or مصنعية references visible on the page
+- Lint passes with no errors
+
+Stage Summary:
+- المصنعية/صنعة completely removed from website UI (price cards + gold pound)
+- المصنعية/صنعة completely removed from Telegram notification messages
+- Backend data storage unchanged (workmanship still saved to DB for potential future use)

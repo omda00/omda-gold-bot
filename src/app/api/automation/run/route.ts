@@ -81,28 +81,14 @@ function buildHourlyReport(params: {
   for (const kp of allKarats) {
     const sell = kp.sellPrice?.toLocaleString() || "—";
     const buy = kp.buyPrice?.toLocaleString() || "—";
-    let line = `عيار ${kp.karat}: بيع ${sell}`;
-    if (kp.sellWorkmanship !== null && kp.sellWorkmanship > 0) {
-      line += ` (صنعة ${kp.sellWorkmanship})`;
-    }
-    line += ` | شراء ${buy}`;
-    if (kp.buyWorkmanship !== null && kp.buyWorkmanship > 0) {
-      line += ` (صنعة ${kp.buyWorkmanship})`;
-    }
+    const line = `عيار ${kp.karat}: بيع ${sell} | شراء ${buy}`;
     report += `  ${line}\n`;
   }
 
   // Gold pound
   if (goldPound && (goldPound.sellPrice || goldPound.buyPrice)) {
     report += "\n🪙 <b>جنيه الذهب:</b>\n";
-    let gpLine = `  بيع ${goldPound.sellPrice?.toLocaleString() || "—"}`;
-    if (goldPound.sellWorkmanship !== null && goldPound.sellWorkmanship > 0) {
-      gpLine += ` (صنعة ${goldPound.sellWorkmanship})`;
-    }
-    gpLine += ` | شراء ${goldPound.buyPrice?.toLocaleString() || "—"}`;
-    if (goldPound.buyWorkmanship !== null && goldPound.buyWorkmanship > 0) {
-      gpLine += ` (صنعة ${goldPound.buyWorkmanship})`;
-    }
+    const gpLine = `  بيع ${goldPound.sellPrice?.toLocaleString() || "—"} | شراء ${goldPound.buyPrice?.toLocaleString() || "—"}`;
     report += `${gpLine}\n`;
   }
 

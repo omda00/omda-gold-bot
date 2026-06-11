@@ -13,7 +13,6 @@ import {
   ArrowRightLeft,
   ArrowDownUp,
   Coins,
-  Wrench,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -174,12 +173,7 @@ export function PriceCards({
                         </span>
                         <span className="text-[10px] text-neutral-500 font-bold">ج.م</span>
                       </div>
-                      {kp.sellWorkmanship !== null && kp.sellWorkmanship > 0 && (
-                        <div className="flex items-center justify-center gap-1 mt-0.5">
-                          <Wrench className="w-2 h-2 text-amber-500" />
-                          <span className="text-[9px] text-amber-500 font-bold">صنعة {formatPrice(kp.sellWorkmanship, 1)}</span>
-                        </div>
-                      )}
+
                     </div>
 
                     {/* Buy price + workmanship */}
@@ -194,12 +188,7 @@ export function PriceCards({
                         </span>
                         <span className="text-[10px] text-neutral-500 font-bold">ج.م</span>
                       </div>
-                      {kp.buyWorkmanship !== null && kp.buyWorkmanship > 0 && (
-                        <div className="flex items-center justify-center gap-1 mt-0.5">
-                          <Wrench className="w-2 h-2 text-sky-500" />
-                          <span className="text-[9px] text-sky-500 font-bold">صنعة {formatPrice(kp.buyWorkmanship, 1)}</span>
-                        </div>
-                      )}
+
                     </div>
 
                     {/* Change indicator */}
@@ -260,12 +249,7 @@ export function PriceCards({
                     </span>
                     <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
                   </div>
-                  {prices.goldPound.sellWorkmanship !== null && prices.goldPound.sellWorkmanship > 0 && (
-                    <div className="flex items-center justify-center gap-1 mt-1">
-                      <Wrench className="w-2.5 h-2.5 text-amber-500" />
-                      <span className="text-[10px] text-amber-500 font-bold">صنعة {formatPrice(prices.goldPound.sellWorkmanship, 1)}</span>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Buy */}
@@ -280,12 +264,7 @@ export function PriceCards({
                     </span>
                     <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
                   </div>
-                  {prices.goldPound.buyWorkmanship !== null && prices.goldPound.buyWorkmanship > 0 && (
-                    <div className="flex items-center justify-center gap-1 mt-1">
-                      <Wrench className="w-2.5 h-2.5 text-sky-500" />
-                      <span className="text-[10px] text-sky-500 font-bold">صنعة {formatPrice(prices.goldPound.buyWorkmanship, 1)}</span>
-                    </div>
-                  )}
+
                 </div>
               </div>
             ) : (
