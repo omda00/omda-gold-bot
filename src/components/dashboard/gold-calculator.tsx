@@ -322,7 +322,7 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                     <div className="bg-gradient-to-r from-amber-400 to-yellow-300 px-5 py-2 rounded-xl shadow-md border border-amber-300 inline-block">
                       <span className="text-base font-black text-amber-900">الجنيه الذهب</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1.5">= 8 جرام عيار 21</p>
+                    <p className="text-sm text-muted-foreground mt-1.5">8 جرام — عيار 21</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -451,7 +451,7 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
                       <Coins className="w-4 h-4 text-white" />
                     </div>
                     <span className="text-sm font-bold text-foreground">حساب الجنيه الذهب</span>
-                    <span className="text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-lg">= 8 جرام عيار 21</span>
+                    <span className="text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-lg">8 جرام — عيار 21</span>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-muted-foreground">عدد الجنيهات</label>
