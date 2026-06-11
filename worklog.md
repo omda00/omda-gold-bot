@@ -52,3 +52,24 @@ Stage Summary:
 - Prices are now automatically updated every 30 seconds from the web
 - The 1-second polling ensures the UI always shows the latest DB data
 - Lint passed with no errors
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Create shared refresh button for gold + USD/EGP prices with source indicators
+
+Work Log:
+- Read current codebase: use-dashboard.ts, header.tsx, price-cards.tsx, price-fetcher.ts, API routes
+- Redesigned PriceCards component to remove individual "تحديث" buttons from each card
+- Added shared refresh bar above cards showing: source indicators (iSagha.com for gold, Google Finance for USD), auto-refresh badge, and combined "تحديث الأسعار" button
+- Fixed triggerFetchPrices to handle concurrent fetches gracefully (refresh from DB instead of showing error)
+- Updated handleFetchPrices toast messages: success message now says "تم تحديث أسعار الذهب والدولار بنجاح", concurrent fetch shows info toast instead of error
+- Verified with browser agent: UI renders correctly, shared button works, POST requests return 200
+
+Stage Summary:
+- Shared "تحديث الأسعار" button replaces two individual buttons
+- Source bar shows iSagha.com (gold) + Google Finance (USD/EGP) with icons
+- Auto-refresh badge shows "تحديث تلقائي كل ثانية"
+- Bug fix: clicking refresh during auto-fetch no longer shows error toast (shows info toast instead)
+- Auto-refresh: 1s DB polling + 30s web fetch already in place
+- Lint passed with no errors

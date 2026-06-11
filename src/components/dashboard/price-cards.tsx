@@ -11,6 +11,7 @@ import {
   ArrowDownUp,
   Radio,
   Clock,
+  Globe,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,6 @@ interface PriceCardProps {
   price: PriceRecord | null;
   loading: boolean;
   fetching: boolean;
-  onFetch: () => void;
-  showFetchButton?: boolean;
 }
 
 function PriceCard({
@@ -35,8 +34,6 @@ function PriceCard({
   price,
   loading,
   fetching,
-  onFetch,
-  showFetchButton = false,
 }: PriceCardProps) {
   const change = price?.change ?? 0;
   const isPositive = change >= 0;
@@ -88,20 +85,6 @@ function PriceCard({
                 <p className="text-sm text-muted-foreground">{subtitle}</p>
               </div>
             </div>
-            {showFetchButton && (
-              <Button
-                variant="ghost"
-                size="default"
-                onClick={onFetch}
-                disabled={fetching}
-                className="h-9 gap-2 text-sm rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/30 px-3"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${fetching ? "animate-spin" : ""}`}
-                />
-                تحديث
-              </Button>
-            )}
           </div>
 
           {price ? (
@@ -217,20 +200,6 @@ function PriceCard({
           ) : (
             <div className="py-8 text-center">
               <p className="text-muted-foreground text-base">لا توجد بيانات متاحة</p>
-              {showFetchButton && (
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={onFetch}
-                  disabled={fetching}
-                  className="mt-3 gap-2 rounded-xl"
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 ${fetching ? "animate-spin" : ""}`}
-                  />
-                  جلب الأسعار
-                </Button>
-              )}
             </div>
           )}
         </CardContent>
@@ -253,27 +222,62 @@ export function PriceCards({
   onFetchPrices,
 }: PriceCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <PriceCard
-        title="Gold 21K"
-        subtitle="ذهب عيار ٢١ في مصر"
-        icon={<Gem className="w-5 h-5 text-amber-600" />}
-        price={prices.gold}
-        loading={loading}
-        fetching={fetching}
-        onFetch={onFetchPrices}
-        showFetchButton
-      />
-      <PriceCard
-        title="USD/EGP"
-        subtitle="سعر الدولار مقابل الجنيه"
-        icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
-        price={prices.usdEgp}
-        loading={loading}
-        fetching={fetching}
-        onFetch={onFetchPrices}
-        showFetchButton
-      />
+    <div className="space-y-3">
+      {/* Shared Refresh Bar */}
+      <div className="flex items-center justify-between bg-gradient-to-r from-amber-50/80 to-yellow-50/80 dark:from-amber-950/20 dark:to-yellow-950/20 rounded-2xl px-4 py-3 ring-1 ring-amber-200/40 dark:ring-amber-800/20">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Globe className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-bold text-foreground">المصادر:</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 bg-white/80 dark:bg-background/60 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-700 dark:text-amber-400 ring-1 ring-amber-200/50 dark:ring-amber-800/30">
+              <Gem className="w-3 h-3" />
+              iSagha.com
+            </span>
+            <span className="inline-flex items-center gap-1 bg-white/80 dark:bg-background/60 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30">
+              <DollarSign className="w-3 h-3" />
+              Google Finance
+            </span>
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-lg">
+            <Radio className="w-3 h-3 text-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">تحديث تلقائي كل ثانية</span>
+          </div>
+        </div>
+        <Button
+          variant="default"
+          size="default"
+          onClick={onFetchPrices}
+          disabled={fetching}
+          className="gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-lg shadow-amber-400/25 h-10 px-5 text-sm font-bold transition-all active:scale-95"
+        >
+          <RefreshCw
+            className={`w-4 h-4 ${fetching ? "animate-spin" : ""}`}
+          />
+          تحديث الأسعار
+        </Button>
+      </div>
+
+      {/* Price Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <PriceCard
+          title="Gold 21K"
+          subtitle="ذهب عيار ٢١ في مصر"
+          icon={<Gem className="w-5 h-5 text-amber-600" />}
+          price={prices.gold}
+          loading={loading}
+          fetching={fetching}
+        />
+        <PriceCard
+          title="USD/EGP"
+          subtitle="سعر الدولار مقابل الجنيه"
+          icon={<DollarSign className="w-5 h-5 text-emerald-600" />}
+          price={prices.usdEgp}
+          loading={loading}
+          fetching={fetching}
+        />
+      </div>
     </div>
   );
 }

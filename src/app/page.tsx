@@ -49,14 +49,15 @@ export default function Home() {
       if (result) {
         const fetched = result.fetched;
         if (fetched?.gold && fetched?.usdEgp) {
-          toast.success("تم جلب الأسعار بنجاح", { duration: 3000 });
+          toast.success("تم تحديث أسعار الذهب والدولار بنجاح", { duration: 3000 });
         } else if (fetched?.gold || fetched?.usdEgp) {
           toast.success("تم جلب بعض الأسعار — يتم عرض آخر الأسعار المتاحة", { duration: 4000 });
         } else {
           toast.info("لم يتم جلب أسعار جديدة — يتم عرض آخر الأسعار المخزنة", { duration: 4000 });
         }
       } else {
-        toast.error("فشل الاتصال بالخادم — يتم عرض آخر الأسعار المتاحة", { duration: 5000 });
+        // null result means a fetch is already in progress or DB was refreshed
+        toast.info("جارِ التحديث بالفعل — يتم عرض آخر الأسعار المتاحة", { duration: 2000 });
       }
     } catch {
       toast.error("حدث خطأ في الاتصال — يتم عرض آخر الأسعار المتاحة", { duration: 5000 });

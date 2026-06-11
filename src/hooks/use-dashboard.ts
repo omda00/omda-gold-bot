@@ -158,8 +158,13 @@ export function useDashboardData() {
 
   // Trigger manual price fetch from the web (POST)
   const triggerFetchPrices = useCallback(async () => {
-    // Prevent concurrent fetches
-    if (isFetchingRef.current) return null;
+    // Prevent concurrent fetches — if one is already running,
+    // wait briefly and return latest prices from DB instead
+    if (isFetchingRef.current) {
+      // Don't show error, just refresh from DB
+      await fetchPrices();
+      return null;
+    }
     isFetchingRef.current = true;
     setLoading((prev) => ({ ...prev, fetching: true }));
     try {
@@ -181,16 +186,20 @@ export function useDashboardData() {
         } catch {
           console.error("Fetch prices error: Unknown error");
         }
+        // Refresh from DB as fallback
+        await fetchPrices();
         return null;
       }
     } catch (err) {
       console.error("Network error fetching prices:", err);
+      // Refresh from DB as fallback
+      await fetchPrices();
       return null;
     } finally {
       setLoading((prev) => ({ ...prev, fetching: false }));
       isFetchingRef.current = false;
     }
-  }, []);
+  }, [fetchPrices]);
 
   // Update config
   const updateConfig = useCallback(async (key: string, value: string) => {
