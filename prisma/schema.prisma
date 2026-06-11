@@ -1,40 +1,28 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-//
-// =============================================
-// DEPLOYMENT NOTE (Vercel + Neon PostgreSQL):
-// =============================================
-// For LOCAL DEVELOPMENT: provider = "sqlite" with DATABASE_URL="file:./db/custom.db"
-// For PRODUCTION (Vercel + Neon): provider = "postgresql" with Neon connection strings
-//
-// When deploying to Vercel + Neon:
-// 1. Change provider below from "sqlite" to "postgresql"
-// 2. Set DATABASE_URL to Neon pooled connection
-// 3. Set DIRECT_URL to Neon direct connection
-// 4. Run: prisma db push
-// =============================================
+// LOCAL DEVELOPMENT: Uses SQLite
+// For Vercel + Neon deployment: use prisma/schema.neon.prisma
+// Run: bun run deploy:setup (copies Neon schema and regenerates client)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "sqlite"
-  url       = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model PriceRecord {
   id              String   @id @default(cuid())
-  symbol          String   // "GOLD_EGP", "USD_EGP", "GOLD_POUND_EGP", "GOLD_24K_EGP", etc.
+  symbol          String
   price           Float
-  currency        String   // "EGP"
-  change          Float?   // percentage change from previous
-  source          String?  // Where the price was fetched from
-  buyPrice        Float?   // Price the shop buys from you (for gold)
-  sellPrice       Float?   // Price the shop sells to you (for gold)
-  sellWorkmanship Float?   // Workmanship fee on sell (صنعة البيع)
-  buyWorkmanship  Float?   // Workmanship fee on buy (صنعة الشراء)
-  changeAmount    Float?   // Absolute change amount (e.g., -10.48)
+  currency        String
+  change          Float?
+  source          String?
+  buyPrice        Float?
+  sellPrice       Float?
+  sellWorkmanship Float?
+  buyWorkmanship  Float?
+  changeAmount    Float?
   createdAt       DateTime @default(now())
 }
 
@@ -46,7 +34,7 @@ model AppConfig {
 
 model NotificationLog {
   id      String   @id @default(cuid())
-  type    String   // "daily_report", "buy_signal", "usd_drop_alert", "test"
+  type    String
   title   String
   message String
   sentAt  DateTime @default(now())
@@ -56,10 +44,10 @@ model NotificationLog {
 
 model TelegramUser {
   id        String   @id @default(cuid())
-  name      String   // Display name for the user
-  botToken  String   // Unique Telegram Bot Token for this user
-  chatId    String   // Unique Chat ID for this user
-  active    Boolean  @default(true) // Whether to send notifications to this user
+  name      String
+  botToken  String
+  chatId    String
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
