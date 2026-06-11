@@ -7,8 +7,6 @@ import {
   RefreshCw,
   Coins,
   CircleDollarSign,
-  ArrowDownUp,
-  ArrowRightLeft,
   Timer,
   Radio,
 } from "lucide-react";
@@ -35,74 +33,6 @@ function formatPrice(price: number | null): string {
   if (price === null) return "—";
   return price.toLocaleString("ar-EG", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
-
-// Modern color themes for each karat
-const karatThemes: Record<number, {
-  badgeBg: string;
-  badgeText: string;
-  badgeBorder: string;
-  cardGlow: string;
-  sellBg: string;
-  buyBg: string;
-  sellIcon: string;
-  buyIcon: string;
-  accentLine: string;
-  label: string;
-  number: string;
-}> = {
-  24: {
-    badgeBg: "bg-gradient-to-r from-amber-400 to-yellow-300",
-    badgeText: "text-amber-900",
-    badgeBorder: "border-amber-300",
-    cardGlow: "shadow-amber-200/40 dark:shadow-amber-900/20",
-    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
-    buyBg: "bg-sky-50 dark:bg-sky-950/30",
-    sellIcon: "text-emerald-600 dark:text-emerald-400",
-    buyIcon: "text-sky-600 dark:text-sky-400",
-    accentLine: "from-amber-400 via-yellow-300 to-amber-400",
-    label: "عيار ٢٤",
-    number: "text-amber-700 dark:text-amber-300",
-  },
-  22: {
-    badgeBg: "bg-gradient-to-r from-orange-400 to-amber-300",
-    badgeText: "text-orange-900",
-    badgeBorder: "border-orange-300",
-    cardGlow: "shadow-orange-200/40 dark:shadow-orange-900/20",
-    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
-    buyBg: "bg-sky-50 dark:bg-sky-950/30",
-    sellIcon: "text-emerald-600 dark:text-emerald-400",
-    buyIcon: "text-sky-600 dark:text-sky-400",
-    accentLine: "from-orange-400 via-amber-300 to-orange-400",
-    label: "عيار ٢٢",
-    number: "text-orange-700 dark:text-orange-300",
-  },
-  21: {
-    badgeBg: "bg-gradient-to-r from-yellow-500 to-amber-400",
-    badgeText: "text-yellow-950",
-    badgeBorder: "border-yellow-400",
-    cardGlow: "shadow-yellow-200/40 dark:shadow-yellow-900/20",
-    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
-    buyBg: "bg-sky-50 dark:bg-sky-950/30",
-    sellIcon: "text-emerald-600 dark:text-emerald-400",
-    buyIcon: "text-sky-600 dark:text-sky-400",
-    accentLine: "from-yellow-500 via-amber-400 to-yellow-500",
-    label: "عيار ٢١",
-    number: "text-yellow-700 dark:text-yellow-300",
-  },
-  18: {
-    badgeBg: "bg-gradient-to-r from-rose-400 to-pink-300",
-    badgeText: "text-rose-900",
-    badgeBorder: "border-rose-300",
-    cardGlow: "shadow-rose-200/40 dark:shadow-rose-900/20",
-    sellBg: "bg-emerald-50 dark:bg-emerald-950/30",
-    buyBg: "bg-sky-50 dark:bg-sky-950/30",
-    sellIcon: "text-emerald-600 dark:text-emerald-400",
-    buyIcon: "text-sky-600 dark:text-sky-400",
-    accentLine: "from-rose-400 via-pink-300 to-rose-400",
-    label: "عيار ١٨",
-    number: "text-rose-700 dark:text-rose-300",
-  },
-};
 
 const AUTO_REFRESH_INTERVAL = 30000;
 
@@ -210,131 +140,20 @@ export function GoldCalculator({ calculatorData, loading, onFetch }: GoldCalcula
 
       {/* Loading skeleton */}
       {(loading || fetching) && !calculatorData && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="animate-pulse rounded-2xl bg-muted/50 h-44 p-4 space-y-3">
-              <div className="h-6 bg-muted rounded-lg w-20" />
-              <div className="h-10 bg-muted rounded-lg w-28" />
-              <div className="h-10 bg-muted rounded-lg w-24" />
-            </div>
-          ))}
+        <div className="animate-pulse rounded-2xl bg-muted/50 h-64 p-4 space-y-4">
+          <div className="h-10 bg-muted rounded-lg w-full" />
+          <div className="h-10 bg-muted rounded-lg w-full" />
+          <div className="h-16 bg-muted rounded-lg w-full" />
         </div>
       )}
 
       {calculatorData && (
         <>
-          {/* Gold Karat Price Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {calculatorData.karats.map((karatPrice, idx) => {
-              const theme = karatThemes[karatPrice.karat];
-              return (
-                <motion.div
-                  key={karatPrice.karat}
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: idx * 0.08, type: "spring", stiffness: 200, damping: 20 }}
-                >
-                  <Card className={`relative overflow-hidden rounded-2xl border-0 shadow-lg ${theme.cardGlow} ring-1 ring-border/20 group hover:shadow-xl transition-shadow duration-300`}>
-                    <div className={`h-1 bg-gradient-to-r ${theme.accentLine}`} />
-                    <CardContent className="relative p-3.5 space-y-3">
-                      {/* Karat badge */}
-                      <div className="flex items-center justify-center">
-                        <div className={`${theme.badgeBg} px-3 py-1 rounded-lg shadow-sm border ${theme.badgeBorder}`}>
-                          <span className={`text-xs font-black ${theme.badgeText} tracking-wide`}>
-                            {theme.label}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Sell price */}
-                      <div className={`${theme.sellBg} rounded-lg p-2.5 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30`}>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <ArrowRightLeft className={`w-3 h-3 ${theme.sellIcon}`} />
-                          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">بيع</span>
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-lg sm:text-xl font-black tracking-tight text-foreground tabular-nums">
-                            {formatPrice(karatPrice.sellPrice)}
-                          </span>
-                          <span className="text-[10px] font-bold text-muted-foreground">ج.م/جرام</span>
-                        </div>
-                      </div>
-
-                      {/* Buy price */}
-                      <div className={`${theme.buyBg} rounded-lg p-2.5 ring-1 ring-sky-200/50 dark:ring-sky-800/30`}>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <ArrowDownUp className={`w-3 h-3 ${theme.buyIcon}`} />
-                          <span className="text-xs font-bold text-sky-700 dark:text-sky-400">شراء</span>
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-sm sm:text-base font-bold tracking-tight text-muted-foreground tabular-nums">
-                            {formatPrice(karatPrice.buyPrice)}
-                          </span>
-                          <span className="text-[10px] font-semibold text-muted-foreground">ج.م/جرام</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          {/* Gold Pound Card */}
+          {/* Calculator Section */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-          >
-            <Card className="relative overflow-hidden rounded-2xl border-0 shadow-lg shadow-amber-200/20 dark:shadow-amber-900/10 ring-1 ring-amber-300/30">
-              <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
-              <CardContent className="relative p-4 space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-400 flex items-center justify-center shadow-md shadow-amber-400/25">
-                    <Coins className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="bg-gradient-to-r from-amber-400 to-yellow-300 px-3 py-1 rounded-lg shadow-sm border border-amber-300 inline-block">
-                      <span className="text-xs font-black text-amber-900">الجنيه الذهب</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">8 جرام — عيار 21</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-3 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">بيع</span>
-                    </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-lg sm:text-xl font-black tracking-tight text-foreground tabular-nums">
-                        {formatPrice(calculatorData.goldPound.sellPrice)}
-                      </span>
-                      <span className="text-[10px] font-bold text-muted-foreground">ج.م</span>
-                    </div>
-                  </div>
-                  <div className="bg-sky-50 dark:bg-sky-950/30 rounded-lg p-3 ring-1 ring-sky-200/50 dark:ring-sky-800/30">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <ArrowDownUp className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                      <span className="text-xs font-bold text-sky-700 dark:text-sky-400">شراء</span>
-                    </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-sm sm:text-base font-bold tracking-tight text-muted-foreground tabular-nums">
-                        {formatPrice(calculatorData.goldPound.buyPrice)}
-                      </span>
-                      <span className="text-[10px] font-semibold text-muted-foreground">ج.م</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Unified Calculator Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.1 }}
           >
             <Card className="rounded-2xl border-0 shadow-md ring-1 ring-border/20 overflow-hidden">
               <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
