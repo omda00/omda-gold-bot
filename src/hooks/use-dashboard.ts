@@ -444,7 +444,7 @@ export function useDashboardData() {
   }, [prices.gold?.price, plans, detectCurrentSignal]);
 
   // =============================================
-  // Polling: Read DB prices every 1 second
+  // Polling: Read DB prices every 10 seconds
   // This is lightweight and ensures the UI always
   // shows the latest data from the database
   // =============================================
@@ -452,7 +452,7 @@ export function useDashboardData() {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = setInterval(() => {
       fetchPrices();
-    }, 1000);
+    }, 10000);
   }, [fetchPrices]);
 
   const stopPolling = useCallback(() => {
@@ -464,18 +464,18 @@ export function useDashboardData() {
 
   // =============================================
   // Auto-fetch: Fetch fresh prices from the web
-  // every 1 minute in the background
-  // This keeps the database updated so the 1-second
+  // every 2 minutes in the background
+  // This keeps the database updated so the 5-second
   // polling always shows relatively fresh data
   // =============================================
   const startAutoFetch = useCallback(() => {
     if (autoFetchIntervalRef.current) clearInterval(autoFetchIntervalRef.current);
-    // Fetch immediately on start
-    triggerFetchPrices();
-    // Then every 1 minute (60000ms)
+    // Don't fetch immediately on start - wait for first interval
+    // triggerFetchPrices();
+    // Then every 2 minutes (120000ms)
     autoFetchIntervalRef.current = setInterval(() => {
       triggerFetchPrices();
-    }, 60000);
+    }, 120000);
   }, [triggerFetchPrices]);
 
   const stopAutoFetch = useCallback(() => {

@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   allowedDevOrigins: [
     ".space-z.ai",
+    "localhost",
+    "127.0.0.1",
   ],
 };
 
