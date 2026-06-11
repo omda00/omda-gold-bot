@@ -44,7 +44,7 @@ export function DashboardHeader({ automationEnabled }: DashboardHeaderProps) {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
             <div className="relative">
-              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-900/90 to-yellow-900/90 shadow-md shadow-amber-400/25 overflow-hidden">
+              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black shadow-md shadow-amber-400/25 overflow-hidden">
                 <Image
                   src="/images/omda-logo.png"
                   alt="Gold Investment Logo"

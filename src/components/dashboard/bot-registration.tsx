@@ -31,7 +31,7 @@ export function BotRegistration() {
 
             {/* Omda Logo */}
             <div className="relative mx-auto mb-5">
-              <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 ring-4 ring-amber-400/20 dark:ring-amber-400/10 overflow-hidden bg-gradient-to-br from-amber-900/90 to-yellow-900/90">
+              <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 ring-4 ring-amber-400/20 dark:ring-amber-400/10 overflow-hidden bg-black">
                 <Image
                   src="/images/omda-logo.png"
                   alt="Gold Investment Bot Logo"
