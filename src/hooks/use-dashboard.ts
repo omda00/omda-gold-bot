@@ -406,23 +406,23 @@ export function useDashboardData() {
         calculator: false,
       }));
 
-      // Auto-fetch fresh prices if data is stale (> 30 min old)
+      // Auto-fetch fresh prices if data is stale (> 30 min old) or missing
       // This ensures the deployed site always has fresh prices on visit
       try {
         const pricesRes = await fetch("/api/prices");
         if (pricesRes.ok) {
-          const pricesData = await prices.json() as { gold?: { createdAt?: string }; usdEgp?: { createdAt?: string } };
+          const pricesData = await pricesRes.json() as { gold?: { createdAt?: string }; usdEgp?: { createdAt?: string } };
           const lastGoldUpdate = pricesData.gold?.createdAt;
           if (lastGoldUpdate) {
             const ageMinutes = (Date.now() - new Date(lastGoldUpdate).getTime()) / 60000;
             if (ageMinutes > 30) {
               console.log(`[auto-refresh] Prices are ${ageMinutes.toFixed(0)} min old, refreshing...`);
-              triggerFetchPrices();
+              await triggerFetchPrices();
             }
           } else {
             // No prices at all — fetch immediately
             console.log("[auto-refresh] No prices found, fetching...");
-            triggerFetchPrices();
+            await triggerFetchPrices();
           }
         }
       } catch {
