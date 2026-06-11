@@ -93,167 +93,137 @@ export function PriceCards({
         </Button>
       </div>
 
-      {/* ─── UNIFIED GOLD PRICES PANEL ─── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      >
-        <Card className="rounded-2xl border-0 shadow-xl overflow-hidden bg-neutral-950 dark:bg-neutral-950 ring-1 ring-neutral-800">
-          {/* Top gold accent line */}
-          <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400" />
-
-          {/* Header */}
-          <div className="px-4 sm:px-6 py-4 border-b border-neutral-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-400/30">
-                  <Gem className="w-6 h-6 text-neutral-950" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black text-white">أسعار الذهب في مصر</h2>
-                    <div className="flex items-center gap-1 bg-amber-400/10 px-1.5 py-0.5 rounded">
-                      <Radio className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
-                      <span className="text-[10px] font-bold text-amber-400">مباشر</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-neutral-500">Gold Prices per Gram — EGP</p>
-                </div>
+      {/* ─── Section Header ─── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-400/25">
+            <Gem className="w-5 h-5 text-neutral-950" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-foreground">أسعار الذهب في مصر</h2>
+              <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
+                <Radio className="w-2.5 h-2.5 text-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">مباشر</span>
               </div>
-              {prices.gold && (
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <div className={`flex items-center gap-1 text-sm font-bold ${isGoldPositive ? "text-emerald-400" : "text-red-400"}`}>
-                    {isGoldPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    <span className="tabular-nums">{isGoldPositive ? "+" : ""}{goldChange.toFixed(2)}%</span>
-                  </div>
-                </div>
-              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Gold Prices per Gram — EGP</p>
+          </div>
+        </div>
+        {prices.gold && (
+          <div className="hidden sm:flex items-center gap-1.5">
+            <div className={`flex items-center gap-1 text-sm font-bold ${isGoldPositive ? "text-emerald-600" : "text-red-600"}`}>
+              {isGoldPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+              <span className="tabular-nums">{isGoldPositive ? "+" : ""}{goldChange.toFixed(2)}%</span>
             </div>
           </div>
+        )}
+      </div>
 
-          <CardContent className="p-0">
-            {/* ─── Karat Price Rows ─── */}
-            {loading ? (
-              <div className="p-5 space-y-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-8 w-24 rounded-lg bg-neutral-800" />
-                    <Skeleton className="h-10 flex-1 rounded-lg bg-neutral-800" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="divide-y divide-neutral-800/60">
-                {allKarats.map((kp, idx) => {
-                  const label = karatLabels[kp.karat];
-                  if (!label) return null;
-                  return (
-                    <motion.div
-                      key={kp.karat}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.07, type: "spring", stiffness: 180, damping: 18 }}
-                      className="group hover:bg-neutral-900/60 transition-colors duration-200"
-                    >
-                      <div className="flex items-center gap-3 sm:gap-5 px-4 sm:px-6 py-4 sm:py-5">
-                        {/* Karat label */}
-                        <div className="min-w-[90px] sm:min-w-[110px]">
-                          <span className="text-lg sm:text-xl font-black text-white tracking-tight">
-                            {label}
-                          </span>
-                        </div>
-
-                        {/* Sell price */}
-                        <div className="flex-1 flex items-center justify-end gap-2 sm:gap-3">
-                          <div className="flex items-center gap-1.5 text-emerald-400">
-                            <ArrowRightLeft className="w-3.5 h-3.5 hidden sm:block" />
-                            <span className="text-xs sm:text-sm font-bold">بيع</span>
-                          </div>
-                          <div className="bg-neutral-900 rounded-xl px-3 sm:px-4 py-2 ring-1 ring-neutral-700/60">
-                            <div className="flex items-baseline gap-1.5">
-                              <span className="text-lg sm:text-2xl font-black text-white tabular-nums tracking-tight">
-                                {formatPrice(kp.sellPrice)}
-                              </span>
-                              <span className="text-xs sm:text-sm text-neutral-500 font-bold">ج.م</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Separator */}
-                        <div className="w-px h-8 bg-neutral-800 flex-shrink-0" />
-
-                        {/* Buy price */}
-                        <div className="flex-1 flex items-center gap-2 sm:gap-3">
-                          <div className="bg-neutral-900 rounded-xl px-3 sm:px-4 py-2 ring-1 ring-neutral-700/60">
-                            <div className="flex items-baseline gap-1.5">
-                              <span className="text-lg sm:text-2xl font-black text-white tabular-nums tracking-tight">
-                                {formatPrice(kp.buyPrice)}
-                              </span>
-                              <span className="text-xs sm:text-sm text-neutral-500 font-bold">ج.م</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-sky-400">
-                            <span className="text-xs sm:text-sm font-bold">شراء</span>
-                            <ArrowDownUp className="w-3.5 h-3.5 hidden sm:block" />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ─── Column headers (subtle) ─── */}
-            {!loading && (
-              <div className="flex items-center gap-3 sm:gap-5 px-4 sm:px-6 py-2 border-t border-neutral-800/60 bg-neutral-900/40">
-                <div className="min-w-[90px] sm:min-w-[110px]" />
-                <div className="flex-1 text-center">
-                  <span className="text-[10px] font-bold text-emerald-400/50 tracking-widest uppercase">Sell · بيع</span>
-                </div>
-                <div className="w-px" />
-                <div className="flex-1 text-center">
-                  <span className="text-[10px] font-bold text-sky-400/50 tracking-widest uppercase">Buy · شراء</span>
-                </div>
-              </div>
-            )}
-
-            {/* ─── Footer: timestamp + update status ─── */}
-            <div className="flex items-center justify-between flex-wrap gap-2 px-4 sm:px-6 py-3 border-t border-neutral-800/60 bg-neutral-900/30">
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                <Clock className="w-3 h-3" />
-                {prices.gold ? (
-                  <span>
-                    آخر تحديث:{" "}
-                    {new Date(prices.gold.createdAt).toLocaleString("ar-EG", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })}
-                  </span>
-                ) : (
-                  <span>في انتظار البيانات...</span>
-                )}
-                {prices.gold?.source && (
-                  <>
-                    <span className="text-neutral-700">•</span>
-                    <span>{prices.gold.source}</span>
-                  </>
-                )}
-              </div>
-              {fetching && (
-                <span className="text-xs text-amber-400 font-bold animate-pulse flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                  جارِ التحديث...
-                </span>
-              )}
+      {/* ─── 4 Individual Karat Cards ─── */}
+      {loading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="animate-pulse rounded-2xl bg-neutral-950 h-40 p-4 space-y-3 ring-1 ring-neutral-800">
+              <div className="h-6 bg-neutral-800 rounded-lg w-20" />
+              <div className="h-8 bg-neutral-800 rounded-lg w-full" />
+              <div className="h-8 bg-neutral-800 rounded-lg w-full" />
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {allKarats.map((kp, idx) => {
+            const label = karatLabels[kp.karat];
+            if (!label) return null;
+            return (
+              <motion.div
+                key={kp.karat}
+                initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: idx * 0.06, type: "spring", stiffness: 200, damping: 20 }}
+              >
+                <Card className="rounded-2xl border-0 shadow-lg overflow-hidden bg-neutral-950 ring-1 ring-neutral-800 hover:ring-amber-400/30 transition-all duration-200 group">
+                  {/* Gold accent line */}
+                  <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400" />
+
+                  <CardContent className="p-3.5 sm:p-4 space-y-3">
+                    {/* Karat badge */}
+                    <div className="flex items-center justify-center">
+                      <div className="bg-gradient-to-r from-amber-400 to-yellow-400 px-4 py-1.5 rounded-lg shadow-sm">
+                        <span className="text-sm font-black text-neutral-950 tracking-wide">
+                          {label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Sell price */}
+                    <div className="bg-neutral-900 rounded-xl p-2.5 ring-1 ring-neutral-800 group-hover:ring-emerald-500/20 transition-colors">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <ArrowRightLeft className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[11px] font-bold text-emerald-400">بيع</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 justify-center">
+                        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                          {formatPrice(kp.sellPrice)}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
+                      </div>
+                    </div>
+
+                    {/* Buy price */}
+                    <div className="bg-neutral-900 rounded-xl p-2.5 ring-1 ring-neutral-800 group-hover:ring-sky-500/20 transition-colors">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <ArrowDownUp className="w-3 h-3 text-sky-400" />
+                        <span className="text-[11px] font-bold text-sky-400">شراء</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 justify-center">
+                        <span className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
+                          {formatPrice(kp.buyPrice)}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 font-bold">ج.م</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─── Footer: timestamp ─── */}
+      <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3 h-3" />
+          {prices.gold ? (
+            <span>
+              آخر تحديث:{" "}
+              {new Date(prices.gold.createdAt).toLocaleString("ar-EG", {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
+          ) : (
+            <span>في انتظار البيانات...</span>
+          )}
+          {prices.gold?.source && (
+            <>
+              <span className="text-border/60">•</span>
+              <span>{prices.gold.source}</span>
+            </>
+          )}
+        </div>
+        {fetching && (
+          <span className="text-amber-600 dark:text-amber-400 font-bold animate-pulse flex items-center gap-1">
+            <RefreshCw className="w-3 h-3 animate-spin" />
+            جارِ التحديث...
+          </span>
+        )}
+      </div>
 
       {/* ─── USD/EGP Card ─── */}
       <motion.div
