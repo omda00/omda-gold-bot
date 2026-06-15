@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllConfig, setConfig, seedDefaultConfig } from "@/lib/config-seeder";
 import { getAdminSession } from "@/lib/admin-auth";
 
+// Cache for config + seed status to avoid re-seeding on every request
+let configCache: { data: Record<string, string>; timestamp: number } | null = null;
+let seeded = false;
+const CONFIG_CACHE_TTL = 30000; // 30 seconds — config rarely changes
+
 /**
  * GET /api/config - Return all config as key-value pairs
  * Public: Anyone can READ config (needed for UI to show automation status, etc.)
@@ -9,8 +14,30 @@ import { getAdminSession } from "@/lib/admin-auth";
  */
 export async function GET() {
   try {
-    await seedDefaultConfig();
+    // Only seed once per server instance (not on every request)
+    if (!seeded) {
+      await seedDefaultConfig();
+      seeded = true;
+    }
+
+    // Return cached config if fresh
+    if (configCache && (Date.now() - configCache.timestamp) < CONFIG_CACHE_TTL) {
+      // Mask sensitive values even from cache
+      const safeConfig: Record<string, string> = {};
+      for (const [key, value] of Object.entries(configCache.data)) {
+        if (key === "TELEGRAM_BOT_TOKEN" && value) {
+          safeConfig[key] = `****${value.slice(-5)}`;
+        } else if (key === "ADMIN_PASSWORD" && value) {
+          safeConfig[key] = "****";
+        } else {
+          safeConfig[key] = value;
+        }
+      }
+      return NextResponse.json(safeConfig);
+    }
+
     const config = await getAllConfig();
+    configCache = { data: config, timestamp: Date.now() };
 
     // Always mask sensitive values
     const safeConfig: Record<string, string> = {};
@@ -66,6 +93,9 @@ export async function POST(request: NextRequest) {
     }
 
     await setConfig(key, value);
+
+    // Invalidate config cache so next GET fetches fresh data
+    configCache = null;
 
     return NextResponse.json({ key, value, updated: true });
   } catch (error) {

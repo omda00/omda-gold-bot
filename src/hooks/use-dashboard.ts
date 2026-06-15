@@ -36,7 +36,6 @@ export function useDashboardData() {
   const [lastWebFetch, setLastWebFetch] = useState<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoFetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const seededRef = useRef(false);
   const isFetchingRef = useRef(false);
 
   // ==========================================
@@ -92,17 +91,6 @@ export function useDashboardData() {
     setTelegramUsers([]);
   }, []);
 
-  // Seed data on first load
-  const seedData = useCallback(async () => {
-    if (seededRef.current) return;
-    try {
-      await fetch("/api/config");
-      seededRef.current = true;
-    } catch (err) {
-      console.error("Seed error:", err);
-    }
-  }, []);
-
   // Fetch prices from DB (lightweight GET)
   const fetchPrices = useCallback(async () => {
     try {
@@ -118,7 +106,7 @@ export function useDashboardData() {
     return null;
   }, []);
 
-  // Fetch config
+  // Fetch config (also seeds default config if needed)
   const fetchConfig = useCallback(async () => {
     try {
       const res = await fetch("/api/config");
@@ -287,7 +275,6 @@ export function useDashboardData() {
         setTelegramUsers(Array.isArray(data) ? data : []);
         return data;
       } else if (res.status === 401) {
-        // Not admin — expected, clear users
         setTelegramUsers([]);
       }
     } catch (err) {
@@ -384,20 +371,29 @@ export function useDashboardData() {
     }
   }, []);
 
-  // Initial data load
+  // ==========================================
+  // Initial data load — OPTIMIZED
+  // Phase 1: Show cached data IMMEDIATELY (fast DB reads in parallel)
+  // Phase 2: Refresh in BACKGROUND if stale (non-blocking web fetch)
+  // ==========================================
   useEffect(() => {
     const init = async () => {
-      // Check admin auth first
-      await checkAdminAuth();
+      // Phase 1: Load all data from DB in parallel + check auth
+      // These are all fast DB reads — no external web fetching
+      const [pricesData] = await Promise.all([
+        fetchPrices(),           // GET /api/prices (DB read, fast)
+        fetchConfig(),           // GET /api/config (DB read + seed, fast)
+        checkAdminAuth(),        // GET /api/auth/admin (cookie check, fast)
+      ]);
       setCheckingAuth(false);
 
-      await seedData();
-      await Promise.all([
-        fetchPrices(),
-        fetchConfig(),
+      // Fetch logs and calculator in parallel (non-critical, load after)
+      Promise.all([
         fetchLogs(),
         fetchCalculatorData(),
       ]);
+
+      // Mark loading as DONE immediately — show cached data to user NOW
       setLoading((prev) => ({
         ...prev,
         prices: false,
@@ -406,31 +402,28 @@ export function useDashboardData() {
         calculator: false,
       }));
 
-      // Auto-fetch fresh prices if data is stale (> 30 min old) or missing
-      // This ensures the deployed site always has fresh prices on visit
-      try {
-        const pricesRes = await fetch("/api/prices");
-        if (pricesRes.ok) {
-          const pricesData = await pricesRes.json() as { gold?: { createdAt?: string }; usdEgp?: { createdAt?: string } };
-          const lastGoldUpdate = pricesData.gold?.createdAt;
-          if (lastGoldUpdate) {
-            const ageMinutes = (Date.now() - new Date(lastGoldUpdate).getTime()) / 60000;
-            if (ageMinutes > 30) {
-              console.log(`[auto-refresh] Prices are ${ageMinutes.toFixed(0)} min old, refreshing...`);
-              await triggerFetchPrices();
-            }
-          } else {
-            // No prices at all — fetch immediately
-            console.log("[auto-refresh] No prices found, fetching...");
-            await triggerFetchPrices();
+      // Phase 2: Check if prices are stale and refresh in BACKGROUND
+      // User already sees cached data — web fetch happens silently
+      if (pricesData) {
+        const lastGoldUpdate = pricesData.gold?.createdAt;
+        if (!lastGoldUpdate) {
+          console.log("[init] No prices found, refreshing in background...");
+          triggerFetchPrices(); // NOT awaited — non-blocking
+        } else {
+          const ageMinutes = (Date.now() - new Date(lastGoldUpdate).getTime()) / 60000;
+          if (ageMinutes > 30) {
+            console.log(`[init] Prices are ${ageMinutes.toFixed(0)} min old, refreshing in background...`);
+            triggerFetchPrices(); // NOT awaited — non-blocking
           }
         }
-      } catch {
-        // Ignore auto-refresh errors
+      } else {
+        // No price data at all — fetch in background
+        console.log("[init] No prices found, refreshing in background...");
+        triggerFetchPrices(); // NOT awaited — non-blocking
       }
     };
     init();
-  }, [seedData, fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData, checkAdminAuth, triggerFetchPrices]);
+  }, [fetchPrices, fetchConfig, fetchLogs, fetchCalculatorData, checkAdminAuth, triggerFetchPrices]);
 
   // Fetch telegram users when admin status changes
   useEffect(() => {

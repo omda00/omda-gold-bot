@@ -48,13 +48,26 @@ function calculateKaratFrom21(price21Sell: number, price21Buy: number | null): K
   }));
 }
 
+// ==========================================
+// In-memory cache for GET /api/prices
+// This endpoint is called every 10 seconds by polling,
+// so caching avoids repeated DB queries.
+// ==========================================
+let pricesCache: { data: unknown; timestamp: number } | null = null;
+const CACHE_TTL = 5000; // 5 seconds — fresh enough for 10s polling
+
 /**
  * GET /api/prices - Return the latest Gold and USD/EGP prices
- * This is called every 10 seconds by the polling mechanism, so it must be lightweight.
- * No seeding or heavy operations here.
+ * Uses in-memory cache (5s TTL) to avoid hammering the DB on every poll.
+ * This endpoint is called every 10 seconds by the polling mechanism.
  */
 export async function GET() {
   try {
+    // Return cached data if fresh
+    if (pricesCache && (Date.now() - pricesCache.timestamp) < CACHE_TTL) {
+      return NextResponse.json(pricesCache.data);
+    }
+
     const goldPrice = await db.priceRecord.findFirst({
       where: { symbol: "GOLD_EGP" },
       orderBy: { createdAt: "desc" },
@@ -107,12 +120,17 @@ export async function GET() {
       };
     }
 
-    return NextResponse.json({
+    const result = {
       gold: goldPrice,
       usdEgp: usdEgpRate,
       allKarats,
       goldPound,
-    });
+    };
+
+    // Cache the result
+    pricesCache = { data: result, timestamp: Date.now() };
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching prices:", error);
     return NextResponse.json(
@@ -138,6 +156,9 @@ export async function POST(request: NextRequest) {
       resetRateLimit();
       console.log("[prices] Rate limit cooldown reset requested");
     }
+
+    // Invalidate the GET cache before fetching new data
+    pricesCache = null;
 
     const allPrices = await fetchAllPrices();
 
