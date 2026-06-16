@@ -127,7 +127,7 @@ async function fetchIsaghaDirectly(url: string): Promise<string> {
   try {
     console.log(`[price-fetcher] 🌐 Direct HTTP fetch: ${url}`);
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(15000), // 15s timeout
+      signal: AbortSignal.timeout(10000), // 10s timeout (was 15s)
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -176,7 +176,7 @@ async function fetchUsdEgpFromGoogleFinanceDirect(): Promise<PriceFetchResult | 
     const url = "https://www.google.com/finance/quote/USD-EGP?hl=en";
 
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(30000), // 30s timeout (page is ~1MB compressed)
+      signal: AbortSignal.timeout(12000), // 12s timeout (was 30s — too slow when Google is slow)
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -601,14 +601,21 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
   };
 
   // ==========================================
-  // METHOD 1 (PRIMARY): Direct HTTP fetch from iSagha
-  // This does NOT use Z-AI SDK — CANNOT be rate limited!
+  // ⚡ PARALLEL FETCH: iSagha (gold) + Google Finance (USD) at the same time
+  // Previously these ran SEQUENTIALLY which doubled the latency.
+  // Now we run them in parallel — total time ≈ max(iSagha, Google) not sum.
   // ==========================================
-  try {
-    console.log("[price-fetcher] 🥇 PRIMARY: Fetching gold prices from iSagha.com via DIRECT HTTP...");
-    const isaghaHtml = await fetchIsaghaDirectly("https://market.isagha.com/prices");
+  console.log("[price-fetcher] ⚡ PARALLEL: Fetching iSagha (gold) + Google Finance (USD) simultaneously...");
+  const parallelStart = Date.now();
 
-    if (isaghaHtml) {
+  const [isaghaHtml, gfDirectResult] = await Promise.all([
+    fetchIsaghaDirectly("https://market.isagha.com/prices"),
+    fetchUsdEgpFromGoogleFinanceDirect(),
+  ]);
+
+  // Process iSagha result (gold + karats + gold pound)
+  if (isaghaHtml) {
+    try {
       const isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
 
       if (isaghaPrices.gold21.sellPrice && isaghaPrices.gold21.sellPrice > 0) {
@@ -658,70 +665,64 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
 
       console.log(`[price-fetcher] ✅ Extracted ${combinedResult.allKarats.length} karat prices + gold pound from iSagha (direct)`);
 
-      // NOTE: We do NOT use iSagha for USD/EGP — user wants Google Finance as the primary source
-      // iSagha USD/EGP rate is stored only as reference info
       if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
         console.log(`[price-fetcher] iSagha USD/EGP rate available (${isaghaPrices.usdEgpRate}) but using Google Finance as primary source`);
       }
-    }
-  } catch (directErr) {
-    console.error("[price-fetcher] ❌ Direct iSagha HTTP fetch failed:", directErr);
-  }
-
-  // ==========================================
-  // METHOD 2 (PRIMARY for USD/EGP): Google Finance Direct HTTP
-  // User specifically requested Google Finance as the source for USD/EGP
-  // This does NOT use Z-AI SDK — CANNOT be rate limited!
-  // ==========================================
-  if (!combinedResult.usdEgp) {
-    const gfDirectResult = await fetchUsdEgpFromGoogleFinanceDirect();
-    if (gfDirectResult) {
-      combinedResult.usdEgp = gfDirectResult;
-      console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (PRIMARY): ${gfDirectResult.price}`);
+    } catch (parseErr) {
+      console.error("[price-fetcher] ❌ iSagha HTML parsing failed:", parseErr);
     }
   }
 
-  // ==========================================
-  // METHOD 3 (FALLBACK for USD/EGP): Google Finance via Z-AI SDK
-  // If direct HTTP didn't work (e.g., Google blocked), try Z-AI SDK
-  // ==========================================
-  if (!combinedResult.usdEgp && !isInCooldown()) {
-    try {
-      const zai = await ZAI.create();
-      const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
-      if (gfResult) {
-        combinedResult.usdEgp = gfResult;
-        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Z-AI SDK: ${gfResult.price}`);
-      }
-    } catch (error) {
-      console.error("[price-fetcher] Google Finance Z-AI SDK fetch failed:", error);
-      checkAndMark429(error);
-    }
+  // Process Google Finance result (USD/EGP)
+  if (gfDirectResult) {
+    combinedResult.usdEgp = gfDirectResult;
+    console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (PRIMARY): ${gfDirectResult.price}`);
   }
 
-  // ==========================================
-  // METHOD 4 (FALLBACK for USD/EGP): Free Exchange Rate API
-  // This does NOT use Z-AI SDK — CANNOT be rate limited!
-  // Used when Google Finance is completely unavailable
-  // ==========================================
-  if (!combinedResult.usdEgp) {
-    const freeApiResult = await fetchUsdEgpFromFreeApi();
-    if (freeApiResult) {
-      combinedResult.usdEgp = freeApiResult;
-      console.log(`[price-fetcher] ✅ Got USD/EGP from free API fallback: ${freeApiResult.price}`);
-    }
-  }
+  console.log(`[price-fetcher] ⏱️ Parallel fetch done in ${Date.now() - parallelStart}ms | gold=${!!combinedResult.gold} usdEgp=${!!combinedResult.usdEgp}`);
 
   // If we got both gold and USD/EGP, return immediately!
   if (combinedResult.gold && combinedResult.usdEgp) {
-    console.log("[price-fetcher] ✅ Got gold (iSagha) + USD/EGP (Google Finance/Free API)");
+    console.log("[price-fetcher] ✅ Got gold (iSagha) + USD/EGP (Google Finance) — skipping fallbacks");
     return combinedResult;
   }
 
   // ==========================================
-  // METHOD 3 (FALLBACK): Z-AI SDK for iSagha
-  // Only if direct HTTP failed AND we're not rate-limited
+  // FALLBACK 1 (parallel): Z-AI SDK Google Finance + Free Exchange Rate API
+  // Only run if USD/EGP is missing — gold fallbacks come next.
   // ==========================================
+  if (!combinedResult.usdEgp) {
+    console.log("[price-fetcher] 🔄 USD/EGP missing — running Z-AI SDK + Free API fallbacks in parallel...");
+    const fallbackPromises: Promise<PriceFetchResult | null>[] = [];
+
+    if (!isInCooldown()) {
+      fallbackPromises.push(
+        (async () => {
+          try {
+            const zai = await ZAI.create();
+            return await fetchUsdEgpFromGoogleFinance(zai);
+          } catch (error) {
+            console.error("[price-fetcher] Google Finance Z-AI SDK fetch failed:", error);
+            checkAndMark429(error);
+            return null;
+          }
+        })()
+      );
+    }
+
+    fallbackPromises.push(fetchUsdEgpFromFreeApi());
+
+    const fallbackResults = await Promise.all(fallbackPromises);
+    for (const result of fallbackResults) {
+      if (result && !combinedResult.usdEgp) {
+        combinedResult.usdEgp = result;
+        console.log(`[price-fetcher] ✅ Got USD/EGP from fallback: ${result.price} (${result.source})`);
+        break;
+      }
+    }
+  }
+
+  // If we still need gold, try Z-AI SDK iSagha
   if (!combinedResult.gold && !isInCooldown()) {
     try {
       console.log("[price-fetcher] 🔄 FALLBACK: Fetching gold from iSagha via Z-AI SDK page_reader...");
@@ -731,9 +732,9 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
         url: "https://market.isagha.com/prices",
       });
 
-      const isaghaHtml = isaghaResult?.data?.html || "";
-      if (isaghaHtml) {
-        const isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+      const sdkIsaghaHtml = isaghaResult?.data?.html || "";
+      if (sdkIsaghaHtml) {
+        const isaghaPrices = extractFromIsaghaHtml(sdkIsaghaHtml);
 
         if (isaghaPrices.gold21.sellPrice && isaghaPrices.gold21.sellPrice > 0) {
           combinedResult.gold = {
@@ -782,7 +783,6 @@ export async function fetchAllPrices(): Promise<CombinedPriceResult> {
           };
         }
 
-        // NOTE: Skip iSagha USD/EGP — Google Finance is the primary source per user request
         if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
           console.log(`[price-fetcher] iSagha SDK USD/EGP available (${isaghaPrices.usdEgpRate}) but using Google Finance as primary`);
         }
