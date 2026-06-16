@@ -312,7 +312,7 @@ export async function POST(request: NextRequest) {
       const dbResult = await buildPricesResponse();
 
       const successMessage = allPrices.gold || allPrices.usdEgp
-        ? "Prices fetched successfully"
+        ? "تم جلب الأسعار بنجاح (parallel + cached)"
         : isRateLimited()
           ? "Z-AI SDK rate limited — but direct HTTP sources should still work. Showing cached prices."
           : "Could not fetch new prices from web — showing latest cached prices";
