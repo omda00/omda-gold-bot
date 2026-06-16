@@ -215,10 +215,15 @@ export async function POST(request: NextRequest) {
 
     const now = Date.now();
 
+    // Read LAST_FETCH_AT from DB upfront (used for both Layer 1 bypass check
+    // and for debug info in the response). This is a single fast DB read.
+    const lastFetchAtDb = forceRefresh ? 0 : await getLastFetchAt();
+    const dbAgeMs = now - lastFetchAtDb;
+
     // ⚡ LAYER 1 — In-memory POST cache (per-instance on Vercel)
     if (!forceRefresh && postFetchCache && (now - postFetchCache.timestamp) < POST_CACHE_TTL) {
       console.log("[prices] ⚡ POST in-memory cache HIT");
-      return NextResponse.json(postFetchCache.data);
+      return NextResponse.json({ ...postFetchCache.data as object, _debug: { layer: "memory", lastFetchAtDb, dbAgeMs: Math.round(dbAgeMs / 1000) } });
     }
 
     // ⚡ LAYER 2 — DB-based POST cache (shared across ALL Vercel instances)
@@ -226,24 +231,20 @@ export async function POST(request: NextRequest) {
     // re-fetch from iSagha/Google Finance on its first POST because the
     // in-memory cache is per-instance. By checking the DB, we know if ANY
     // instance already fetched recently.
-    if (!forceRefresh) {
-      const lastFetchAt = await getLastFetchAt();
-      const ageMs = now - lastFetchAt;
-      if (ageMs < POST_CACHE_TTL) {
-        console.log(`[prices] ⚡ POST DB cache HIT — last fetch was ${Math.round(ageMs / 1000)}s ago, returning DB prices without web fetch`);
-        const cachedDbResult = await buildPricesResponse();
-        const cachedResponse = {
-          ...cachedDbResult,
-          fetched: { gold: false, usdEgp: false },
-          rateLimited: isRateLimited(),
-          message: "تم تحديث الأسعار مؤخراً — عرض آخر الأسعار المحفوظة",
-          cached: true,
-          cacheAgeSeconds: Math.round(ageMs / 1000),
-        };
-        // Also store in in-memory cache for subsequent same-instance hits
-        postFetchCache = { data: cachedResponse, timestamp: now };
-        return NextResponse.json(cachedResponse);
-      }
+    if (!forceRefresh && dbAgeMs < POST_CACHE_TTL) {
+      console.log(`[prices] ⚡ POST DB cache HIT — last fetch was ${Math.round(dbAgeMs / 1000)}s ago, returning DB prices without web fetch`);
+      const cachedDbResult = await buildPricesResponse();
+      const cachedResponse = {
+        ...cachedDbResult,
+        fetched: { gold: false, usdEgp: false },
+        rateLimited: isRateLimited(),
+        message: "تم تحديث الأسعار مؤخراً — عرض آخر الأسعار المحفوظة",
+        cached: true,
+        cacheAgeSeconds: Math.round(dbAgeMs / 1000),
+      };
+      // Also store in in-memory cache for subsequent same-instance hits
+      postFetchCache = { data: cachedResponse, timestamp: now };
+      return NextResponse.json(cachedResponse);
     }
 
     const fetchPromise = (async () => {
@@ -324,6 +325,10 @@ export async function POST(request: NextRequest) {
         },
         rateLimited: isRateLimited(),
         message: successMessage,
+        _debug: {
+          lastFetchAtDb,
+          dbAgeMsAtStart: Math.round(dbAgeMs / 1000),
+        },
       };
 
       // Persist the fetch timestamp to the DB so other Vercel instances
