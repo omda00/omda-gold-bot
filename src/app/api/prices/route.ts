@@ -60,15 +60,48 @@ let pricesCache: { data: unknown; timestamp: number } | null = null;
 const CACHE_TTL = 15000; // 15 seconds
 
 // ==========================================
-// In-memory cache for POST /api/prices (the slow web-fetch path)
-// If multiple users click "تحديث الأسعار" within 60s, only the FIRST
-// request triggers an actual web fetch. Subsequent ones return the
-// already-fetched result immediately. This prevents thundering-herd
-// latency on the Vercel function.
+// POST /api/prices cache — TWO LAYERS:
+//
+// Layer 1 (in-memory): Fast, but per-instance on Vercel serverless.
+//   Helps when the same warm instance handles back-to-back POSTs.
+//
+// Layer 2 (DB-based, AppConfig key = "LAST_FETCH_AT"): Shared across ALL
+//   instances. This is the critical one for Vercel — if any instance fetched
+//   within the last POST_CACHE_TTL ms, we skip the web fetch entirely and
+//   just return the latest DB prices. This is what makes "تحديث الأسعار"
+//   feel instant when multiple users click it within a minute.
+//
+// Use ?force=true to bypass both layers (used by manual "force refresh").
 // ==========================================
 let postFetchCache: { data: unknown; timestamp: number } | null = null;
-const POST_CACHE_TTL = 60000; // 60 seconds
-let postFetchInProgress: Promise<unknown> | null = null;
+const POST_CACHE_TTL = 60000; // 60 seconds — fresh enough for "manual refresh"
+const LAST_FETCH_AT_KEY = "LAST_FETCH_AT";
+
+/** Read the timestamp of the most recent successful web fetch from the DB. */
+async function getLastFetchAt(): Promise<number> {
+  try {
+    const row = await db.appConfig.findUnique({ where: { key: LAST_FETCH_AT_KEY } });
+    if (!row) return 0;
+    const ts = parseInt(row.value, 10);
+    return Number.isFinite(ts) ? ts : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Persist the timestamp of a successful web fetch so other instances see it. */
+async function setLastFetchAt(ts: number): Promise<void> {
+  try {
+    await db.appConfig.upsert({
+      where: { key: LAST_FETCH_AT_KEY },
+      update: { value: String(ts) },
+      create: { key: LAST_FETCH_AT_KEY, value: String(ts) },
+    });
+  } catch (err) {
+    // Non-fatal — cache miss just means an extra fetch
+    console.error("[prices] Failed to persist LAST_FETCH_AT:", err);
+  }
+}
 
 /**
  * GET /api/prices - Return the latest Gold and USD/EGP prices
@@ -180,28 +213,36 @@ export async function POST(request: NextRequest) {
       console.log("[prices] Rate limit cooldown reset requested");
     }
 
-    // ⚡ POST CACHE: If we fetched within the last 60s, return that result
-    // immediately instead of hitting iSagha/Google Finance again. This is the
-    // single biggest win for perceived speed — multiple users clicking
-    // "تحديث الأسعار" no longer each pay the full web-fetch latency.
-    if (!forceRefresh && postFetchCache && (Date.now() - postFetchCache.timestamp) < POST_CACHE_TTL) {
-      console.log("[prices] ⚡ POST cache HIT — returning recent fetch result");
+    const now = Date.now();
+
+    // ⚡ LAYER 1 — In-memory POST cache (per-instance on Vercel)
+    if (!forceRefresh && postFetchCache && (now - postFetchCache.timestamp) < POST_CACHE_TTL) {
+      console.log("[prices] ⚡ POST in-memory cache HIT");
       return NextResponse.json(postFetchCache.data);
     }
 
-    // ⚡ REQUEST COALESCING: If a fetch is already in-flight, wait for it
-    // instead of starting a duplicate. Prevents thundering-herd on cold start.
-    if (postFetchInProgress && !forceRefresh) {
-      console.log("[prices] ⚡ Coalescing with in-flight POST fetch...");
-      try {
-        const coalescedResult = await Promise.race([
-          postFetchInProgress,
-          new Promise((_, reject) => setTimeout(() => reject(new Error("coalesce-timeout")), 30000)),
-        ]);
-        return NextResponse.json(coalescedResult);
-      } catch {
-        // If coalescing fails/times out, fall through to do our own fetch
-        console.log("[prices] Coalesce timed out, proceeding with own fetch");
+    // ⚡ LAYER 2 — DB-based POST cache (shared across ALL Vercel instances)
+    // This is the critical layer. Without it, every Vercel instance would
+    // re-fetch from iSagha/Google Finance on its first POST because the
+    // in-memory cache is per-instance. By checking the DB, we know if ANY
+    // instance already fetched recently.
+    if (!forceRefresh) {
+      const lastFetchAt = await getLastFetchAt();
+      const ageMs = now - lastFetchAt;
+      if (ageMs < POST_CACHE_TTL) {
+        console.log(`[prices] ⚡ POST DB cache HIT — last fetch was ${Math.round(ageMs / 1000)}s ago, returning DB prices without web fetch`);
+        const cachedDbResult = await buildPricesResponse();
+        const cachedResponse = {
+          ...cachedDbResult,
+          fetched: { gold: false, usdEgp: false },
+          rateLimited: isRateLimited(),
+          message: "تم تحديث الأسعار مؤخراً — عرض آخر الأسعار المحفوظة",
+          cached: true,
+          cacheAgeSeconds: Math.round(ageMs / 1000),
+        };
+        // Also store in in-memory cache for subsequent same-instance hits
+        postFetchCache = { data: cachedResponse, timestamp: now };
+        return NextResponse.json(cachedResponse);
       }
     }
 
@@ -285,6 +326,12 @@ export async function POST(request: NextRequest) {
         message: successMessage,
       };
 
+      // Persist the fetch timestamp to the DB so other Vercel instances
+      // can see it (in-memory cache is per-instance on serverless).
+      if (allPrices.gold || allPrices.usdEgp) {
+        await setLastFetchAt(Date.now());
+      }
+
       // Save to POST cache
       postFetchCache = { data: response, timestamp: Date.now() };
       // Invalidate GET cache so the next GET sees fresh data
@@ -293,17 +340,10 @@ export async function POST(request: NextRequest) {
       return response;
     })();
 
-    // Register the in-flight promise for coalescing
-    postFetchInProgress = fetchPromise as Promise<unknown>;
-
     const response = await fetchPromise;
-
-    // Clear the in-flight marker
-    postFetchInProgress = null;
 
     return NextResponse.json(response);
   } catch (error) {
-    postFetchInProgress = null;
     console.error("Error fetching prices:", error);
 
     // Even on error, try to return the latest DB prices

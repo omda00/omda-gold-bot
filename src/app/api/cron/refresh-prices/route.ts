@@ -90,6 +90,20 @@ export async function GET() {
       await Promise.all(savePromises);
     }
 
+    // Persist the fetch timestamp so /api/prices POST can short-circuit
+    // for the next 60s (DB-based cache shared across Vercel instances).
+    if (allPrices.gold || allPrices.usdEgp) {
+      try {
+        await db.appConfig.upsert({
+          where: { key: "LAST_FETCH_AT" },
+          update: { value: String(Date.now()) },
+          create: { key: "LAST_FETCH_AT", value: String(Date.now()) },
+        });
+      } catch (err) {
+        console.error("[cron/refresh-prices] Failed to persist LAST_FETCH_AT:", err);
+      }
+    }
+
     const gold = await db.priceRecord.findFirst({
       where: { symbol: "GOLD_EGP" },
       orderBy: { createdAt: "desc" },
