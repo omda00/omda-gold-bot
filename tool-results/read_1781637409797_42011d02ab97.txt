@@ -1,0 +1,1157 @@
+     1→import ZAI from "z-ai-web-dev-sdk";
+     2→import { db } from "@/lib/db";
+     3→
+     4→// ==========================================
+     5→// Rate limit protection: If we get a 429,
+     6→// stop trying Z-AI SDK for 60 seconds
+     7→// (reduced from 5 minutes to avoid blocking)
+     8→// ==========================================
+     9→let last429Time = 0;
+    10→const COOLDOWN_AFTER_429 = 60 * 1000; // 1 minute (was 5 min)
+    11→
+    12→function isInCooldown(): boolean {
+    13→  return Date.now() - last429Time < COOLDOWN_AFTER_429;
+    14→}
+    15→
+    16→function mark429(): void {
+    17→  last429Time = Date.now();
+    18→  console.log(`[price-fetcher] ⚠️ Rate limit hit (429). Cooling down Z-AI SDK for 1 minute until ${new Date(last429Time + COOLDOWN_AFTER_429).toLocaleTimeString()}`);
+    19→}
+    20→
+    21→/** Check if an error is a 429 rate limit error and mark cooldown if so */
+    22→function checkAndMark429(error: unknown): void {
+    23→  const msg = error instanceof Error ? error.message : String(error);
+    24→  if (msg.includes("429") || msg.includes("Too many requests")) {
+    25→    mark429();
+    26→  }
+    27→}
+    28→
+    29→/** Reset the rate limit cooldown - useful when we want to force a fresh attempt */
+    30→export function resetRateLimit(): void {
+    31→  last429Time = 0;
+    32→  console.log("[price-fetcher] Rate limit cooldown reset");
+    33→}
+    34→
+    35→export function isRateLimited(): boolean {
+    36→  return isInCooldown();
+    37→}
+    38→
+    39→export interface PriceFetchResult {
+    40→  price: number;
+    41→  source: string;
+    42→  buyPrice?: number;
+    43→  sellPrice?: number;
+    44→}
+    45→
+    46→export interface KaratPriceResult {
+    47→  karat: number;
+    48→  sellPrice: number;
+    49→  buyPrice: number | null;
+    50→  sellWorkmanship: number | null;
+    51→  buyWorkmanship: number | null;
+    52→  changeAmount: number | null;
+    53→  changePercent: number | null;
+    54→}
+    55→
+    56→export interface GoldPoundResult {
+    57→  sellPrice: number | null;
+    58→  buyPrice: number | null;
+    59→  sellWorkmanship: number | null;
+    60→  buyWorkmanship: number | null;
+    61→  changeAmount: number | null;
+    62→  changePercent: number | null;
+    63→}
+    64→
+    65→export interface CombinedPriceResult {
+    66→  gold: PriceFetchResult | null;
+    67→  usdEgp: PriceFetchResult | null;
+    68→  allKarats: KaratPriceResult[];
+    69→  goldPound: GoldPoundResult | null;
+    70→}
+    71→
+    72→export interface KaratPrice {
+    73→  karat: number;
+    74→  sellPrice: number | null;
+    75→  buyPrice: number | null;
+    76→}
+    77→
+    78→export interface GoldPoundPrice {
+    79→  sellPrice: number | null;
+    80→  buyPrice: number | null;
+    81→}
+    82→
+    83→export interface CalculatorPriceResult {
+    84→  karats: KaratPrice[];
+    85→  goldPound: GoldPoundPrice;
+    86→  source: string;
+    87→  fetchedAt: string;
+    88→}
+    89→
+    90→/**
+    91→ * Per-karat extraction result with all iSagha fields
+    92→ */
+    93→interface KaratExtraction {
+    94→  sellPrice: number | null;
+    95→  buyPrice: number | null;
+    96→  sellWorkmanship: number | null;
+    97→  buyWorkmanship: number | null;
+    98→  changeAmount: number | null;
+    99→  changePercent: number | null;
+   100→}
+   101→
+   102→/**
+   103→ * Full extraction result from iSagha HTML
+   104→ */
+   105→interface IsaghaExtractionResult {
+   106→  gold24: KaratExtraction;
+   107→  gold22: KaratExtraction;
+   108→  gold21: KaratExtraction;
+   109→  gold18: KaratExtraction;
+   110→  goldPound: KaratExtraction;
+   111→  silverSell: number | null;
+   112→  silverBuy: number | null;
+   113→  usdEgpRate: number | null;
+   114→}
+   115→
+   116→// ==========================================
+   117→// PRIMARY METHOD: Direct HTTP fetch from iSagha
+   118→// This does NOT use Z-AI SDK and therefore
+   119→// CANNOT be rate-limited. It uses standard
+   120→// Node.js fetch() directly.
+   121→// ==========================================
+   122→
+   123→/**
+   124→ * Fetch iSagha HTML directly via HTTP (no Z-AI SDK, no rate limits)
+   125→ */
+   126→async function fetchIsaghaDirectly(url: string): Promise<string> {
+   127→  try {
+   128→    console.log(`[price-fetcher] 🌐 Direct HTTP fetch: ${url}`);
+   129→    const response = await fetch(url, {
+   130→      signal: AbortSignal.timeout(15000), // 15s timeout
+   131→      headers: {
+   132→        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+   133→        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+   134→        "Accept-Language": "ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+   135→      },
+   136→    });
+   137→
+   138→    if (!response.ok) {
+   139→      console.error(`[price-fetcher] Direct HTTP fetch failed with status ${response.status}`);
+   140→      return "";
+   141→    }
+   142→
+   143→    const html = await response.text();
+   144→    console.log(`[price-fetcher] ✅ Direct HTTP fetch succeeded (${html.length} chars)`);
+   145→    return html;
+   146→  } catch (err) {
+   147→    console.error("[price-fetcher] Direct HTTP fetch error:", err);
+   148→    return "";
+   149→  }
+   150→}
+   151→
+   152→// ==========================================
+   153→// PRIMARY METHOD for USD/EGP: Direct HTTP fetch from Google Finance
+   154→// This does NOT use Z-AI SDK and therefore
+   155→// CANNOT be rate-limited. It uses standard
+   156→// Node.js fetch() directly.
+   157→// ==========================================
+   158→
+   159→/**
+   160→ * Fetch USD/EGP from Google Finance directly via HTTP (no Z-AI SDK, no rate limits).
+   161→ *
+   162→ * Google Finance redirects /finance/quote/USD-EGP → /finance/beta/quote/USD-EGP (302).
+   163→ * We MUST follow redirects AND use Accept-Encoding: gzip, deflate (compressed transfer).
+   164→ *
+   165→ * NOTE: Using Accept-Encoding: identity causes timeouts because the uncompressed
+   166→ * page is ~1MB. With gzip, it takes ~5 seconds instead of timing out.
+   167→ *
+   168→ * The page embeds the price in reliable locations:
+   169→ *  1. A <span jsname="Pdsbrc"> element in the main display area
+   170→ *  2. AF_initDataCallback JavaScript with "USD / EGP" identifier
+   171→ */
+   172→async function fetchUsdEgpFromGoogleFinanceDirect(): Promise<PriceFetchResult | null> {
+   173→  try {
+   174→    console.log("[price-fetcher] 🌐 Direct HTTP fetch: Google Finance USD/EGP...");
+   175→
+   176→    const url = "https://www.google.com/finance/quote/USD-EGP?hl=en";
+   177→
+   178→    const response = await fetch(url, {
+   179→      signal: AbortSignal.timeout(30000), // 30s timeout (page is ~1MB compressed)
+   180→      headers: {
+   181→        "User-Agent":
+   182→          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+   183→        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+   184→        "Accept-Language": "en-US,en;q=0.9",
+   185→        "Accept-Encoding": "gzip, deflate", // CRITICAL: uncompressed is ~1MB, gzip makes it ~5s vs timeout
+   186→        "Cache-Control": "no-cache",
+   187→        Connection: "keep-alive",
+   188→      },
+   189→      redirect: "follow", // CRITICAL: Google 302-redirects to /finance/beta/quote/USD-EGP
+   190→    });
+   191→
+   192→    if (!response.ok) {
+   193→      console.log(`[price-fetcher] Google Finance direct HTTP ${response.status}`);
+   194→      return null;
+   195→    }
+   196→
+   197→    const html = await response.text();
+   198→    console.log(`[price-fetcher] Google Finance page loaded (${html.length} chars)`);
+   199→
+   200→    if (html.length < 1000) {
+   201→      console.log("[price-fetcher] Google Finance returned too little content, likely blocked");
+   202→      return null;
+   203→    }
+   204→
+   205→    // ── Pattern 1: <span jsname="Pdsbrc"> near the main price display ──
+   206→    // This is the MOST reliable pattern. The Pdsbrc span is the main price display
+   207→    // that the user sees on the page. Look for values in the USD/EGP range (40-80).
+   208→    const pdsbrcMatches = [...html.matchAll(/jsname="Pdsbrc"[^>]*>\s*(?:<span[^>]*>)?\s*([0-9.]+)\s*(?:<\/span>)?/g)];
+   209→    for (const match of pdsbrcMatches) {
+   210→      const val = parseFloat(match[1]);
+   211→      if (val > 40 && val < 80) {
+   212→        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (Pdsbrc span): ${val}`);
+   213→        return { price: Math.round(val * 100) / 100, source: "Google Finance" };
+   214→      }
+   215→    }
+   216→
+   217→    // ── Pattern 2: AF_initDataCallback with "USD / EGP" ──
+   218→    // Google embeds the live price in JavaScript data callbacks like:
+   219→    //   AF_initDataCallback({key: 'ds:2', ...data:[[[["/g/11bvv_25bp",null,"USD / EGP",3,null,[51.9795,...
+   220→    // Use .{0,200}? because there ARE digits between "USD / EGP" and the price
+   221→    const usdEgpJsPattern = /"USD\s*\/\s*EGP".{0,200}?\[(5[0-2]\.[0-9]{2,4})/g;
+   222→    let jsMatch;
+   223→    while ((jsMatch = usdEgpJsPattern.exec(html)) !== null) {
+   224→      const rate = parseFloat(jsMatch[1]);
+   225→      if (rate > 40 && rate < 80) {
+   226→        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (JS AF_initDataCallback): ${rate}`);
+   227→        return { price: Math.round(rate * 100) / 100, source: "Google Finance" };
+   228→      }
+   229→    }
+   230→
+   231→    // ── Pattern 3: data-last-price attribute (older Google Finance versions) ──
+   232→    const dataLastPriceMatch = html.match(/data-last-price="([0-9.]+)"/);
+   233→    if (dataLastPriceMatch) {
+   234→      const rate = parseFloat(dataLastPriceMatch[1]);
+   235→      if (rate > 40 && rate < 80) {
+   236→        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (data-last-price): ${rate}`);
+   237→        return { price: Math.round(rate * 100) / 100, source: "Google Finance" };
+   238→      }
+   239→    }
+   240→
+   241→    // ── Pattern 4: "USD / EGP" followed by a number in JS data (without [ requirement) ──
+   242→    const jsUsdEgpMatch = html.match(/"USD\s*\/\s*EGP".{0,200}?(5[0-2]\.[0-9]{2,4})/);
+   243→    if (jsUsdEgpMatch) {
+   244→      const rate = parseFloat(jsUsdEgpMatch[1]);
+   245→      if (rate > 40 && rate < 80) {
+   246→        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (JS data fallback): ${rate}`);
+   247→        return { price: Math.round(rate * 100) / 100, source: "Google Finance" };
+   248→      }
+   249→    }
+   250→
+   251→    console.log("[price-fetcher] Google Finance page loaded but couldn't extract rate");
+   252→  } catch (error) {
+   253→    console.error("[price-fetcher] Google Finance Direct HTTP fetch failed:", error);
+   254→  }
+   255→
+   256→  return null;
+   257→}
+   258→
+   259→/**
+   260→ * Parse a price string like "6931.5 ج.م" or "-11.43 ج.م" or "-0.16%"
+   261→ * Returns the numeric value or null.
+   262→ */
+   263→function parsePriceCell(cell: string): number | null {
+   264→  const cleaned = cell.replace(/[\u200e\u200f]/g, "").trim(); // Remove LRM/RLM markers
+   265→  // Check if it's a percentage
+   266→  const pctMatch = cleaned.match(/(-?\d[\d,]*\.?\d*)\s*%/);
+   267→  if (pctMatch) {
+   268→    const val = parseFloat(pctMatch[1].replace(/,/g, ""));
+   269→    return isNaN(val) ? null : val;
+   270→  }
+   271→  // Check for a number with optional minus sign
+   272→  const numMatch = cleaned.match(/(-?\d[\d,]*\.?\d*)/);
+   273→  if (numMatch) {
+   274→    const val = parseFloat(numMatch[1].replace(/,/g, ""));
+   275→    return isNaN(val) ? null : val;
+   276→  }
+   277→  return null;
+   278→}
+   279→
+   280→/**
+   281→ * Extract karat/gold pound data from a single table row's <td> cells.
+   282→ *
+   283→ * iSagha table format per row (7 cells):
+   284→ *   [0] Name: "عيار 24" or "جنيه ذهب"
+   285→ *   [1] Sell price: "6931.5 ج.م"
+   286→ *   [2] Sell workmanship: "111.5 ج.م"
+   287→ *   [3] Buy price: "6868.5 ج.م"
+   288→ *   [4] Buy workmanship: "62.25 ج.م"
+   289→ *   [5] Change amount: "‎-11.43 ج.م"
+   290→ *   [6] Change percent: "‎-0.16%"
+   291→ */
+   292→function extractKaratFromCells(cells: string[]): KaratExtraction {
+   293→  const emptyKarat: KaratExtraction = {
+   294→    sellPrice: null, buyPrice: null,
+   295→    sellWorkmanship: null, buyWorkmanship: null,
+   296→    changeAmount: null, changePercent: null,
+   297→  };
+   298→
+   299→  if (cells.length < 5) return emptyKarat;
+   300→
+   301→  const sellPrice = parsePriceCell(cells[1]);
+   302→  const sellWork = parsePriceCell(cells[2]);
+   303→  const buyPrice = parsePriceCell(cells[3]);
+   304→  const buyWork = parsePriceCell(cells[4]);
+   305→  const changeAmt = cells.length >= 6 ? parsePriceCell(cells[5]) : null;
+   306→  const changePct = cells.length >= 7 ? parsePriceCell(cells[6]) : null;
+   307→
+   308→  return {
+   309→    sellPrice,
+   310→    buyPrice,
+   311→    sellWorkmanship: sellWork,
+   312→    buyWorkmanship: buyWork,
+   313→    changeAmount: changeAmt,
+   314→    changePercent: changePct,
+   315→  };
+   316→}
+   317→
+   318→/**
+   319→ * PRIMARY SOURCE: Extract gold prices from iSagha (market.isagha.com) HTML content.
+   320→ *
+   321→ * iSagha is the authoritative source for Egyptian gold prices.
+   322→ * It provides real-time, second-by-second updates from Egyptian gold markets.
+   323→ *
+   324→ * We parse the HTML table directly using <td> cells, which is much more
+   325→ * reliable than the old range-based number filtering approach.
+   326→ *
+   327→ * Table structure per row (7 columns):
+   328→ *   عيار [K] | بيع ج.م | صنعة بيع ج.م | شراء ج.م | صنعة شراء ج.م | التغيير ج.م | النسبة %
+   329→ */
+   330→function extractFromIsaghaHtml(html: string): IsaghaExtractionResult {
+   331→  const emptyKarat = (): KaratExtraction => ({
+   332→    sellPrice: null, buyPrice: null,
+   333→    sellWorkmanship: null, buyWorkmanship: null,
+   334→    changeAmount: null, changePercent: null,
+   335→  });
+   336→
+   337→  const result: IsaghaExtractionResult = {
+   338→    gold24: emptyKarat(),
+   339→    gold22: emptyKarat(),
+   340→    gold21: emptyKarat(),
+   341→    gold18: emptyKarat(),
+   342→    goldPound: emptyKarat(),
+   343→    silverSell: null,
+   344→    silverBuy: null,
+   345→    usdEgpRate: null,
+   346→  };
+   347→
+   348→  // === METHOD 1: Parse HTML table rows (<td> cells) ===
+   349→  // This is the most reliable approach — each <td> maps to a specific field.
+   350→  const rows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/g) || [];
+   351→
+   352→  for (const row of rows) {
+   353→    const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
+   354→    const cleanCells = cells.map((c: string) =>
+   355→      c.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+   356→    );
+   357→
+   358→    if (cleanCells.length === 0) continue;
+   359→    const firstCell = cleanCells[0];
+   360→
+   361→    // Match karat rows: "عيار 24", "عيار 22", "عيار 21", "عيار 18"
+   362→    const karatMatch = firstCell.match(/عيار\s*(\d+)/);
+   363→    if (karatMatch) {
+   364→      const karatNum = parseInt(karatMatch[1]);
+   365→      const extracted = extractKaratFromCells(cleanCells);
+   366→
+   367→      if (karatNum === 24) result.gold24 = extracted;
+   368→      else if (karatNum === 22) result.gold22 = extracted;
+   369→      else if (karatNum === 21) result.gold21 = extracted;
+   370→      else if (karatNum === 18) result.gold18 = extracted;
+   371→      continue;
+   372→    }
+   373→
+   374→    // Match gold pound row: "جنيه ذهب"
+   375→    if (firstCell.includes("جنيه ذهب")) {
+   376→      result.goldPound = extractKaratFromCells(cleanCells);
+   377→      continue;
+   378→    }
+   379→  }
+   380→
+   381→  // === METHOD 2 (FALLBACK): Text-based extraction if table parsing failed ===
+   382→  // This handles cases where the HTML structure is different
+   383→  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+   384→
+   385→  // If table parsing didn't get 21K data, fall back to range-based extraction
+   386→  if (!result.gold21.sellPrice) {
+   387→    console.log("[price-fetcher] Table parsing didn't find gold data, falling back to text extraction...");
+   388→
+   389→    const karatConfigs = [
+   390→      { name: "24", minPrice: 6500, maxPrice: 10000, minWork: 50, maxWork: 500 },
+   391→      { name: "22", minPrice: 5500, maxPrice: 8500, minWork: 50, maxWork: 400 },
+   392→      { name: "21", minPrice: 5500, maxPrice: 8000, minWork: 50, maxWork: 400 },
+   393→      { name: "18", minPrice: 4500, maxPrice: 7000, minWork: 40, maxWork: 300 },
+   394→    ];
+   395→
+   396→    for (const section of karatConfigs) {
+   397→      const marker = `عيار ${section.name}`;
+   398→      const idx = text.indexOf(marker);
+   399→      if (idx < 0) continue;
+   400→
+   401→      let endIdx = idx + 300;
+   402→      for (const other of karatConfigs) {
+   403→        if (other.name === section.name) continue;
+   404→        const otherIdx = text.indexOf(`عيار ${other.name}`, idx + marker.length);
+   405→        if (otherIdx > idx && otherIdx < endIdx) endIdx = otherIdx;
+   406→      }
+   407→      const coinIdx = text.indexOf("جنيه ذهب", idx + marker.length);
+   408→      if (coinIdx > idx && coinIdx < endIdx) endIdx = coinIdx;
+   409→
+   410→      const chunk = text.substring(idx, endIdx);
+   411→      const numbers = chunk.match(/-?\d[\d,]*\.?\d*/g) || [];
+   412→      const parsed = numbers.map((n) => parseFloat(n.replace(/,/g, ""))).filter((n) => !isNaN(n));
+   413→
+   414→      const prices = parsed.filter((v) => v >= section.minPrice && v <= section.maxPrice);
+   415→      const work = parsed.filter((v) => v >= section.minWork && v <= section.maxWork);
+   416→      const changes = parsed.filter((v) => v > -50 && v < 50 && v !== 0);
+   417→
+   418→      const karatResult: KaratExtraction = {
+   419→        sellPrice: prices[0] ?? null,
+   420→        buyPrice: prices[1] ?? null,
+   421→        sellWorkmanship: work[0] ?? null,
+   422→        buyWorkmanship: work[1] ?? null,
+   423→        changeAmount: changes[0] ?? null,
+   424→        changePercent: changes[1] ?? null,
+   425→      };
+   426→
+   427→      if (section.name === "24") result.gold24 = karatResult;
+   428→      else if (section.name === "22") result.gold22 = karatResult;
+   429→      else if (section.name === "21") result.gold21 = karatResult;
+   430→      else if (section.name === "18") result.gold18 = karatResult;
+   431→    }
+   432→
+   433→    // Gold pound fallback
+   434→    if (!result.goldPound.sellPrice) {
+   435→      const gpIdx = text.indexOf("جنيه ذهب");
+   436→      if (gpIdx >= 0) {
+   437→        let gpEndIdx = text.indexOf("أوقية", gpIdx);
+   438→        if (gpEndIdx < 0 || gpEndIdx > gpIdx + 400) gpEndIdx = gpIdx + 400;
+   439→        const gpChunk = text.substring(gpIdx, gpEndIdx);
+   440→        const gpNumbers = gpChunk.match(/-?\d[\d,]*\.?\d*/g) || [];
+   441→        const gpParsed = gpNumbers.map((n) => parseFloat(n.replace(/,/g, ""))).filter((n) => !isNaN(n));
+   442→        const gpPrices = gpParsed.filter((v) => v >= 30000 && v <= 80000);
+   443→        const gpWork = gpParsed.filter((v) => v >= 300 && v <= 3000);
+   444→        result.goldPound = {
+   445→          sellPrice: gpPrices[0] ?? null,
+   446→          buyPrice: gpPrices[1] ?? null,
+   447→          sellWorkmanship: gpWork[0] ?? null,
+   448→          buyWorkmanship: gpWork[1] ?? null,
+   449→          changeAmount: null,
+   450→          changePercent: null,
+   451→        };
+   452→      }
+   453→    }
+   454→  }
+   455→
+   456→  // === Extract Silver price ===
+   457→  const silverPatterns = [
+   458→    /السعر المحلى للفضة\s*([0-9,]+\.?\d*)\s*ج\.?م/,
+   459→    /سعر الفضة[^0-9]*?([0-9,]+\.?\d*)\s*ج\.?م/,
+   460→  ];
+   461→  for (const pattern of silverPatterns) {
+   462→    const match = text.match(pattern);
+   463→    if (match) {
+   464→      const price = parseFloat(match[1].replace(/,/g, ""));
+   465→      if (price >= 50 && price <= 500) {
+   466→        result.silverSell = price;
+   467→        break;
+   468→      }
+   469→    }
+   470→  }
+   471→
+   472→  // === Extract USD/EGP rate from iSagha (if available) ===
+   473→  const usdPatterns = [
+   474→    /(?:دولار أمريكي|الدولار الأمريكي|USD)[^0-9]*?([0-9]+\.[0-9]+)/i,
+   475→    /(?:USD|دولار)[^0-9]*?([5][0-9]\.[0-9]+)/i,
+   476→  ];
+   477→
+   478→  for (const pattern of usdPatterns) {
+   479→    const usdMatch = text.match(pattern);
+   480→    if (usdMatch) {
+   481→      const rate = parseFloat(usdMatch[1]);
+   482→      if (rate > 40 && rate < 80) {
+   483→        result.usdEgpRate = rate;
+   484→        break;
+   485→      }
+   486→    }
+   487→  }
+   488→
+   489→  return result;
+   490→}
+   491→
+   492→/**
+   493→ * Fallback: Fetch USD/EGP from a free exchange rate API.
+   494→ * This doesn't use Z-AI SDK so it's not subject to rate limiting.
+   495→ * Used when Google Finance is unavailable due to rate limits.
+   496→ */
+   497→async function fetchUsdEgpFromFreeApi(): Promise<PriceFetchResult | null> {
+   498→  try {
+   499→    console.log("[price-fetcher] Fetching USD/EGP from free exchange rate API (open.er-api.com)...");
+   500→    const response = await fetch("https://open.er-api.com/v6/latest/USD", {
+   501→      signal: AbortSignal.timeout(10000), // 10s timeout
+   502→    });
+   503→    if (!response.ok) {
+   504→      console.error(`[price-fetcher] Free API returned status ${response.status}`);
+   505→      return null;
+   506→    }
+   507→    const data = await response.json() as { rates?: Record<string, number>; result?: string };
+   508→    const egpRate = data?.rates?.EGP;
+   509→    if (egpRate && egpRate > 40 && egpRate < 80) {
+   510→      console.log(`[price-fetcher] ✅ Got USD/EGP from free exchange API: ${egpRate}`);
+   511→      return { price: Math.round(egpRate * 100) / 100, source: "Exchange Rate API" };
+   512→    }
+   513→  } catch (err) {
+   514→    console.error("[price-fetcher] Free exchange API failed:", err);
+   515→  }
+   516→  return null;
+   517→}
+   518→
+   519→/**
+   520→ * SECONDARY: Fetch USD/EGP from Google Finance via Z-AI SDK
+   521→ * Only used when free API fails and we're not rate-limited
+   522→ */
+   523→async function fetchUsdEgpFromGoogleFinance(zai: ZAI.ZAI): Promise<PriceFetchResult | null> {
+   524→  // Skip if we're in rate limit cooldown
+   525→  if (isInCooldown()) {
+   526→    console.log("[price-fetcher] ⏸️ Skipping Google Finance — Z-AI SDK in cooldown");
+   527→    return null;
+   528→  }
+   529→
+   530→  try {
+   531→    console.log("[price-fetcher] Fetching USD/EGP from Google Finance (Z-AI SDK)...");
+   532→
+   533→    // Strategy 1: Direct page_reader from Google Finance
+   534→    try {
+   535→      const gfResult = await zai.functions.invoke("page_reader", {
+   536→        url: "https://www.google.com/finance/quote/USD-EGP?hl=en",
+   537→      });
+   538→
+   539→      const gfHtml = gfResult?.data?.html || "";
+   540→
+   541→      // Pattern A: JS data with "USD / EGP" (most reliable)
+   542→      const jsPattern = /"USD\s*\/\s*EGP".{0,200}?\[(5[0-2]\.[0-9]{2,4})/g;
+   543→      let jsM;
+   544→      while ((jsM = jsPattern.exec(gfHtml)) !== null) {
+   545→        const rate = parseFloat(jsM[1]);
+   546→        if (rate > 40 && rate < 80) {
+   547→          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance SDK (JS data): ${rate}`);
+   548→          return { price: Math.round(rate * 100) / 100, source: "Google Finance" };
+   549→        }
+   550→      }
+   551→
+   552→      // Pattern B: Pdsbrc span
+   553→      const pdsbrcMatches = [...gfHtml.matchAll(/jsname="Pdsbrc"[^>]*>\s*(?:<span[^>]*>)?\s*([0-9.]+)\s*(?:<\/span>)?/g)];
+   554→      for (const match of pdsbrcMatches) {
+   555→        const val = parseFloat(match[1]);
+   556→        if (val > 40 && val < 80) {
+   557→          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance SDK (Pdsbrc span): ${val}`);
+   558→          return { price: Math.round(val * 100) / 100, source: "Google Finance" };
+   559→        }
+   560→      }
+   561→
+   562→      // Pattern C: data-last-price (older versions)
+   563→      const dataLastPriceMatch = gfHtml.match(/data-last-price="([0-9.]+)"/);
+   564→      if (dataLastPriceMatch) {
+   565→        const rate = parseFloat(dataLastPriceMatch[1]);
+   566→        if (rate > 40 && rate < 80) {
+   567→          console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance SDK (data-last-price): ${rate}`);
+   568→          return { price: Math.round(rate * 100) / 100, source: "Google Finance" };
+   569→        }
+   570→      }
+   571→    } catch (pageErr) {
+   572→      console.error("[price-fetcher] Google Finance page_reader failed:", pageErr);
+   573→      checkAndMark429(pageErr);
+   574→    }
+   575→  } catch (error) {
+   576→    console.error("[price-fetcher] Google Finance fetch failed:", error);
+   577→    checkAndMark429(error);
+   578→  }
+   579→
+   580→  return null;
+   581→}
+   582→
+   583→/**
+   584→ * Fetch BOTH gold price and USD/EGP rate.
+   585→ *
+   586→ * STRATEGY (in priority order):
+   587→ * 1. DIRECT HTTP: iSagha.com for gold prices — NO rate limits!
+   588→ * 2. DIRECT HTTP: Google Finance for USD/EGP — NO rate limits! (follows redirects)
+   589→ * 3. Z-AI SDK: Google Finance via page_reader (backup, may be rate-limited)
+   590→ * 4. Free API: USD/EGP from open.er-api.com — NO rate limits! (labeled "Exchange Rate API")
+   591→ * 5. Z-AI SDK: iSagha via page_reader (backup for gold, may be rate-limited)
+   592→ * 6. Z-AI SDK: banklive.net (backup for both, may be rate-limited)
+   593→ * 7. Z-AI SDK: web_search + LLM (last resort, may be rate-limited)
+   594→ */
+   595→export async function fetchAllPrices(): Promise<CombinedPriceResult> {
+   596→  const combinedResult: CombinedPriceResult = {
+   597→    gold: null,
+   598→    usdEgp: null,
+   599→    allKarats: [],
+   600→    goldPound: null,
+   601→  };
+   602→
+   603→  // ==========================================
+   604→  // METHOD 1 (PRIMARY): Direct HTTP fetch from iSagha
+   605→  // This does NOT use Z-AI SDK — CANNOT be rate limited!
+   606→  // ==========================================
+   607→  try {
+   608→    console.log("[price-fetcher] 🥇 PRIMARY: Fetching gold prices from iSagha.com via DIRECT HTTP...");
+   609→    const isaghaHtml = await fetchIsaghaDirectly("https://market.isagha.com/prices");
+   610→
+   611→    if (isaghaHtml) {
+   612→      const isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+   613→
+   614→      if (isaghaPrices.gold21.sellPrice && isaghaPrices.gold21.sellPrice > 0) {
+   615→        combinedResult.gold = {
+   616→          price: isaghaPrices.gold21.sellPrice,
+   617→          source: "iSagha.com",
+   618→          buyPrice: isaghaPrices.gold21.buyPrice || undefined,
+   619→          sellPrice: isaghaPrices.gold21.sellPrice,
+   620→        };
+   621→        console.log(
+   622→          `[price-fetcher] ✅ Got gold from iSagha (direct): sell=${isaghaPrices.gold21.sellPrice}, buy=${isaghaPrices.gold21.buyPrice}`
+   623→        );
+   624→      }
+   625→
+   626→      // Extract all karat prices with workmanship and change from iSagha
+   627→      const karatData: { karat: number; data: KaratExtraction }[] = [
+   628→        { karat: 24, data: isaghaPrices.gold24 },
+   629→        { karat: 22, data: isaghaPrices.gold22 },
+   630→        { karat: 21, data: isaghaPrices.gold21 },
+   631→        { karat: 18, data: isaghaPrices.gold18 },
+   632→      ];
+   633→      for (const k of karatData) {
+   634→        if (k.data.sellPrice && k.data.sellPrice > 0) {
+   635→          combinedResult.allKarats.push({
+   636→            karat: k.karat,
+   637→            sellPrice: k.data.sellPrice,
+   638→            buyPrice: k.data.buyPrice,
+   639→            sellWorkmanship: k.data.sellWorkmanship,
+   640→            buyWorkmanship: k.data.buyWorkmanship,
+   641→            changeAmount: k.data.changeAmount,
+   642→            changePercent: k.data.changePercent,
+   643→          });
+   644→        }
+   645→      }
+   646→
+   647→      // Extract gold pound prices with workmanship and change from iSagha
+   648→      if (isaghaPrices.goldPound.sellPrice && isaghaPrices.goldPound.sellPrice > 0) {
+   649→        combinedResult.goldPound = {
+   650→          sellPrice: isaghaPrices.goldPound.sellPrice,
+   651→          buyPrice: isaghaPrices.goldPound.buyPrice,
+   652→          sellWorkmanship: isaghaPrices.goldPound.sellWorkmanship,
+   653→          buyWorkmanship: isaghaPrices.goldPound.buyWorkmanship,
+   654→          changeAmount: isaghaPrices.goldPound.changeAmount,
+   655→          changePercent: isaghaPrices.goldPound.changePercent,
+   656→        };
+   657→      }
+   658→
+   659→      console.log(`[price-fetcher] ✅ Extracted ${combinedResult.allKarats.length} karat prices + gold pound from iSagha (direct)`);
+   660→
+   661→      // NOTE: We do NOT use iSagha for USD/EGP — user wants Google Finance as the primary source
+   662→      // iSagha USD/EGP rate is stored only as reference info
+   663→      if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
+   664→        console.log(`[price-fetcher] iSagha USD/EGP rate available (${isaghaPrices.usdEgpRate}) but using Google Finance as primary source`);
+   665→      }
+   666→    }
+   667→  } catch (directErr) {
+   668→    console.error("[price-fetcher] ❌ Direct iSagha HTTP fetch failed:", directErr);
+   669→  }
+   670→
+   671→  // ==========================================
+   672→  // METHOD 2 (PRIMARY for USD/EGP): Google Finance Direct HTTP
+   673→  // User specifically requested Google Finance as the source for USD/EGP
+   674→  // This does NOT use Z-AI SDK — CANNOT be rate limited!
+   675→  // ==========================================
+   676→  if (!combinedResult.usdEgp) {
+   677→    const gfDirectResult = await fetchUsdEgpFromGoogleFinanceDirect();
+   678→    if (gfDirectResult) {
+   679→      combinedResult.usdEgp = gfDirectResult;
+   680→      console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Direct (PRIMARY): ${gfDirectResult.price}`);
+   681→    }
+   682→  }
+   683→
+   684→  // ==========================================
+   685→  // METHOD 3 (FALLBACK for USD/EGP): Google Finance via Z-AI SDK
+   686→  // If direct HTTP didn't work (e.g., Google blocked), try Z-AI SDK
+   687→  // ==========================================
+   688→  if (!combinedResult.usdEgp && !isInCooldown()) {
+   689→    try {
+   690→      const zai = await ZAI.create();
+   691→      const gfResult = await fetchUsdEgpFromGoogleFinance(zai);
+   692→      if (gfResult) {
+   693→        combinedResult.usdEgp = gfResult;
+   694→        console.log(`[price-fetcher] ✅ Got USD/EGP from Google Finance Z-AI SDK: ${gfResult.price}`);
+   695→      }
+   696→    } catch (error) {
+   697→      console.error("[price-fetcher] Google Finance Z-AI SDK fetch failed:", error);
+   698→      checkAndMark429(error);
+   699→    }
+   700→  }
+   701→
+   702→  // ==========================================
+   703→  // METHOD 4 (FALLBACK for USD/EGP): Free Exchange Rate API
+   704→  // This does NOT use Z-AI SDK — CANNOT be rate limited!
+   705→  // Used when Google Finance is completely unavailable
+   706→  // ==========================================
+   707→  if (!combinedResult.usdEgp) {
+   708→    const freeApiResult = await fetchUsdEgpFromFreeApi();
+   709→    if (freeApiResult) {
+   710→      combinedResult.usdEgp = freeApiResult;
+   711→      console.log(`[price-fetcher] ✅ Got USD/EGP from free API fallback: ${freeApiResult.price}`);
+   712→    }
+   713→  }
+   714→
+   715→  // If we got both gold and USD/EGP, return immediately!
+   716→  if (combinedResult.gold && combinedResult.usdEgp) {
+   717→    console.log("[price-fetcher] ✅ Got gold (iSagha) + USD/EGP (Google Finance/Free API)");
+   718→    return combinedResult;
+   719→  }
+   720→
+   721→  // ==========================================
+   722→  // METHOD 3 (FALLBACK): Z-AI SDK for iSagha
+   723→  // Only if direct HTTP failed AND we're not rate-limited
+   724→  // ==========================================
+   725→  if (!combinedResult.gold && !isInCooldown()) {
+   726→    try {
+   727→      console.log("[price-fetcher] 🔄 FALLBACK: Fetching gold from iSagha via Z-AI SDK page_reader...");
+   728→      const zai = await ZAI.create();
+   729→
+   730→      const isaghaResult = await zai.functions.invoke("page_reader", {
+   731→        url: "https://market.isagha.com/prices",
+   732→      });
+   733→
+   734→      const isaghaHtml = isaghaResult?.data?.html || "";
+   735→      if (isaghaHtml) {
+   736→        const isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+   737→
+   738→        if (isaghaPrices.gold21.sellPrice && isaghaPrices.gold21.sellPrice > 0) {
+   739→          combinedResult.gold = {
+   740→            price: isaghaPrices.gold21.sellPrice,
+   741→            source: "iSagha.com (SDK)",
+   742→            buyPrice: isaghaPrices.gold21.buyPrice || undefined,
+   743→            sellPrice: isaghaPrices.gold21.sellPrice,
+   744→          };
+   745→          console.log(
+   746→            `[price-fetcher] ✅ Got gold from iSagha (SDK): sell=${isaghaPrices.gold21.sellPrice}, buy=${isaghaPrices.gold21.buyPrice}`
+   747→          );
+   748→        }
+   749→
+   750→        // Extract karat prices if not already present
+   751→        if (combinedResult.allKarats.length === 0) {
+   752→          const karatData: { karat: number; data: KaratExtraction }[] = [
+   753→            { karat: 24, data: isaghaPrices.gold24 },
+   754→            { karat: 22, data: isaghaPrices.gold22 },
+   755→            { karat: 21, data: isaghaPrices.gold21 },
+   756→            { karat: 18, data: isaghaPrices.gold18 },
+   757→          ];
+   758→          for (const k of karatData) {
+   759→            if (k.data.sellPrice && k.data.sellPrice > 0) {
+   760→              combinedResult.allKarats.push({
+   761→                karat: k.karat,
+   762→                sellPrice: k.data.sellPrice,
+   763→                buyPrice: k.data.buyPrice,
+   764→                sellWorkmanship: k.data.sellWorkmanship,
+   765→                buyWorkmanship: k.data.buyWorkmanship,
+   766→                changeAmount: k.data.changeAmount,
+   767→                changePercent: k.data.changePercent,
+   768→              });
+   769→            }
+   770→          }
+   771→        }
+   772→
+   773→        // Extract gold pound if not already present
+   774→        if (!combinedResult.goldPound && isaghaPrices.goldPound.sellPrice && isaghaPrices.goldPound.sellPrice > 0) {
+   775→          combinedResult.goldPound = {
+   776→            sellPrice: isaghaPrices.goldPound.sellPrice,
+   777→            buyPrice: isaghaPrices.goldPound.buyPrice,
+   778→            sellWorkmanship: isaghaPrices.goldPound.sellWorkmanship,
+   779→            buyWorkmanship: isaghaPrices.goldPound.buyWorkmanship,
+   780→            changeAmount: isaghaPrices.goldPound.changeAmount,
+   781→            changePercent: isaghaPrices.goldPound.changePercent,
+   782→          };
+   783→        }
+   784→
+   785→        // NOTE: Skip iSagha USD/EGP — Google Finance is the primary source per user request
+   786→        if (isaghaPrices.usdEgpRate && isaghaPrices.usdEgpRate > 0) {
+   787→          console.log(`[price-fetcher] iSagha SDK USD/EGP available (${isaghaPrices.usdEgpRate}) but using Google Finance as primary`);
+   788→        }
+   789→      }
+   790→    } catch (pageError) {
+   791→      console.error("[price-fetcher] ❌ iSagha Z-AI SDK page_reader failed:", pageError);
+   792→      checkAndMark429(pageError);
+   793→    }
+   794→  }
+   795→
+   796→  if (combinedResult.gold && combinedResult.usdEgp) {
+   797→    return combinedResult;
+   798→  }
+   799→
+   800→  // ==========================================
+   801→  // METHOD 5 (LAST RESORT): banklive.net via Z-AI SDK
+   802→  // ==========================================
+   803→  if ((!combinedResult.gold || !combinedResult.usdEgp) && !isInCooldown()) {
+   804→    try {
+   805→      const zai = await ZAI.create();
+   806→      console.log("[price-fetcher] 🔄 LAST RESORT: banklive.net...");
+   807→      const bankliveResult = await zai.functions.invoke("page_reader", {
+   808→        url: "https://banklive.net/ar/gold-price-today-in-egypt",
+   809→      });
+   810→
+   811→      const html = bankliveResult?.data?.html || "";
+   812→      if (html) {
+   813→        const banklivePrices = extractFromBankliveHtml(html);
+   814→
+   815→        if (!combinedResult.gold && banklivePrices.gold21Sell && banklivePrices.gold21Sell > 0) {
+   816→          combinedResult.gold = {
+   817→            price: banklivePrices.gold21Sell,
+   818→            source: "banklive.net",
+   819→            buyPrice: banklivePrices.gold21Buy || undefined,
+   820→            sellPrice: banklivePrices.gold21Sell,
+   821→          };
+   822→        }
+   823→
+   824→        if (!combinedResult.usdEgp && banklivePrices.usdEgpSell && banklivePrices.usdEgpSell > 0) {
+   825→          combinedResult.usdEgp = {
+   826→            price: banklivePrices.usdEgpSell,
+   827→            source: "banklive.net",
+   828→          };
+   829→        }
+   830→      }
+   831→    } catch (pageError) {
+   832→      console.error("[price-fetcher] banklive.net failed:", pageError);
+   833→      checkAndMark429(pageError);
+   834→    }
+   835→  }
+   836→
+   837→  if (combinedResult.gold && combinedResult.usdEgp) {
+   838→    return combinedResult;
+   839→  }
+   840→
+   841→  // ==========================================
+   842→  // METHOD 6 (FINAL): Broader web search + LLM
+   843→  // ==========================================
+   844→  if ((!combinedResult.gold || !combinedResult.usdEgp) && !isInCooldown()) {
+   845→    try {
+   846→      const zai = await ZAI.create();
+   847→      console.log("[price-fetcher] 🔄 FINAL: web search + LLM...");
+   848→      const searchResults = await zai.functions.invoke("web_search", {
+   849→        query: "سعر الذهب عيار 21 في مصر اليوم من iSagha جنيه مصري وسعر الدولار",
+   850→        num: 5,
+   851→      });
+   852→
+   853→      const searchText =
+   854→        typeof searchResults === "string"
+   855→          ? searchResults
+   856→          : JSON.stringify(searchResults);
+   857→
+   858→      const truncatedSearch = searchText.substring(0, 3000);
+   859→
+   860→      const completion = await zai.chat.completions.create({
+   861→        model: "glm-4",
+   862→        messages: [
+   863→          {
+   864→            role: "system",
+   865→            content:
+   866→              "Extract from search results: 1) Gold 21K sell price per gram in EGP (5000-8000 range), 2) Gold 21K buy price in EGP, 3) USD/EGP exchange rate (45-60 range). Return ONLY JSON: {\"gold21Sell\": number, \"gold21Buy\": number|null, \"usdEgpRate\": number, \"source\": \"string\"}. If not found, use null.",
+   867→          },
+   868→          {
+   869→            role: "user",
+   870→            content: `Search results:\n${truncatedSearch}`,
+   871→          },
+   872→        ],
+   873→      });
+   874→
+   875→      const content = completion.choices?.[0]?.message?.content || "";
+   876→      const parsed = extractJsonFromText(content);
+   877→      if (parsed) {
+   878→        if (
+   879→          !combinedResult.gold &&
+   880→          typeof parsed.gold21Sell === "number" &&
+   881→          parsed.gold21Sell > 0
+   882→        ) {
+   883→          combinedResult.gold = {
+   884→            price: parsed.gold21Sell,
+   885→            source: parsed.source || "web_search+LLM",
+   886→            buyPrice:
+   887→              typeof parsed.gold21Buy === "number"
+   888→                ? parsed.gold21Buy
+   889→                : undefined,
+   890→            sellPrice: parsed.gold21Sell,
+   891→          };
+   892→        }
+   893→        if (
+   894→          !combinedResult.usdEgp &&
+   895→          typeof parsed.usdEgpRate === "number" &&
+   896→          parsed.usdEgpRate > 0
+   897→        ) {
+   898→          combinedResult.usdEgp = {
+   899→            price: parsed.usdEgpRate,
+   900→            source: parsed.source || "web_search+LLM",
+   901→          };
+   902→        }
+   903→      }
+   904→    } catch (llmError) {
+   905→      console.error("[price-fetcher] LLM extraction failed:", llmError);
+   906→      checkAndMark429(llmError);
+   907→    }
+   908→  }
+   909→
+   910→  return combinedResult;
+   911→}
+   912→
+   913→/**
+   914→ * Fetch calculator prices: all karats, gold pound, and silver from iSagha.
+   915→ * Uses BOTH direct HTTP and the calculator page for complete data.
+   916→ */
+   917→export async function fetchCalculatorPrices(): Promise<CalculatorPriceResult> {
+   918→  const emptyResult: CalculatorPriceResult = {
+   919→    karats: [
+   920→      { karat: 24, sellPrice: null, buyPrice: null },
+   921→      { karat: 22, sellPrice: null, buyPrice: null },
+   922→      { karat: 21, sellPrice: null, buyPrice: null },
+   923→      { karat: 18, sellPrice: null, buyPrice: null },
+   924→    ],
+   925→    goldPound: { sellPrice: null, buyPrice: null },
+   926→    source: "",
+   927→    fetchedAt: new Date().toISOString(),
+   928→  };
+   929→
+   930→  // PRIMARY: Direct HTTP fetch from iSagha prices page
+   931→  let isaghaPrices: IsaghaExtractionResult | null = null;
+   932→  try {
+   933→    console.log("[calculator] PRIMARY: Fetching prices from iSagha.com via DIRECT HTTP...");
+   934→    const isaghaHtml = await fetchIsaghaDirectly("https://market.isagha.com/prices");
+   935→    if (isaghaHtml) {
+   936→      isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+   937→    }
+   938→  } catch (err) {
+   939→    console.error("[calculator] Direct iSagha HTTP fetch failed:", err);
+   940→  }
+   941→
+   942→  // Also try the calculator page via direct HTTP
+   943→  try {
+   944→    console.log("[calculator] Fetching additional data from iSagha.com/calculateGoldPrice via DIRECT HTTP...");
+   945→    const calcHtml = await fetchIsaghaDirectly("https://market.isagha.com/calculateGoldPrice");
+   946→    if (calcHtml && !isaghaPrices) {
+   947→      isaghaPrices = extractFromIsaghaHtml(calcHtml);
+   948→    }
+   949→  } catch (err) {
+   950→    console.error("[calculator] Direct iSagha calculator page HTTP fetch failed:", err);
+   951→  }
+   952→
+   953→  // FALLBACK: Z-AI SDK if direct HTTP didn't work
+   954→  if (!isaghaPrices && !isInCooldown()) {
+   955→    try {
+   956→      console.log("[calculator] FALLBACK: Fetching from iSagha via Z-AI SDK...");
+   957→      const zai = await ZAI.create();
+   958→      const isaghaResult = await zai.functions.invoke("page_reader", {
+   959→        url: "https://market.isagha.com/prices",
+   960→      });
+   961→      const isaghaHtml = isaghaResult?.data?.html || "";
+   962→      if (isaghaHtml) {
+   963→        isaghaPrices = extractFromIsaghaHtml(isaghaHtml);
+   964→      }
+   965→    } catch (err) {
+   966→      console.error("[calculator] iSagha Z-AI SDK failed:", err);
+   967→      checkAndMark429(err);
+   968→    }
+   969→  }
+   970→
+   971→  if (!isaghaPrices) {
+   972→    return emptyResult;
+   973→  }
+   974→
+   975→  // Build the karats array
+   976→  const karatMap: Record<number, KaratExtraction> = {
+   977→    24: isaghaPrices.gold24,
+   978→    22: isaghaPrices.gold22,
+   979→    21: isaghaPrices.gold21,
+   980→    18: isaghaPrices.gold18,
+   981→  };
+   982→
+   983→  const karats: KaratPrice[] = [24, 22, 21, 18].map((k) => ({
+   984→    karat: k,
+   985→    sellPrice: karatMap[k]?.sellPrice ?? null,
+   986→    buyPrice: karatMap[k]?.buyPrice ?? null,
+   987→  }));
+   988→
+   989→  return {
+   990→    karats,
+   991→    goldPound: {
+   992→      sellPrice: isaghaPrices.goldPound.sellPrice,
+   993→      buyPrice: isaghaPrices.goldPound.buyPrice,
+   994→    },
+   995→    source: "iSagha.com",
+   996→    fetchedAt: new Date().toISOString(),
+   997→  };
+   998→}
+   999→
+  1000→/**
+  1001→ * Extract prices from banklive.net HTML content.
+  1002→ * Used as a fallback when iSagha is unavailable.
+  1003→ */
+  1004→function extractFromBankliveHtml(html: string): {
+  1005→  gold21Sell: number | null;
+  1006→  gold21Buy: number | null;
+  1007→  usdEgpSell: number | null;
+  1008→  usdEgpBuy: number | null;
+  1009→} {
+  1010→  const result = {
+  1011→    gold21Sell: null as number | null,
+  1012→    gold21Buy: null as number | null,
+  1013→    usdEgpSell: null as number | null,
+  1014→    usdEgpBuy: null as number | null,
+  1015→  };
+  1016→
+  1017→  const tableBody = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
+  1018→  if (!tableBody) return result;
+  1019→
+  1020→  const rows = tableBody[1].match(/<tr>([\s\S]*?)<\/tr>/g) || [];
+  1021→
+  1022→  for (const row of rows) {
+  1023→    const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
+  1024→    const cleanCells = cells.map((c: string) =>
+  1025→      c.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+  1026→    );
+  1027→
+  1028→    const rowText = cleanCells.join(" ");
+  1029→
+  1030→    if (rowText.includes("عيار 21") || rowText.includes("21 karat")) {
+  1031→      const numbers = rowText.match(/\d[\d,]*\.?\d*/g) || [];
+  1032→      for (const num of numbers) {
+  1033→        const val = parseFloat(num.replace(/,/g, ""));
+  1034→        if (val >= 5000 && val <= 15000) {
+  1035→          if (!result.gold21Sell) {
+  1036→            result.gold21Sell = val;
+  1037→          } else if (!result.gold21Buy) {
+  1038→            result.gold21Buy = val;
+  1039→          }
+  1040→        }
+  1041→      }
+  1042→    }
+  1043→
+  1044→    if (
+  1045→      (rowText.includes("USD/EGP") || rowText.includes("الدولار الأمريكي")) &&
+  1046→      !rowText.includes("الكندي")
+  1047→    ) {
+  1048→      const numbers = rowText.match(/\d[\d,]*\.?\d*/g) || [];
+  1049→      for (const num of numbers) {
+  1050→        const val = parseFloat(num.replace(/,/g, ""));
+  1051→        if (val >= 40 && val <= 80) {
+  1052→          if (!result.usdEgpSell) {
+  1053→            result.usdEgpSell = val;
+  1054→          } else if (!result.usdEgpBuy) {
+  1055→            result.usdEgpBuy = val;
+  1056→          }
+  1057→        }
+  1058→      }
+  1059→    }
+  1060→  }
+  1061→
+  1062→  return result;
+  1063→}
+  1064→
+  1065→/**
+  1066→ * Fetch the current USD/EGP exchange rate.
+  1067→ */
+  1068→export async function fetchUsdEgpRate(): Promise<PriceFetchResult> {
+  1069→  const allPrices = await fetchAllPrices();
+  1070→  if (allPrices.usdEgp) return allPrices.usdEgp;
+  1071→  throw new Error("Could not extract USD/EGP rate from any source");
+  1072→}
+  1073→
+  1074→/**
+  1075→ * Fetch the current gold price per gram (21 karat) in EGP.
+  1076→ */
+  1077→export async function fetchGoldEgpPrice(): Promise<PriceFetchResult> {
+  1078→  const allPrices = await fetchAllPrices();
+  1079→  if (allPrices.gold) return allPrices.gold;
+  1080→  throw new Error("Could not extract gold price in EGP from iSagha.com");
+  1081→}
+  1082→
+  1083→/**
+  1084→ * Save a price record to the database and calculate change from previous
+  1085→ */
+  1086→export async function savePriceRecord(
+  1087→  symbol: string,
+  1088→  price: number,
+  1089→  currency: string,
+  1090→  source: string,
+  1091→  extras?: { buyPrice?: number; sellPrice?: number; sellWorkmanship?: number; buyWorkmanship?: number; changeAmount?: number; changePercent?: number }
+  1092→) {
+  1093→  const previous = await db.priceRecord.findFirst({
+  1094→    where: { symbol },
+  1095→    orderBy: { createdAt: "desc" },
+  1096→  });
+  1097→
+  1098→  // Use iSagha's change data if provided, otherwise calculate from previous record
+  1099→  const changePercent = extras?.changePercent !== undefined && extras.changePercent !== null
+  1100→    ? extras.changePercent
+  1101→    : previous
+  1102→      ? Math.round((((price - previous.price) / previous.price) * 100) * 100) / 100
+  1103→      : 0;
+  1104→
+  1105→  const changeAmount = extras?.changeAmount !== undefined && extras.changeAmount !== null
+  1106→    ? extras.changeAmount
+  1107→    : previous
+  1108→      ? Math.round((price - previous.price) * 100) / 100
+  1109→      : 0;
+  1110→
+  1111→  return db.priceRecord.create({
+  1112→    data: {
+  1113→      symbol,
+  1114→      price,
+  1115→      currency,
+  1116→      change: Math.round(changePercent * 100) / 100,
+  1117→      changeAmount: Math.round(changeAmount * 100) / 100,
+  1118→      source,
+  1119→      buyPrice: extras?.buyPrice ?? null,
+  1120→      sellPrice: extras?.sellPrice ?? null,
+  1121→      sellWorkmanship: extras?.sellWorkmanship ?? null,
+  1122→      buyWorkmanship: extras?.buyWorkmanship ?? null,
+  1123→    },
+  1124→  });
+  1125→}
+  1126→
+  1127→/**
+  1128→ * Try to extract JSON from text that might contain markdown code blocks
+  1129→ */
+  1130→function extractJsonFromText(text: string): Record<string, unknown> | null {
+  1131→  try {
+  1132→    return JSON.parse(text);
+  1133→  } catch {
+  1134→    // Continue
+  1135→  }
+  1136→
+  1137→  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  1138→  if (codeBlockMatch) {
+  1139→    try {
+  1140→      return JSON.parse(codeBlockMatch[1]);
+  1141→    } catch {
+  1142→      // Continue
+  1143→    }
+  1144→  }
+  1145→
+  1146→  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  1147→  if (jsonMatch) {
+  1148→    try {
+  1149→      return JSON.parse(jsonMatch[0]);
+  1150→    } catch {
+  1151→      // Give up
+  1152→    }
+  1153→  }
+  1154→
+  1155→  return null;
+  1156→}
+  1157→
