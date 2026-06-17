@@ -104,3 +104,50 @@ Stage Summary:
   2. يعمل manual redeploy من Vercel dashboard
   3. يتشيك على build logs لو فيه errors
 - لما الـ deploy يحدث، التحسينات هتشتغل تلقائياً
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: اتأكد أن البوت بيتبعت ليه رسالة واحدة فقط كل ساعة وليس أكثر من رسالة، وطبق التعديلات على GitHub و Vercel
+
+Work Log:
+- حللت الإنتاج عبر /api/logs و /api/telegram-users (بـ admin JWT):
+  - اكتشفت 4 مستخدمين نشطين كلهم بنفس الـ botToken (****3dzns):
+    1. Ōmda (chatId 6350496212) — إنشاء 12 يونيو
+    2. Test Test (chatId 7503487136) — إنشاء 12 يونيو
+    3. Omda (chatId 750182271) — إنشاء 11 يونيو (الأصلي)
+    4. Waleed Elbasha (chatId 1534788014) — إنشاء 11 يونيو
+  - كل ساعة كان البوت بيبعت 4 رسائل (واحدة لكل مستخدم نشط)
+  - المالك سجل نفس البوت مع 3 chatIds مختلفة (Ōmda + Test Test + Omda) فكان بيوصل 3 رسائل كل ساعة
+- إصلاح فوري على الإنتاج (مفعّل دلوقتي):
+  - ألغيت تفعيل Ōmda (id cmqa7kr8p0000lh04dkzboe8y) عبر PATCH /api/telegram-users/[id]
+  - ألغيت تفعيل Test Test (id cmqa6ptya0000i5048egt0yig) عبر PATCH /api/telegram-users/[id]
+  - عدد المستخدمين النشطين نقص من 4 → 2 (Omda + Waleed Elbasha)
+  - المالك دلوقتي هيستلم رسالة واحدة فقط كل ساعة (على chatId 750182271)
+- إصلاح كودي (safeguards إضافية) في commit af9e4bf:
+  في src/lib/report-sender.ts:
+  - أضفت acquireHourlyReportLock() — DB lock atomically عبر AppConfig key "HOURLY_REPORT_LOCK" بـ TTL 55 دقيقة. واحد بس من الـ callers يقدر يكمل في نفس الساعة (يمنع race conditions بين Vercel Cron / UptimeRobot / in-process cron)
+  - أضفت wasChatSentRecently(chatId) + markChatSent(chatId) — per-chat dedup عبر AppConfig key "LAST_REPORT_CHAT_<chatId>". نفس الـ chatId مستحيل يوصل 2 رسائل في نفس الساعة حتى لو مسجل بـ botTokens مختلفة
+  - markChatSent بيتكتب بس بعد successful send عشان الفشل يقدر يتعمل retry
+  - sendReportToAllUsers بقت بترجع skipped count كمان
+  في src/app/api/cron/refresh-prices/route.ts:
+  - استبدلت wasReportSentRecently() (مش atomic) بـ acquireHourlyReportLock() (atomic)
+  - حدّثت الـ response عشان يبين لو الـ lock كان محجوز
+- lint: passed بدون أخطاء
+- type-check: التغييرات بتاعتي clean (الأخطاء الموجودة pre-existing من InvestmentPlan model)
+- رفعت على GitHub: commits af9e4bf + de9adae (empty trigger commit)
+- Vercel: للأسف مش بي deploy تلقائياً (نفس مشكلة Task 3):
+  - تأكدت إن commit 03e93e6 (اللي كان test message) لسه مش موجود على الإنتاج
+  - production لسه بيرجع "Prices fetched successfully" (الرسالة القديمة) بدون _debug
+  - حاولت أثبّت Vercel CLI ونزل بنجاح بس مفيش token للمصادقة
+  - كل الـ commits المطلوبة مترفعة على GitHub وجاهزة للـ deploy
+
+Stage Summary:
+- الإصلاح الفوري (إلغاء تفعيل المستخدمين المكررين) مفعّل على الإنتاج دلوقتي — المالك هيستلم رسالة واحدة فقط كل ساعة بدءً من الكرون الجاي (~21:09 UTC)
+- الإصلاح الكودي (atomic lock + per-chat dedup) مترفع على GitHub بس محتاج Vercel deploy
+- Vercel GitHub integration يبدو إنه مفصول — المستخدم محتاج:
+  1. يفتح Vercel dashboard → project → Settings → Git
+  2. يتأكد إن GitHub integration متصل بـ repo omda00/omda-gold-bot
+  3. يعمل manual Redeploy من Deployments tab (أحدث deployment → "..." → Redeploy)
+  4. أو يربط الـ project من جديد بـ GitHub
+- لما الـ deploy يحصل، التحسينات هتشتغل تلقائياً وتضيف طبقة حماية إضافية فوق إلغاء التفعيل
