@@ -7,7 +7,7 @@ import {
 } from "@/lib/price-fetcher";
 import { getConfig } from "@/lib/config-seeder";
 import {
-  wasReportSentRecently,
+  acquireHourlyReportLock,
   sendReportToAllUsers,
   sendReportViaGlobalConfig,
   buildHourlyReport,
@@ -119,16 +119,23 @@ export async function GET() {
     );
 
     // ========================================
-    // Auto-send hourly report (DEDUPLICATED)
+    // Auto-send hourly report (DEDUPLICATED — atomic lock)
     // ========================================
+    // Three layers of protection ensure exactly ONE message per chat per hour:
+    //   1. acquireHourlyReportLock() — atomic DB lock, only one caller per
+    //      55-min window can proceed (kills race conditions between Vercel
+    //      Cron / UptimeRobot / in-process cron).
+    //   2. wasChatSentRecently(chatId) — per-chat check inside the send loop
+    //      so the same chat never gets 2 messages even if registered twice.
+    //   3. In-memory chatId dedup of the user list.
     let reportSent = false;
     let reportDetails = "";
 
     if (automationEnabled === "true" && gold && usdEgp) {
-      const alreadySent = await wasReportSentRecently("hourly_report", 55);
+      const gotLock = await acquireHourlyReportLock();
 
-      if (!alreadySent) {
-        console.log("[cron/refresh-prices] 📨 No report sent in last 55 min — sending now...");
+      if (gotLock) {
+        console.log("[cron/refresh-prices] 📨 Hourly lock acquired — sending report...");
 
         const hourlyReport = buildHourlyReport({
           goldPrice: gold.price,
@@ -149,7 +156,10 @@ export async function GET() {
           const result = await sendReportToAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
           reportSent = result.sent > 0;
           reportDetails = `تم الإرسال إلى ${result.sent}/${result.total} مستخدم`;
-          console.log(`[cron/refresh-prices] 📨 Report sent: ${result.sent}/${result.total}`);
+          console.log(
+            `[cron/refresh-prices] 📨 Report sent: ${result.sent}/${result.total}` +
+            (result.skipped ? ` (skipped ${result.skipped} already-sent)` : "")
+          );
         } else {
           const result = await sendReportViaGlobalConfig(hourlyReport, "hourly_report", "Hourly Price Report");
           reportSent = result.ok;
@@ -157,7 +167,8 @@ export async function GET() {
           console.log(`[cron/refresh-prices] 📨 Report via global config: ${result.ok ? "success" : result.error}`);
         }
       } else {
-        console.log("[cron/refresh-prices] ⏭️ Report already sent in last 55 min — skipping");
+        console.log("[cron/refresh-prices] ⏭️ Hourly report lock held by another caller — skipping (already sent this hour)");
+        reportDetails = "تم الإرسال بالفعل هذه الساعة (lock held)";
       }
     } else if (automationEnabled !== "true") {
       console.log("[cron/refresh-prices] ⏭️ Automation disabled — skipping report");
