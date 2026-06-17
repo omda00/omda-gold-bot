@@ -151,3 +151,69 @@ Stage Summary:
   3. يعمل manual Redeploy من Deployments tab (أحدث deployment → "..." → Redeploy)
   4. أو يربط الـ project من جديد بـ GitHub
 - لما الـ deploy يحصل، التحسينات هتشتغل تلقائياً وتضيف طبقة حماية إضافية فوق إلغاء التفعيل
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: اتأكد أن البوت بيبعت رسالة واحدة فقط كل ساعة وطبق التعديلات على GitHub و Vercel
+
+Work Log:
+- حللت الصورة اللي رفعها المستخدم (VLM skill):
+  - رسالتين عن أسعار الذهب
+  - الأولى 11:52 ص بتوقيت القاهرة (08:52 UTC) — مصدر: iSagha.com (SDK)
+  - التانية 12:00 م بتوقيت القاهرة (09:00 UTC) — مصدر: iSagha.com
+  - 8 دقايق فرق، مصادر مختلفة = ترايجرز منفصلة
+
+- حللت NotificationLog على الإنتاج (آخر 50 log):
+  - معظم الساعات: 1 batch فقط (من UptimeRobot → /api/cron/refresh-prices مع dedup)
+  - عند 09:00 UTC (12:00 ظهراً القاهرة): 2 batches!
+    - batch 1: من UptimeRobot → /api/cron/refresh-prices (مع dedup)
+    - batch 2: من Vercel Cron → /api/automation/run (بدون dedup!)
+  - ده بيطابق الصورة تماماً (08:52 + 09:00 UTC = 11:52 + 12:00 القاهرة)
+
+- السبب الجذري المكتشف:
+  - الكود اللي متdeploy على Vercel قديم (قبل commit 68781a0)
+  - /api/automation/run المنشور ليه logic إرسال مستقل (buildHourlyReport + notifyAllUsers) بدون أي dedup check
+  - /api/cron/refresh-prices المنشور فيه dedup (shouldSendHourlyReport — 55 min threshold)
+  - vercel.json المنشور فيه cron لـ /api/automation/run يومياً at 09:00 UTC
+  - لما الإتنين يتضربوا في نفس الساعة → المستخدم بيوصل 2 رسائل
+
+- أكدت إن مفيش GitHub webhook للـ Vercel integration:
+  - curl GitHub API: 0 webhooks على repo omda00/omda-gold-bot
+  - ده ليه Vercel مش بيdeploy تلقائياً من الـ commits
+
+- إصلاحات الكود (commit 6169404 على GitHub):
+  في src/app/api/automation/run/route.ts:
+  - شيلت كل logic الإرسال المستقل (buildHourlyReport + notifyAllUsers + global config fallback)
+  - خليت الـ endpoint بيعمل redirect لـ /api/cron/refresh-prices بس
+  - redirect بيستخدم request.url origin (أعتمد من VERCEL_URL env var)
+  - ده يخلي كل الإرسال يعدّي عبر /api/cron/refresh-prices اللي فيه 3 طبقات dedup:
+    1. acquireHourlyReportLock (atomic DB lock — 55 min TTL)
+    2. wasChatSentRecently (per-chat dedup)
+    3. in-memory chatId dedup
+  - النتيجة: مهما كان عدد الترايجرز (Vercel Cron / UptimeRobot / manual) ، كل chat هيستلم رسالة واحدة فقط كل ساعة
+
+  vercel.json (كان متعدل من قبل):
+  - cron اتغير من /api/automation/run (يومياً 09:00 UTC) لـ /api/cron/refresh-prices (كل ساعة :00 UTC)
+  - ده يخلي Vercel Cron يضرب الإندبوينت الصح اللي فيه dedup
+
+- lint: passed بدون أخطاء
+
+- حاولت أdeploy بطرق مختلفة:
+  1. Vercel CLI: nزلته بس مفيش token للمصادقة
+  2. GitHub webhook: مفيش، ومش أقدر أعرفه بدون Vercel dashboard access
+  3. GitHub Action: حاولت أضيف .github/workflows/deploy.yml بس الـ PAT مش عنده `workflow` scope (rejected by GitHub)
+  4. Vercel REST API: محتاج token
+
+- كل الـ commits مترفعة على GitHub وجاهزة للـ deploy:
+  - af9e4bf: acquireHourlyReportLock + per-chat dedup
+  - 6169404: /api/automation/run redirect to /api/cron/refresh-prices
+
+Stage Summary:
+- السبب الجذري: /api/automation/run المنشور بيبعت بدون dedup + Vercel Cron بيضربه يومياً at 09:00 UTC + UptimeRobot بيضرب /api/cron/refresh-prices → 2 رسائل عند الظهر بتوقيت القاهرة
+- الإصلاح الكودي كامل على GitHub (3 طبقات dedup + redirect + vercel.json update)
+- Vercel مش بيdeploy تلقائياً (GitHub integration مقطوعة — 0 webhooks)
+- المستخدم محتاج يعمل ONE من الآتي:
+  1. Vercel Dashboard → Settings → Git → يعيد ربط GitHub repo
+  2. Vercel Dashboard → Deployments → أحدث deployment → "..." → Redeploy (لو الـ integration شغالة)
+  3. Vercel CLI: vercel login ← vercel --prod --yes (من جهازه)
