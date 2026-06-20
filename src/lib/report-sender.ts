@@ -24,7 +24,7 @@ import { sendTelegramMessage } from "@/lib/telegram";
  *    same chatId never appears twice in a single send loop.
  */
 
-const LOCK_TTL_MS = 55 * 60 * 1000; // 55 minutes — leaves a 5-min safety margin
+const LOCK_TTL_MS = 59 * 60 * 1000; // 59 minutes — ensures only ONE send per hour even if UptimeRobot fires at :24
 const LOCK_KEY = "HOURLY_REPORT_LOCK";
 
 /**
