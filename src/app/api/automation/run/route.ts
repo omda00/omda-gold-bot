@@ -1,26 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminSession } from "@/lib/admin-auth";
 
 /**
- * /api/automation/run — Redirects to /api/cron/refresh-prices
+ * /api/automation/run — Admin-only manual trigger
  *
- * ALL reporting logic lives in /api/cron/refresh-prices (single source of
- * truth). That endpoint has a 3-layer dedup system:
- *   1. Atomic DB lock (acquireHourlyReportLock — 55 min TTL)
- *   2. Per-chat dedup (wasChatSentRecently)
- *   3. In-memory chatId dedup
+ * SECURITY:
+ * This endpoint performs TWO expensive/dangerous actions:
+ *   1. Scrapes external gold-price websites (iSagha, etc.) and writes to DB.
+ *   2. Sends a Telegram message to ALL registered customers immediately.
  *
- * By redirecting here instead of sending directly, we GUARANTEE that no
- * matter how many external triggers (Vercel Cron, UptimeRobot, manual
- * calls) hit EITHER endpoint, only ONE message per chat per hour is sent.
+ * Because of (2), it MUST NOT be callable by anonymous visitors — otherwise
+ * any visitor (or attacker with a script) could spam all your customers with
+ * unscheduled messages, or trigger repeated web-scraping that gets the
+ * server IP banned.
  *
- * The old deployed version of this endpoint sent reports independently
- * WITHOUT any dedup — causing duplicate messages. This redirect fixes that.
+ * AUTH POLICY:
+ *   - Admin session cookie (set via /api/auth/admin login) → allowed.
+ *     This covers: the dashboard "تشغيل الأتمتة" button (admin only) AND
+ *     the internal hourly schedulers (instrumentation.ts + cron-service),
+ *     which obtain an admin token via the password and pass the cookie.
+ *   - No valid admin session → 401 Unauthorized.
+ *
+ * The actual reporting logic still lives in /api/cron/refresh-prices
+ * (single source of truth with the 3-layer dedup system). This handler
+ * is now just an authenticated redirect to it.
  */
+async function checkAuth(): Promise<boolean> {
+  return await getAdminSession();
+}
+
 export async function GET(request: NextRequest) {
   return POST(request);
 }
 
 export async function POST(request: NextRequest) {
+  // ── Auth gate ──────────────────────────────────────────────
+  const isAdmin = await checkAuth();
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "غير مصرح — هذه العملية للمسؤول فقط",
+      },
+      { status: 401 }
+    );
+  }
+
   try {
     // Build the URL for the internal call using the request's origin.
     // This is more reliable than VERCEL_URL on Vercel serverless.

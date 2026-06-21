@@ -111,17 +111,37 @@ async function isAutomationEnabled(): Promise<boolean> {
 
 /**
  * Call production /api/automation/run — sends hourly report to ALL users.
- * This endpoint (deployed, old code) has NO dedup, so it always sends.
- * We rely on the cron-service dedup check above to prevent double-sends.
+ *
+ * AUTH: The production endpoint now requires an admin session cookie.
+ * We obtain one via /api/auth/admin (using the admin password) and pass
+ * it as a Cookie header. If token retrieval fails we still attempt the
+ * call (production may still be running old, unauthenticated code), but
+ * we log a warning because the new code will reject it with 401.
+ *
+ * DEDUP: we rely on the cron-service dedup check (wasReportSentRecently)
+ * plus the production 55-min atomic lock to prevent double-sends.
  */
 async function runAutomation(): Promise<boolean> {
   const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
   console.log(`⏰ [${cairoTime}] Calling production /api/automation/run...`);
 
   try {
+    // Obtain admin session token for the auth-protected endpoint
+    const adminToken = await getAdminToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (adminToken) {
+      headers.Cookie = `admin_session=${adminToken}`;
+    } else {
+      console.warn(
+        `⏰ [${cairoTime}] ⚠️ No admin token — /api/automation/run may reject with 401 on the new production code`
+      );
+    }
+
     const response = await fetch(`${PRODUCTION_URL}/api/automation/run`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       signal: AbortSignal.timeout(120000),
     });
 

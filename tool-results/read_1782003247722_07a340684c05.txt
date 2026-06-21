@@ -1,0 +1,689 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect } from "react";
+     4→import {
+     5→  Send,
+     6→  TestTube,
+     7→  Settings,
+     8→  RefreshCw,
+     9→  Save,
+    10→  Eye,
+    11→  EyeOff,
+    12→  Bot,
+    13→  Clock,
+    14→  AlertTriangle,
+    15→  Zap,
+    16→  Key,
+    17→  UserPlus,
+    18→  Trash2,
+    19→  Power,
+    20→  PowerOff,
+    21→  Shield,
+    22→  Users,
+    23→  CheckCircle2,
+    24→  XCircle,
+    25→  Lock,
+    26→  LogOut,
+    27→  ShieldCheck,
+    28→  UserCheck,
+    29→  UserX,
+    30→} from "lucide-react";
+    31→import { Card, CardContent } from "@/components/ui/card";
+    32→import { Button } from "@/components/ui/button";
+    33→import { Input } from "@/components/ui/input";
+    34→import { Label } from "@/components/ui/label";
+    35→import { Switch } from "@/components/ui/switch";
+    36→import { Badge } from "@/components/ui/badge";
+    37→import {
+    38→  Dialog,
+    39→  DialogContent,
+    40→  DialogHeader,
+    41→  DialogTitle,
+    42→  DialogTrigger,
+    43→  DialogFooter,
+    44→  DialogClose,
+    45→} from "@/components/ui/dialog";
+    46→import type { AppConfig, TelegramUser } from "@/lib/dashboard-types";
+    47→import { toast } from "sonner";
+    48→
+    49→interface SettingsTabProps {
+    50→  config: AppConfig | null;
+    51→  onUpdateConfig: (key: string, value: string) => Promise<boolean>;
+    52→  onTestTelegram: () => Promise<{ ok?: boolean; message?: string; error?: string }>;
+    53→  telegramUsers: TelegramUser[];
+    54→  onAddTelegramUser: (name: string, botToken: string, chatId: string) => Promise<{ ok: boolean; error?: string; data?: TelegramUser }>;
+    55→  onDeleteTelegramUser: (id: string) => Promise<boolean>;
+    56→  onToggleTelegramUser: (id: string, active: boolean) => Promise<boolean>;
+    57→  onTestTelegramUser: (id: string) => Promise<{ ok?: boolean; message?: string; error?: string }>;
+    58→  isAdmin: boolean;
+    59→  checkingAuth: boolean;
+    60→  onAdminLogin: (password: string) => Promise<{ ok: boolean; error?: string }>;
+    61→  onAdminLogout: () => Promise<void>;
+    62→}
+    63→
+    64→export function SettingsTab({
+    65→  config,
+    66→  onUpdateConfig,
+    67→  onTestTelegram,
+    68→  telegramUsers,
+    69→  onAddTelegramUser,
+    70→  onDeleteTelegramUser,
+    71→  onToggleTelegramUser,
+    72→  onTestTelegramUser,
+    73→  isAdmin,
+    74→  checkingAuth,
+    75→  onAdminLogin,
+    76→  onAdminLogout,
+    77→}: SettingsTabProps) {
+    78→  const [automationEnabled, setAutomationEnabled] = useState(false);
+    79→  const [dailyReportTime, setDailyReportTime] = useState("09:00");
+    80→  const [usdDropThreshold, setUsdDropThreshold] = useState("2");
+    81→  const [savingConfig, setSavingConfig] = useState(false);
+    82→
+    83→  // New Telegram user form
+    84→  const [newName, setNewName] = useState("");
+    85→  const [newBotToken, setNewBotToken] = useState("");
+    86→  const [newChatId, setNewChatId] = useState("");
+    87→  const [showToken, setShowToken] = useState(false);
+    88→  const [addingUser, setAddingUser] = useState(false);
+    89→  const [addDialogOpen, setAddDialogOpen] = useState(false);
+    90→
+    91→  // Testing state per user
+    92→  const [testingUserId, setTestingUserId] = useState<string | null>(null);
+    93→  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
+    94→
+    95→  // Deleting state
+    96→  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+    97→
+    98→  // Admin login form
+    99→  const [loginPassword, setLoginPassword] = useState("");
+   100→  const [showLoginPassword, setShowLoginPassword] = useState(false);
+   101→  const [loginLoading, setLoginLoading] = useState(false);
+   102→  const [loginError, setLoginError] = useState("");
+   103→
+   104→  // Subscriber count
+   105→  const [subscriberStats, setSubscriberStats] = useState<{ total: number; active: number } | null>(null);
+   106→
+   107→  useEffect(() => {
+   108→    if (config) {
+   109→      setAutomationEnabled(config.AUTOMATION_ENABLED === "true");
+   110→      setDailyReportTime(config.DAILY_REPORT_TIME || "09:00");
+   111→      setUsdDropThreshold(config.USD_DROP_THRESHOLD || "2");
+   112→    }
+   113→  }, [config]);
+   114→
+   115→  // Fetch subscriber count
+   116→  useEffect(() => {
+   117→    if (!isAdmin) return;
+   118→    async function fetchCount() {
+   119→      try {
+   120→        const res = await fetch("/api/telegram-users/count");
+   121→        if (res.ok) {
+   122→          const data = await res.json();
+   123→          setSubscriberStats({ total: data.total ?? 0, active: data.active ?? 0 });
+   124→        }
+   125→      } catch {
+   126→        // ignore
+   127→      }
+   128→    }
+   129→    fetchCount();
+   130→    const interval = setInterval(fetchCount, 30000);
+   131→    return () => clearInterval(interval);
+   132→  }, [isAdmin]);
+   133→
+   134→  const handleSaveConfig = async () => {
+   135→    setSavingConfig(true);
+   136→    try {
+   137→      const updates = [
+   138→        onUpdateConfig("AUTOMATION_ENABLED", automationEnabled ? "true" : "false"),
+   139→        onUpdateConfig("DAILY_REPORT_TIME", dailyReportTime),
+   140→        onUpdateConfig("USD_DROP_THRESHOLD", usdDropThreshold),
+   141→      ];
+   142→      await Promise.all(updates);
+   143→      toast.success("تم حفظ الإعدادات بنجاح");
+   144→    } catch {
+   145→      toast.error("فشل في حفظ الإعدادات");
+   146→    } finally {
+   147→      setSavingConfig(false);
+   148→    }
+   149→  };
+   150→
+   151→  const handleAddUser = async () => {
+   152→    if (!newName.trim() || !newBotToken.trim() || !newChatId.trim()) {
+   153→      toast.error("يرجى ملء جميع الحقول");
+   154→      return;
+   155→    }
+   156→    setAddingUser(true);
+   157→    try {
+   158→      const result = await onAddTelegramUser(newName.trim(), newBotToken.trim(), newChatId.trim());
+   159→      if (result.ok) {
+   160→        toast.success(`تم تسجيل ${newName} بنجاح — سيصلك التحديث كل ساعة بتوقيت مصر`);
+   161→        setNewName("");
+   162→        setNewBotToken("");
+   163→        setNewChatId("");
+   164→        setAddDialogOpen(false);
+   165→      } else {
+   166→        toast.error(result.error || "فشل في تسجيل المستخدم");
+   167→      }
+   168→    } finally {
+   169→      setAddingUser(false);
+   170→    }
+   171→  };
+   172→
+   173→  const handleTestUser = async (id: string, name: string) => {
+   174→    setTestingUserId(id);
+   175→    try {
+   176→      const result = await onTestTelegramUser(id);
+   177→      if (result.ok) {
+   178→        setTestResults((prev) => ({ ...prev, [id]: { ok: true, message: "متصل ✓" } }));
+   179→        toast.success(`تم إرسال رسالة اختبار إلى ${name}`);
+   180→      } else {
+   181→        setTestResults((prev) => ({ ...prev, [id]: { ok: false, message: result.error || "فشل الاتصال" } }));
+   182→        toast.error(`فشل اختبار اتصال ${name}`);
+   183→      }
+   184→    } finally {
+   185→      setTestingUserId(null);
+   186→    }
+   187→  };
+   188→
+   189→  const handleDeleteUser = async (id: string, name: string) => {
+   190→    setDeletingUserId(id);
+   191→    try {
+   192→      const success = await onDeleteTelegramUser(id);
+   193→      if (success) {
+   194→        toast.success(`تم حذف ${name}`);
+   195→      } else {
+   196→        toast.error("فشل في حذف المستخدم");
+   197→      }
+   198→    } finally {
+   199→      setDeletingUserId(null);
+   200→    }
+   201→  };
+   202→
+   203→  const handleToggleUser = async (id: string, active: boolean, name: string) => {
+   204→    const success = await onToggleTelegramUser(id, active);
+   205→    if (success) {
+   206→      toast.success(active ? `تم تفعيل إشعارات ${name}` : `تم إيقاف إشعارات ${name}`);
+   207→    } else {
+   208→      toast.error("فشل في تحديث حالة المستخدم");
+   209→    }
+   210→  };
+   211→
+   212→  const handleLogin = async () => {
+   213→    if (!loginPassword.trim()) {
+   214→      setLoginError("يرجى إدخال كلمة المرور");
+   215→      return;
+   216→    }
+   217→    setLoginLoading(true);
+   218→    setLoginError("");
+   219→    try {
+   220→      const result = await onAdminLogin(loginPassword.trim());
+   221→      if (result.ok) {
+   222→        toast.success("تم تسجيل الدخول بنجاح");
+   223→        setLoginPassword("");
+   224→      } else {
+   225→        setLoginError(result.error || "كلمة المرور غير صحيحة");
+   226→      }
+   227→    } finally {
+   228→      setLoginLoading(false);
+   229→    }
+   230→  };
+   231→
+   232→  const handleLogout = async () => {
+   233→    await onAdminLogout();
+   234→    toast.success("تم تسجيل الخروج");
+   235→  };
+   236→
+   237→  // =============================================
+   238→  // ADMIN LOCK SCREEN — shown when not admin
+   239→  // =============================================
+   240→  if (!isAdmin) {
+   241→    return (
+   242→      <div className="space-y-3">
+   243→        {/* Public info card */}
+   244→        <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+   245→          <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
+   246→          <CardContent className="p-6 text-center">
+   247→            <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
+   248→              <Settings className="w-8 h-8 text-amber-500" />
+   249→            </div>
+   250→            <h3 className="text-base font-bold mb-1">الإعدادات</h3>
+   251→            <p className="text-sm text-muted-foreground mb-6">
+   252→              لتعديل الإعدادات وإدارة البوتات، يرجى تسجيل الدخول كمسؤول
+   253→            </p>
+   254→
+   255→            {/* Login form */}
+   256→            <div className="max-w-xs mx-auto space-y-3">
+   257→              <div className="relative">
+   258→                <Input
+   259→                  type={showLoginPassword ? "text" : "password"}
+   260→                  value={loginPassword}
+   261→                  onChange={(e) => { setLoginPassword(e.target.value); setLoginError(""); }}
+   262→                  placeholder="كلمة مرور المسؤول"
+   263→                  className="rounded-xl h-11 text-sm pr-4 pl-10"
+   264→                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+   265→                  disabled={loginLoading || checkingAuth}
+   266→                />
+   267→                <Button
+   268→                  type="button"
+   269→                  variant="ghost"
+   270→                  size="sm"
+   271→                  className="absolute left-0 top-0 h-full px-3"
+   272→                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+   273→                >
+   274→                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+   275→                </Button>
+   276→              </div>
+   277→              {loginError && (
+   278→                <p className="text-xs text-red-500 font-medium">{loginError}</p>
+   279→              )}
+   280→              <Button
+   281→                onClick={handleLogin}
+   282→                disabled={loginLoading || checkingAuth || !loginPassword.trim()}
+   283→                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 gap-2 rounded-xl h-10 text-sm font-bold shadow-sm shadow-amber-500/20"
+   284→              >
+   285→                {loginLoading ? (
+   286→                  <RefreshCw className="w-4 h-4 animate-spin" />
+   287→                ) : (
+   288→                  <Lock className="w-4 h-4" />
+   289→                )}
+   290→                تسجيل الدخول
+   291→              </Button>
+   292→              <p className="text-[10px] text-muted-foreground/60">
+   293→                أدخل كلمة مرور المسؤول للوصول إلى لوحة القيادة
+   294→              </p>
+   295→            </div>
+   296→          </CardContent>
+   297→        </Card>
+   298→      </div>
+   299→    );
+   300→  }
+   301→
+   302→  // =============================================
+   303→  // ADMIN VIEW — full access
+   304→  // =============================================
+   305→  return (
+   306→    <div className="space-y-3">
+   307→      {/* Subscriber Stats Card */}
+   308→      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+   309→        <div className="h-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-emerald-500" />
+   310→        <CardContent className="p-4">
+   311→          <div className="flex items-center gap-2.5 mb-4">
+   312→            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-sm shadow-amber-400/20">
+   313→              <Users className="w-4.5 h-4.5 text-white" />
+   314→            </div>
+   315→            <div>
+   316→              <h3 className="text-sm font-bold">إحصائيات المشتركين</h3>
+   317→              <p className="text-xs text-muted-foreground">عدد المشتركين في بوت التيليجرام</p>
+   318→            </div>
+   319→          </div>
+   320→          <div className="grid grid-cols-2 gap-3">
+   321→            <div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 rounded-xl p-4 ring-1 ring-emerald-200/50 dark:ring-emerald-800/30">
+   322→              <div className="flex items-center gap-2 mb-2">
+   323→                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+   324→                  <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+   325→                </div>
+   326→                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">نشط</span>
+   327→              </div>
+   328→              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+   329→                {subscriberStats ? subscriberStats.active.toLocaleString("ar-EG") : "..."}
+   330→              </p>
+   331→              <p className="text-[10px] text-muted-foreground mt-0.5">مشترك نشط يستقبل الإشعارات</p>
+   332→            </div>
+   333→            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 rounded-xl p-4 ring-1 ring-amber-200/50 dark:ring-amber-800/30">
+   334→              <div className="flex items-center gap-2 mb-2">
+   335→                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+   336→                  <Users className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+   337→                </div>
+   338→                <span className="text-xs font-bold text-amber-700 dark:text-amber-300">إجمالي</span>
+   339→              </div>
+   340→              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+   341→                {subscriberStats ? subscriberStats.total.toLocaleString("ar-EG") : "..."}
+   342→              </p>
+   343→              <p className="text-[10px] text-muted-foreground mt-0.5">إجمالي المشتركين (نشط + متوقف)</p>
+   344→            </div>
+   345→          </div>
+   346→          {subscriberStats && subscriberStats.total > 0 && (
+   347→            <div className="mt-3 flex items-center gap-2">
+   348→              <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+   349→                <div
+   350→                  className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500"
+   351→                  style={{ width: `${(subscriberStats.active / subscriberStats.total) * 100}%` }}
+   352→                />
+   353→              </div>
+   354→              <span className="text-xs font-bold text-muted-foreground">
+   355→                {Math.round((subscriberStats.active / subscriberStats.total) * 100)}%
+   356→              </span>
+   357→            </div>
+   358→          )}
+   359→          {subscriberStats && subscriberStats.total > 0 && (
+   360→            <div className="mt-2 flex items-center gap-1.5">
+   361→              <UserX className="w-3.5 h-3.5 text-red-400" />
+   362→              <span className="text-xs text-muted-foreground">
+   363→                {subscriberStats.total - subscriberStats.active} مشترك متوقف عن الاستقبال
+   364→              </span>
+   365→            </div>
+   366→          )}
+   367→        </CardContent>
+   368→      </Card>
+   369→
+   370→      {/* Admin badge / logout */}
+   371→      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+   372→        <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-500" />
+   373→        <CardContent className="p-3 flex items-center justify-between">
+   374→          <div className="flex items-center gap-2.5">
+   375→            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-sm shadow-emerald-400/20">
+   376→              <ShieldCheck className="w-4 h-4 text-white" />
+   377→            </div>
+   378→            <div>
+   379→              <div className="flex items-center gap-2">
+   380→                <p className="text-sm font-bold">وضع المسؤول</p>
+   381→                <Badge className="rounded-md text-[10px] px-1.5 py-0 font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+   382→                  نشط
+   383→                </Badge>
+   384→              </div>
+   385→              <p className="text-xs text-muted-foreground">لديك صلاحية كاملة لإدارة البوتات والإعدادات</p>
+   386→            </div>
+   387→          </div>
+   388→          <Button
+   389→            variant="outline"
+   390→            size="sm"
+   391→            onClick={handleLogout}
+   392→            className="gap-1.5 rounded-lg h-8 text-xs border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30 text-red-600"
+   393→          >
+   394→            <LogOut className="w-3.5 h-3.5" />
+   395→            خروج
+   396→          </Button>
+   397→        </CardContent>
+   398→      </Card>
+   399→
+   400→      {/* ============================================ */}
+   401→      {/* Telegram Users Management (Per-User Bots) */}
+   402→      {/* ============================================ */}
+   403→      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+   404→        <div className="h-1 bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-500" />
+   405→        <div className="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20 px-4 py-3 flex items-center justify-between border-b border-border/30">
+   406→          <div className="flex items-center gap-2.5">
+   407→            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-sm shadow-sky-400/20">
+   408→              <Shield className="w-4 h-4 text-white" />
+   409→            </div>
+   410→            <div>
+   411→              <h3 className="text-sm font-bold">لوحة قيادة البوتات</h3>
+   412→              <p className="text-xs text-muted-foreground">إدارة بوتات التيليجرام — المسؤول فقط</p>
+   413→            </div>
+   414→          </div>
+   415→          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+   416→            <DialogTrigger asChild>
+   417→              <Button
+   418→                size="default"
+   419→                className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 gap-1.5 rounded-lg shadow-sm shadow-sky-500/20 h-8 text-xs"
+   420→              >
+   421→                <UserPlus className="w-3.5 h-3.5" />
+   422→                تسجيل بوت جديد
+   423→              </Button>
+   424→            </DialogTrigger>
+   425→            <DialogContent className="sm:max-w-md rounded-2xl" dir="rtl">
+   426→              <DialogHeader>
+   427→                <DialogTitle className="flex items-center gap-2 text-base">
+   428→                  <Bot className="w-5 h-5 text-sky-500" />
+   429→                  تسجيل بوت تيليجرام جديد
+   430→                </DialogTitle>
+   431→              </DialogHeader>
+   432→              <div className="space-y-4 py-3">
+   433→                <div className="bg-sky-50 dark:bg-sky-950/30 rounded-xl p-3 ring-1 ring-sky-200 dark:ring-sky-800">
+   434→                  <p className="text-xs font-medium text-sky-700 dark:text-sky-300 leading-relaxed">
+   435→                    📌 كل عميل يسجل بوته الخاص — البيانات خاصة ولا يمكن لأي شخص آخر الوصول إليها.
+   436→                    <br />✅ سيتم إرسال أسعار الذهب والدولار كل ساعة بتوقيت مصر.
+   437→                  </p>
+   438→                </div>
+   439→                <div className="space-y-2">
+   440→                  <Label className="text-xs font-bold text-muted-foreground">الاسم</Label>
+   441→                  <Input
+   442→                    value={newName}
+   443→                    onChange={(e) => setNewName(e.target.value)}
+   444→                    placeholder="أدخل اسم العميل"
+   445→                    className="rounded-lg h-10 text-sm"
+   446→                  />
+   447→                </div>
+   448→                <div className="space-y-2">
+   449→                  <Label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+   450→                    <Key className="w-3.5 h-3.5" /> Bot Token
+   451→                  </Label>
+   452→                  <div className="relative">
+   453→                    <Input
+   454→                      type={showToken ? "text" : "password"}
+   455→                      value={newBotToken}
+   456→                      onChange={(e) => setNewBotToken(e.target.value)}
+   457→                      placeholder="مثال: 123456789:ABCdefGHI..."
+   458→                      className="pr-10 rounded-lg h-10 text-sm"
+   459→                    />
+   460→                    <Button
+   461→                      type="button"
+   462→                      variant="ghost"
+   463→                      size="sm"
+   464→                      className="absolute right-0 top-0 h-full px-3"
+   465→                      onClick={() => setShowToken(!showToken)}
+   466→                    >
+   467→                      {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+   468→                    </Button>
+   469→                  </div>
+   470→                </div>
+   471→                <div className="space-y-2">
+   472→                  <Label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+   473→                    <Bot className="w-3.5 h-3.5" /> Chat ID
+   474→                  </Label>
+   475→                  <Input
+   476→                    value={newChatId}
+   477→                    onChange={(e) => setNewChatId(e.target.value)}
+   478→                    placeholder="مثال: 123456789"
+   479→                    className="rounded-lg h-10 text-sm"
+   480→                  />
+   481→                </div>
+   482→              </div>
+   483→              <DialogFooter className="gap-2">
+   484→                <DialogClose asChild>
+   485→                  <Button variant="outline" className="rounded-lg text-xs">إلغاء</Button>
+   486→                </DialogClose>
+   487→                <Button
+   488→                  onClick={handleAddUser}
+   489→                  disabled={addingUser || !newName.trim() || !newBotToken.trim() || !newChatId.trim()}
+   490→                  className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 gap-1.5 rounded-lg text-xs"
+   491→                >
+   492→                  {addingUser ? (
+   493→                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+   494→                  ) : (
+   495→                    <UserPlus className="w-3.5 h-3.5" />
+   496→                  )}
+   497→                  تسجيل
+   498→                </Button>
+   499→              </DialogFooter>
+   500→            </DialogContent>
+   501→          </Dialog>
+   502→        </div>
+   503→        <CardContent className="p-4">
+   504→          {telegramUsers.length === 0 ? (
+   505→            <div className="text-center py-8">
+   506→              <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-3">
+   507→                <Users className="w-8 h-8 text-muted-foreground/40" />
+   508→              </div>
+   509→              <p className="text-sm font-medium text-muted-foreground">لا يوجد بوتات مسجلة حتى الآن</p>
+   510→              <p className="text-xs text-muted-foreground/60 mt-1">
+   511→                اضغط &quot;تسجيل بوت جديد&quot; لإضافة بوت تيليجرام
+   512→              </p>
+   513→            </div>
+   514→          ) : (
+   515→            <div className="space-y-2.5">
+   516→              {telegramUsers.map((user) => (
+   517→                <div
+   518→                  key={user.id}
+   519→                  className={`bg-muted/20 rounded-xl p-3.5 ring-1 ring-border/20 transition-all ${
+   520→                    user.active ? "hover:bg-muted/30" : "opacity-60"
+   521→                  }`}
+   522→                >
+   523→                  <div className="flex items-center justify-between gap-3">
+   524→                    <div className="flex items-center gap-3 min-w-0">
+   525→                      <div
+   526→                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+   527→                          user.active
+   528→                            ? "bg-gradient-to-br from-sky-400 to-indigo-500 shadow-sm shadow-sky-400/20"
+   529→                            : "bg-muted/40"
+   530→                        }`}
+   531→                      >
+   532→                        <Bot className={`w-4 h-4 ${user.active ? "text-white" : "text-muted-foreground"}`} />
+   533→                      </div>
+   534→                      <div className="min-w-0">
+   535→                        <div className="flex items-center gap-2">
+   536→                          <p className="text-sm font-bold truncate">{user.name}</p>
+   537→                          <Badge
+   538→                            variant={user.active ? "default" : "secondary"}
+   539→                            className={`rounded-md text-[10px] px-1.5 py-0 font-bold ${
+   540→                              user.active
+   541→                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+   542→                                : "bg-muted text-muted-foreground"
+   543→                            }`}
+   544→                          >
+   545→                            {user.active ? "نشط" : "متوقف"}
+   546→                          </Badge>
+   547→                        </div>
+   548→                        <p className="text-xs text-muted-foreground truncate">
+   549→                          Token: {user.botToken} • Chat: {user.chatId}
+   550→                        </p>
+   551→                      </div>
+   552→                    </div>
+   553→
+   554→                    <div className="flex items-center gap-1.5 flex-shrink-0">
+   555→                      {testResults[user.id] && (
+   556→                        <Badge
+   557→                          variant={testResults[user.id].ok ? "default" : "destructive"}
+   558→                          className={`rounded-md text-[10px] px-1.5 py-0 font-bold ${
+   559→                            testResults[user.id].ok
+   560→                              ? "bg-emerald-500 text-white"
+   561→                              : ""
+   562→                          }`}
+   563→                        >
+   564→                          {testResults[user.id].ok ? (
+   565→                            <CheckCircle2 className="w-3 h-3 mr-0.5" />
+   566→                          ) : (
+   567→                            <XCircle className="w-3 h-3 mr-0.5" />
+   568→                          )}
+   569→                          {testResults[user.id].message}
+   570→                        </Badge>
+   571→                      )}
+   572→                      <Button
+   573→                        variant="ghost"
+   574→                        size="sm"
+   575→                        className="h-8 w-8 p-0 rounded-lg"
+   576→                        onClick={() => handleTestUser(user.id, user.name)}
+   577→                        disabled={testingUserId === user.id}
+   578→                      >
+   579→                        {testingUserId === user.id ? (
+   580→                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
+   581→                        ) : (
+   582→                          <TestTube className="w-3.5 h-3.5 text-muted-foreground hover:text-sky-500" />
+   583→                        )}
+   584→                      </Button>
+   585→                      <Button
+   586→                        variant="ghost"
+   587→                        size="sm"
+   588→                        className="h-8 w-8 p-0 rounded-lg"
+   589→                        onClick={() => handleToggleUser(user.id, !user.active, user.name)}
+   590→                      >
+   591→                        {user.active ? (
+   592→                          <PowerOff className="w-3.5 h-3.5 text-amber-500" />
+   593→                        ) : (
+   594→                          <Power className="w-3.5 h-3.5 text-emerald-500" />
+   595→                        )}
+   596→                      </Button>
+   597→                      <Button
+   598→                        variant="ghost"
+   599→                        size="sm"
+   600→                        className="h-8 w-8 p-0 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
+   601→                        onClick={() => handleDeleteUser(user.id, user.name)}
+   602→                        disabled={deletingUserId === user.id}
+   603→                      >
+   604→                        {deletingUserId === user.id ? (
+   605→                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-500" />
+   606→                        ) : (
+   607→                          <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />
+   608→                        )}
+   609→                      </Button>
+   610→                    </div>
+   611→                  </div>
+   612→                </div>
+   613→              ))}
+   614→            </div>
+   615→          )}
+   616→        </CardContent>
+   617→      </Card>
+   618→
+   619→      {/* Automation Settings */}
+   620→      <Card className="rounded-2xl border-0 shadow-lg ring-1 ring-border/20 overflow-hidden">
+   621→        <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500" />
+   622→        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 px-4 py-3 flex items-center gap-2.5 border-b border-border/30">
+   623→          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-sm shadow-emerald-400/20">
+   624→            <Zap className="w-4 h-4 text-white" />
+   625→          </div>
+   626→          <div>
+   627→            <h3 className="text-sm font-bold">إعدادات الأتمتة</h3>
+   628→            <p className="text-xs text-muted-foreground">Automation Settings</p>
+   629→          </div>
+   630→        </div>
+   631→        <CardContent className="p-4 space-y-4">
+   632→          <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3 ring-1 ring-border/20">
+   633→            <div>
+   634→              <Label className="font-bold text-sm">تفعيل الأتمتة</Label>
+   635→              <p className="text-xs text-muted-foreground">
+   636→                تشغيل جلب الأسعار والإشعارات تلقائياً
+   637→              </p>
+   638→            </div>
+   639→            <Switch
+   640→              checked={automationEnabled}
+   641→              onCheckedChange={setAutomationEnabled}
+   642→            />
+   643→          </div>
+   644→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   645→            <div className="space-y-2">
+   646→              <Label htmlFor="reportTime" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+   647→                <Clock className="w-3.5 h-3.5" /> وقت التقرير اليومي
+   648→              </Label>
+   649→              <Input
+   650→                id="reportTime"
+   651→                type="time"
+   652→                value={dailyReportTime}
+   653→                onChange={(e) => setDailyReportTime(e.target.value)}
+   654→                className="rounded-lg h-9 text-xs"
+   655→              />
+   656→            </div>
+   657→            <div className="space-y-2">
+   658→              <Label htmlFor="threshold" className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+   659→                <AlertTriangle className="w-3.5 h-3.5" /> حد انخفاض الدولار (%)
+   660→              </Label>
+   661→              <Input
+   662→                id="threshold"
+   663→                type="number"
+   664→                step="0.1"
+   665→                min="0"
+   666→                value={usdDropThreshold}
+   667→                onChange={(e) => setUsdDropThreshold(e.target.value)}
+   668→                className="rounded-lg h-9 text-xs"
+   669→              />
+   670→            </div>
+   671→          </div>
+   672→          <Button
+   673→            onClick={handleSaveConfig}
+   674→            disabled={savingConfig}
+   675→            className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 gap-2 rounded-lg shadow-sm shadow-emerald-500/20 h-9 px-4 text-xs"
+   676→          >
+   677→            {savingConfig ? (
+   678→              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+   679→            ) : (
+   680→              <Save className="w-3.5 h-3.5" />
+   681→            )}
+   682→            <span className="text-xs font-bold">حفظ الإعدادات</span>
+   683→          </Button>
+   684→        </CardContent>
+   685→      </Card>
+   686→    </div>
+   687→  );
+   688→}
+   689→

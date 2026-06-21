@@ -96,6 +96,11 @@ export async function register() {
       const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
       console.log(`[scheduler] ⏰ [${cairoTime}] Firing production /api/automation/run...`);
 
+      // Obtain an admin session token so the (now auth-protected)
+      // /api/automation/run endpoint accepts the request. The token is
+      // also reused for the dedup check below.
+      const adminToken = await getAdminToken();
+
       // Dedup check
       const recentlySent = await wasReportSentRecently();
       if (recentlySent) {
@@ -103,9 +108,20 @@ export async function register() {
         return;
       }
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (adminToken) {
+        headers.Cookie = `admin_session=${adminToken}`;
+      } else {
+        console.warn(
+          `[scheduler] ⚠️ No admin token — /api/automation/run may reject with 401 on the new production code`
+        );
+      }
+
       const response = await fetch(`${PRODUCTION_URL}/api/automation/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         signal: AbortSignal.timeout(120000),
       });
       const data = await response.json() as {

@@ -131,12 +131,13 @@ export default function Home() {
               )}
             </TabsList>
 
-            {activeTab === "dashboard" && (
+            {activeTab === "dashboard" && isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRunAutomation}
                 disabled={loading.automation}
+                title="زر إداري — يظهر للمسؤول فقط لتشغيل دورة الأتمتة يدوياً (تحديث الأسعار + إرسال تقرير فوري للعملاء). لا يؤثر على الزوار العاديين."
                 className="gap-1.5 rounded-xl border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/30 h-8 text-xs font-bold"
               >
                 <Play
