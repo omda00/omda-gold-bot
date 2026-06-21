@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getAdminSession } from "@/lib/admin-auth";
+import { upsertTelegramUser } from "@/lib/telegram-user-helpers";
 
 /**
  * GET /api/telegram-users - Return all registered Telegram users
@@ -76,26 +77,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert to prevent duplicates (chatId+botToken is unique)
-    const user = await db.telegramUser.upsert({
-      where: { chatId_botToken: { chatId: chatId.trim(), botToken: botToken.trim() } },
-      update: {
-        name: name.trim(),
-        active: true,
-      },
-      create: {
-        name: name.trim(),
-        botToken: botToken.trim(),
-        chatId: chatId.trim(),
-        active: true,
-      },
+    // Upsert to prevent duplicates — uses resilient helper that works
+    // even if the DB doesn't have the @@unique([chatId, botToken]) constraint.
+    const { user, created } = await upsertTelegramUser({
+      chatId: chatId.trim(),
+      botToken: botToken.trim(),
+      name: name.trim(),
     });
 
     // Mask bot token in response
     return NextResponse.json({
       ...user,
       botToken: user.botToken ? `****${user.botToken.slice(-5)}` : "",
-    }, { status: user.createdAt.getTime() === user.updatedAt.getTime() ? 201 : 200 });
+    }, { status: created ? 201 : 200 });
   } catch (error) {
     console.error("Error creating telegram user:", error);
     return NextResponse.json(

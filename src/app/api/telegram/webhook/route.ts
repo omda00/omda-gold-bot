@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { getConfig } from "@/lib/config-seeder";
+import { findTelegramUser, upsertTelegramUser } from "@/lib/telegram-user-helpers";
 
 /**
  * POST /api/telegram/webhook - Telegram Bot Webhook
@@ -111,24 +112,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /start command - Register user (upsert to prevent duplicates)
+    // Handle /start command - Register user
+    // Uses resilient helper that works even if the DB doesn't have the
+    // @@unique([chatId, botToken]) constraint applied (production Neon issue).
     if (text === "/start" || text.startsWith("/start ")) {
       const userName = fromUser.first_name 
         + (fromUser.last_name ? ` ${fromUser.last_name}` : "");
 
-      // Use upsert to guarantee no duplicates (chatId+botToken is unique)
-      const user = await db.telegramUser.upsert({
-        where: { chatId_botToken: { chatId, botToken } },
-        update: { active: true, name: userName },
-        create: {
-          name: userName,
-          botToken,
-          chatId,
-          active: true,
-        },
+      const { created } = await upsertTelegramUser({
+        chatId,
+        botToken,
+        name: userName,
       });
 
-      const wasReactivated = user.createdAt !== user.updatedAt;
+      const wasReactivated = !created;
 
       if (wasReactivated) {
         // User existed before — welcome back
@@ -159,9 +156,8 @@ export async function POST(request: NextRequest) {
 
     // Handle /stop command - Deactivate user
     if (text === "/stop") {
-      const existing = await db.telegramUser.findUnique({
-        where: { chatId_botToken: { chatId, botToken } },
-      });
+      // Use resilient helper (compound unique key may not exist on production DB)
+      const existing = await findTelegramUser(chatId, botToken);
 
       if (existing) {
         await db.telegramUser.update({

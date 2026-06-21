@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { upsertTelegramUser } from "@/lib/telegram-user-helpers";
 
 /**
  * POST /api/telegram-users/register - Public bot registration (no admin auth required)
@@ -33,19 +34,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this bot token + chat ID combination already exists — upsert to prevent duplicates
-    const user = await db.telegramUser.upsert({
-      where: { chatId_botToken: { chatId: chatId.trim(), botToken: botToken.trim() } },
-      update: { active: true, name: name.trim() },
-      create: {
-        name: name.trim(),
-        botToken: botToken.trim(),
-        chatId: chatId.trim(),
-        active: true,
-      },
+    // Upsert to prevent duplicates — uses resilient helper that works
+    // even if the DB doesn't have the @@unique([chatId, botToken]) constraint.
+    const { user, created } = await upsertTelegramUser({
+      chatId: chatId.trim(),
+      botToken: botToken.trim(),
+      name: name.trim(),
     });
 
-    const isNewUser = user.createdAt.getTime() === user.updatedAt.getTime();
+    const isNewUser = created;
 
     if (!isNewUser) {
       // User was reactivated — test connection and notify
