@@ -6,11 +6,5 @@
         { "key": "Cache-Control", "value": "no-cache" }
       ]
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/refresh-prices",
-      "schedule": "1 * * * *"
-    }
   ]
 }
