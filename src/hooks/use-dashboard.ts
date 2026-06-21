@@ -30,6 +30,7 @@ export function useDashboardData() {
     fetching: false,
     automation: false,
     calculator: true,
+    testSend: false,
   });
 
   const [lastAutomationRun, setLastAutomationRun] = useState<string | null>(null);
@@ -261,6 +262,30 @@ export function useDashboardData() {
       setLoading((prev) => ({ ...prev, automation: false }));
     }
   }, [fetchPrices, fetchLogs]);
+
+  // Send a TEST message to the OWNER ONLY (does NOT disturb subscribers).
+  // Calls the existing /api/test-send-owner endpoint which sends to the
+  // hardcoded owner chatId (750182271 / dukeomda) and does NOT touch any
+  // dedup state, so it cannot interfere with the scheduled hourly send.
+  const sendTestToOwner = useCallback(async () => {
+    setLoading((prev) => ({ ...prev, testSend: true }));
+    try {
+      const res = await fetch("/api/test-send-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchLogs();
+        return data;
+      } else {
+        throw new Error(data.error || "Test send failed");
+      }
+    } finally {
+      setLoading((prev) => ({ ...prev, testSend: false }));
+    }
+  }, [fetchLogs]);
 
   // ==========================================
   // Telegram Users Management (Admin Only)
@@ -497,6 +522,7 @@ export function useDashboardData() {
     updateConfig,
     testTelegram,
     runAutomation,
+    sendTestToOwner,
     fetchCalculatorData,
     fetchTelegramUsers,
     addTelegramUser,

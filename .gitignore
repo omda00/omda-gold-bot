@@ -63,3 +63,6 @@ server.log
 /mini-services/db/custom.db
 tool-results/
 worklog.md
+
+# Dev server PID files
+.zscripts/

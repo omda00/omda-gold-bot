@@ -155,10 +155,12 @@ export async function GET() {
         if (activeUsers.length > 0) {
           const result = await sendReportToAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
           reportSent = result.sent > 0;
-          reportDetails = `تم الإرسال إلى ${result.sent}/${result.total} مستخدم`;
+          reportDetails = `تم الإرسال إلى ${result.sent}/${result.total} مستخدم` +
+            (result.deactivated ? ` (تم إلغاء تفعيل ${result.deactivated} مستخدم حظر البوت)` : "");
           console.log(
             `[cron/refresh-prices] 📨 Report sent: ${result.sent}/${result.total}` +
-            (result.skipped ? ` (skipped ${result.skipped} already-sent)` : "")
+            (result.skipped ? ` (skipped ${result.skipped} already-sent)` : "") +
+            (result.deactivated ? ` (deactivated ${result.deactivated} blocked)` : "")
           );
         } else {
           const result = await sendReportViaGlobalConfig(hourlyReport, "hourly_report", "Hourly Price Report");

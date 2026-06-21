@@ -132,7 +132,7 @@ export async function sendReportToAllUsers(
   message: string,
   type: string,
   title: string
-): Promise<{ sent: number; failed: number; total: number; skipped: number }> {
+): Promise<{ sent: number; failed: number; total: number; skipped: number; deactivated: number }> {
   const allUsers = await db.telegramUser.findMany({ where: { active: true } });
 
   // Deduplicate by chatId — keep only one record per unique chatId.
@@ -156,14 +156,15 @@ export async function sendReportToAllUsers(
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let deactivated = 0;
 
   for (const user of uniqueUsers) {
-    // Per-chat dedup: skip if this chat already got a report in the last 55 min.
+    // Per-chat dedup: skip if this chat already got a report in the last hour.
     // This is the ultimate safeguard — even if the global lock failed due to a
     // race, each chat is still protected individually.
     if (await wasChatSentRecently(user.chatId)) {
       console.log(
-        `[report] ⏭️ Skipping ${user.name} (chatId ${user.chatId}) — already sent in last 55 min`
+        `[report] ⏭️ Skipping ${user.name} (chatId ${user.chatId}) — already sent in last hour`
       );
       skipped++;
       continue;
@@ -190,6 +191,35 @@ export async function sendReportToAllUsers(
       } else {
         failed++;
         console.error(`[report] Failed to send to ${user.name}: ${result.error}`);
+
+        // ── Auto-deactivate users who have blocked the bot ──────────────
+        // Telegram returns "Forbidden: bot was blocked by the user" when a
+        // user has blocked the bot. This is PERMANENT — the bot can NEVER
+        // deliver to that chat again unless the user unblocks it and
+        // re-opens the conversation. Deactivating them:
+        //   • stops wasting time retrying a permanently-failing chat
+        //   • keeps the NotificationLog clean (no more repeated failures)
+        //   • surfaces the blocked status in the admin dashboard
+        // If the user unblocks the bot and sends /start again, the webhook
+        // upsert will reactivate them automatically.
+        if (
+          result.error &&
+          (result.error.includes("blocked by the user") ||
+            result.error.toLowerCase().includes("forbidden"))
+        ) {
+          try {
+            await db.telegramUser.updateMany({
+              where: { chatId: user.chatId },
+              data: { active: false },
+            });
+            deactivated++;
+            console.log(
+              `[report] 🚫 Auto-deactivated ${user.name} (chatId ${user.chatId}) — bot was blocked by the user`
+            );
+          } catch (deactErr) {
+            console.error(`[report] Failed to auto-deactivate ${user.name}:`, deactErr);
+          }
+        }
       }
     } catch (err) {
       failed++;
@@ -197,7 +227,7 @@ export async function sendReportToAllUsers(
     }
   }
 
-  return { sent, failed, total: uniqueUsers.length, skipped };
+  return { sent, failed, total: uniqueUsers.length, skipped, deactivated };
 }
 
 /**
