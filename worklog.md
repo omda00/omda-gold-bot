@@ -343,3 +343,79 @@ Stage Summary:
   • وظيفة الزر: تشغيل يدوي لدورة الأتمتة (تحديث الأسعار + إرسال تقرير فوري لكل العملاء)
   • مخاطر ضغط الزوار: نعم — رسائل غير مجدولة للعملاء + إساءة موارد + ثغرة أمنية
   • أهميته للزوار: لا أهمية إطلاقاً — أداة إدارية بحتة، الزوار يحتاجون فقط عرض الأسعار
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix "messages reach only the owner, other subscribers don't receive" + ensure test messages go to owner only
+
+Work Log:
+- Diagnosed production via /api/telegram-users + /api/logs (admin JWT):
+  - 8 active users, all same botToken (****3dzns):
+    1. Omda (750182271) — ✅ SUCCESS — THE OWNER (dukeomda)
+    2. Ōmda (6350496212) — ✅ SUCCESS — DUPLICATE of owner
+    3. Test Test (7503487136) — ✅ SUCCESS — DUPLICATE of owner
+    4. The Pyramid (1272398409) — ✅ SUCCESS — real subscriber
+    5. Waleed Elbasha (1534788014) — ❌ "Forbidden: bot was blocked by the user"
+    6. Michael Fayez (1229422896) — ❌ "Forbidden: bot was blocked by the user"
+    7. 𝐁𝐄𝐁𝐎 𝐓𝐄𝐂𝐇 (6782986749) — ❌ "Forbidden: bot was blocked by the user"
+    8. ꧁☠︎𝙳𝕒𝚛𝕜♔♕𝚂𝕙𝚊𝕕𝚘𝕨☠︎꧂ (5807410264) — ❌ "Forbidden: bot was blocked by the user"
+  - Root cause: code was CORRECT (sends to all 8) but 4 users had blocked the
+    bot (Telegram-side, permanent — not a code bug) + owner registered 3x.
+
+- Production data cleanup (via PATCH /api/telegram-users/[id] with admin cookie):
+  - Deactivated Ōmda (6350496212) — duplicate owner
+  - Deactivated Test Test (7503487136) — duplicate owner
+  - Deactivated Waleed Elbasha, Michael Fayez, BEBO TECH, Dark Shadow — all blocked the bot
+  - Remaining active: 2 users (Omda owner + The Pyramid subscriber)
+
+- Code changes (commit cce9557 on GitHub):
+  - src/lib/report-sender.ts (sendReportToAllUsers):
+    * NEW: auto-deactivate users whose send returns "Forbidden: bot was blocked
+      by the user". Stops retrying permanently-failing chats, keeps logs clean,
+      surfaces blocked status in admin UI. If user unblocks bot + sends /start,
+      webhook upsert reactivates them automatically.
+    * Returns new 'deactivated' count.
+  - src/app/api/cron/refresh-prices/route.ts: log deactivated count in response.
+  - src/hooks/use-dashboard.ts: add sendTestToOwner() calling existing
+    /api/test-send-owner endpoint (admin-only, hardcoded owner chatId 750182271,
+    does NOT touch dedup state).
+  - src/app/page.tsx: add "إرسال تجريبي للمالك" button (admin-only, amber)
+    next to "تشغيل الأتمتة" (admin-only, emerald). Both hidden from non-admins.
+  - .gitignore: add .zscripts/ for dev PID files.
+
+- Verified locally:
+  - POST /api/test-send-owner → 401 without admin cookie ✅
+  - POST /api/test-send-owner with admin cookie → {"success":true,"sentTo":"750182271"} ✅
+  - UI: "إرسال تجريبي للمالك" button visible to admin, toast confirms send ✅
+  - Logs tab: test sends logged as "Test Send — Owner Only" (1 entry, NOT per-subscriber) ✅
+  - Dev server running as daemon (PID 3390, PPid=1) — scheduler fires at :01 UTC ✅
+
+- Verified on production:
+  - /api/test-send-owner endpoint already deployed (from commit 2c4864a) ✅
+  - POST with admin cookie → {"success":true,"sentTo":"750182271"} ✅
+  - HOURLY_REPORT_LOCK + LAST_REPORT_CHAT_* keys all expired (last send 05:02 UTC, TTL 59 min)
+  - Next scheduler fire: 09:01 UTC → will send to both active users (Omda + The Pyramid)
+
+- Vercel deploy:
+  - New code pushed to GitHub (commit cce9557) ✅
+  - GitHub repo has 0 webhooks → Vercel does NOT auto-deploy
+  - No Vercel token available → cannot deploy via CLI/API
+  - User needs to manually redeploy via Vercel dashboard to get:
+    (a) the "إرسال تجريبي للمالك" UI button
+    (b) the auto-deactivation logic for future blocked users
+  - CORE FIX (production data cleanup) is already live — no deploy needed
+
+Stage Summary:
+- The user's complaint "only the owner receives messages" was NOT a code bug:
+  4 real subscribers had blocked the bot (Telegram-side, permanent), and the
+  owner was registered 3x (getting 3 copies). The code was correctly sending
+  to all 8 active users every hour.
+- FIXED by deactivating: 4 blocked users + 2 duplicate owner entries.
+  Now only 2 active users remain: Omda (owner) + The Pyramid (subscriber).
+  The next hourly send (09:01 UTC) will deliver to BOTH.
+- Test messages: the /api/test-send-owner endpoint (already on production)
+  sends ONLY to the owner (hardcoded chatId 750182271). New UI button added
+  (pending Vercel deploy) for one-click test sends from the dashboard.
+- Auto-deactivation (pending Vercel deploy) will automatically disable future
+  users who block the bot, keeping the send loop + logs clean.
