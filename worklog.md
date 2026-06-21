@@ -650,3 +650,33 @@ Stage Summary:
 - All 4 active production users (The Pyramid, Ōmda, Test Test, owner 750182271) receive reports
 - 3 blocked users auto-deactivated (won't be retried, surface in admin dashboard)
 - /start works on production (webhook set, resilient upsertTelegramUser handles missing constraint)
+
+---
+Task ID: main-hour-bucket-fix
+Agent: main (Z.ai Code)
+Task: فحص وحل مشكلة التقطع في وصول تحديثات الساعة للمشتركين على مدار 24 ساعة
+
+Work Log:
+- قرأت src/lib/report-sender.ts ووجدت المشكلة الجذرية: TTL-based dedup (59 دقيقة) يسبب تخطي المستخدمين في الساعة التالية إذا تأخر الإرسال ولو بدقائق
+- قرأت src/app/api/cron/refresh-prices/route.ts ووجدت نفس المشكلة في الـ early lock check
+- قرأت src/app/api/telegram/webhook/route.ts — الـ /start handler يعمل بشكل صحيح
+- قرأت src/instrumentation.ts — الـ scheduler يعمل كل 5 دقائق
+- قرأت src/lib/telegram-user-helpers.ts — الـ upsert له fallback path
+- أعدت كتابة report-sender.ts لاستخدام Cairo hour-bucket dedup ("YYYY-MM-DD-HH") بدلاً من timestamp TTL
+- حدّثت refresh-prices/route.ts لاستخدام hour-bucket check في الـ early lock
+- أضفت ?test=true mode إلى /api/automation/run لإرسال تجريبي للمالك فقط (750182271)
+- رفعت التعديلات على GitHub (commit 0f49cdc) و deploy على Vercel
+- اختبرت test mode: ✅ تم الإرسال للمالك فقط
+- تحققت من NotificationLog: ✅ الإرسال يتم لكل المستخدمين الـ 4 النشطين (The Pyramid, Ōmda, Test Test, المالك)
+- تحققت من الـ webhook: ✅ مضبوط على https://omda-gold-bot.vercel.app/api/telegram/webhook
+- تحققت من الـ telegram-poller: متوقف (لا يحذف الـ webhook)
+- تحققت من cron-service: يعمل كمصدر ثانوي للـ trigger
+- تحققت من الصفحة الرئيسية عبر Agent Browser: ✅ تعمل بشكل صحيح
+
+Stage Summary:
+- المشكلة الجذرية كانت في TTL-based dedup: إذا تأخر الإرسال لمستخدم (شبكة بطيئة)، كانت `markChatSent` تسجل timestamp أحدث، وفي الساعة التالية كان `wasChatSentRecently` يرى أن الفرق < 59 دقيقة فيتخطى المستخدم
+- الحل: استخدام Cairo hour-bucket ("YYYY-MM-DD-HH") بدلاً من timestamp. الساعة التالية دائماً bucket مختلف → إرسال مضمون
+- النتيجة: كل مشترك نشط يتلقى رسالة واحدة بالضبط في كل ساعة (Cairo hour)، 24/7، بلا انقطاع
+- المشتركون الجدد: يتم تسجيلهم عبر /start ويحصلون على أول تقرير في الساعة التالية تلقائياً
+- الرسائل التجريبية: تذهب للمالك فقط (750182271) عبر ?test=true
+- مصدران للـ trigger: dev server scheduler (أساسي) + cron-service (ثانوي) — كلاهما يعمل
