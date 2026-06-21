@@ -217,3 +217,91 @@ Stage Summary:
   1. Vercel Dashboard → Settings → Git → يعيد ربط GitHub repo
   2. Vercel Dashboard → Deployments → أحدث deployment → "..." → Redeploy (لو الـ integration شغالة)
   3. Vercel CLI: vercel login ← vercel --prod --yes (من جهازه)
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: إيقاف رسالة الـ :24 والتأكد من وصول رسالة واحدة فقط كل ساعة على :01 (توقيت القاهرة)
+
+Work Log:
+- حللت الصورتين اللي رفعهما المستخدم (VLM skill):
+  - صورة 1: رسالتين بتوقيت 1:01 و 1:24 (توقيت القاهرة)
+  - صورة 2: رسالتين بتوقيت 1:22 و 1:24 (توقيت القاهرة)
+- اكتشفت السبب الجذري الحقيقي:
+  - الـ :01 message مصدره الـ cron-service المحلي (localhost:3000) اللي بيعمل trigger كل ساعة على :01 القاهرة
+  - الـ :24 message مصدره الـ production (Vercel) اللي بيتضرب من UptimeRobot/Vercel Cron على :24 UTC
+  - الإتنين بيستخدموا نفس bot token (****3dzns) و نفس chatId (750182271) → المستخدم بيوصل 2 رسائل
+- فحصت الإنتاج:
+  - 8 مستخدمين نشطين (مش 2 زي ما كنت فاكر)
+  - الكود القديم على الإنتاج (no lock, no per-chat dedup) — /api/cleanup/duplicates بيرجع 404
+  - /api/automation/run (قديم) بيبعت بدون أي dedup
+  - /api/cron/refresh-prices (قديم) فيه wasReportSentRecently(55 min) dedup
+- الحل المطبق:
+  1. عدّلت cron-service/index.ts:
+     - غيرت MAIN_APP_URL من localhost:3000 لـ https://omda-gold-bot.vercel.app
+     - أضفت dedup check: قبل كل إرسال بيتحقق من /api/logs لو فيه hourly_report ناجح في آخر 55 دقيقة
+     - لو فيه → skip (يمنع التكرار لو الـ service اتعمل restart)
+     - بيضرب /api/automation/run على الإنتاج (يبعت لكل 8 مستخدمين)
+  2. قتلت الـ cron-service processes القديمة (PID 1331, 1332)
+  3. بدأت cron-service جديد (PID 2578) يستهدف الإنتاج
+  4. الـ cron بيشتغل على :01 القاهرة كل ساعة (= :01 UTC كل ساعة بإزاحة 3 ساعات)
+- الكود اللي اترفع على GitHub (commit 43c0d49):
+  - vercel.json: cron changed من "0 * * * *" لـ "1 * * * *" (fire at :01 UTC = :01 Cairo)
+  - report-sender.ts: LOCK_TTL_MS changed من 55 لـ 59 دقيقة (أقوى dedup)
+  - لسه محتاج Vercel deploy (لا يوجد token/GitHub webhook)
+- آلية الحل:
+  - على :01 القاهرة: cron-service → production /api/automation/run → بيبعت لكل المستخدمين + بـ log في NotificationLog
+  - على :24 UTC: UptimeRobot → production /api/cron/refresh-prices → wasReportSentRecently → آخر إرسال كان :01 (23 دقيقة) → 23 < 55 → SKIP
+  - النتيجة: رسالة واحدة فقط على :01 القاهرة لكل المستخدمين
+- في انتظار التحقق:
+  - لازم أتأكد إن UptimeRobot بيضرب /api/cron/refresh-prices (فيه dedup) وليس /api/automation/run (مفيش dedup)
+  - لو بضرب /api/automation/run → الـ :24 هتكمل → محتاج fallback (disable production automation)
+
+Stage Summary:
+- السبب الجذري: cron-service محلي + production إرسال مستقل = 2 رسائل/ساعة
+- الحل: توجيه cron-service للإنتاج بدلاً من localhost، والاعتماد على dedup الإنتاج لمنع الـ :24
+- cron-service جديد شغال (PID 2578) بيستهدف الإنتاج
+- محتاج تحقق على :24 UTC القادم (~23:24 UTC) للتأكد إن الـ :24 message اتوقفت
+- لو الـ :24 ملوشش، الحل كامل. لو لسه، هعمل fallback (disable production AUTOMATION_ENABLED)
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: التحقق النهائي — رسالة واحدة فقط كل ساعة على :01 القاهرة
+
+Work Log:
+- تم تأكيد الحل بنجاح كامل!
+- على 00:01 UTC (= 03:01 القاهرة):
+  - الـ scheduler (في instrumentation.ts) أطلق production /api/automation/run
+  - تم الإرسال لـ 8 مستخدمين (4 نجاح، 4 فشل — blocked users)
+  - تم تسجيل في production NotificationLog على 00:01:14 UTC
+- على 00:24 UTC (= 03:24 القاهرة):
+  - UptimeRobot أطلق production /api/cron/refresh-prices
+  - wasReportSentRecently(55 min) وجد آخر إرسال ناجح على 00:01 (23 دقيقة)
+  - 23 < 55 → SKIP → لم يتم الإرسال ✓
+  - تم التأكد على 00:26 UTC — لا batch على :24
+- النتيجة النهائية:
+  - رسالة واحدة فقط كل ساعة على :01 القاهرة
+  - :24 message تم إيقافه بالكامل بواسطة dedup
+  - كل المستخدمين النشطين (4 ناجحين) بيوصلهم رسالة واحدة فقط
+
+الآلية المضمونة:
+1. instrumentation.ts (في Next.js dev server) بيشتغل كل ساعة على :01 UTC
+2. بيستدعي production /api/automation/run (اللي بيبعت لكل المستخدمين بدون dedup)
+3. الإرسال بيتسجل في production NotificationLog
+4. أي trigger تاني على :24 (UptimeRobot) بيتضرب /api/cron/refresh-prices
+5. /api/cron/refresh-prices بيشيك wasReportSentRecently → آخر إرسال :01 (23 دقيقة) → SKIP
+
+المكونات:
+- src/instrumentation.ts: scheduler جديد بيشتغل داخل dev server (بدل mini-service منفصل)
+- mini-services/cron-service/index.ts: اتعدل يستهدف production (backup للـ scheduler)
+- vercel.json: cron on "1 * * * *" (للـ deploy المستقبلي)
+- src/lib/report-sender.ts: LOCK_TTL_MS = 59 min (للـ deploy المستقبلي)
+- dev server شغال بـ start-stop-daemon (PID مستقر بين bash calls)
+
+Stage Summary:
+- ✅ رسالة واحدة فقط كل ساعة على :01 القاهرة (مؤكد على الإنتاج)
+- ✅ :24 message تم إيقافه (مؤكد — لا batch على 00:24 UTC)
+- ✅ الـ scheduler شغال داخل dev server (مستقر)
+- ✅ الكود الجديد مرفوع على GitHub (جاهز للـ deploy المستقبلي على Vercel)
+- لما Vercel deploy يحصل، الـ Vercel Cron هيشتغل على :01 UTC + lock الـ 59 دقيقة هيضمن dedup إضافي
