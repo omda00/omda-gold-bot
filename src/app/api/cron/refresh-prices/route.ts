@@ -11,6 +11,7 @@ import {
   sendReportToAllUsers,
   sendReportViaGlobalConfig,
   buildHourlyReport,
+  getCairoHourBucket,
 } from "@/lib/report-sender";
 
 // Karat symbol mapping
@@ -45,21 +46,23 @@ export async function GET() {
     // poll would trigger a full web scrape (iSagha + Google Finance) —
     // 288 scrapes/day, risking IP bans and wasting resources.
     //
-    // The lock has a 59-min TTL. If it's still held, we know no report is
-    // due, so we skip scraping entirely and return immediately. Prices are
-    // still served from the DB (last fetched values) to the dashboard.
+    // The lock stores the Cairo hour-bucket ("YYYY-MM-DD-HH"). If the stored
+    // bucket matches the current Cairo hour, a report was already sent this
+    // hour → skip scraping entirely and return immediately. Prices are still
+    // served from the DB (last fetched values) to the dashboard.
     //
-    // Only when the lock is acquirable (i.e. ~1 hour since last send) do we
+    // Only when the bucket differs (i.e. a new Cairo hour has started) do we
     // proceed to scrape fresh prices and send the report.
+    //
+    // IMPORTANT: using hour-bucket (not timestamp TTL) means send-loop
+    // latency never causes a false "already sent" in the next hour. This
+    // fixes the intermittent delivery bug that affected non-owner
+    // subscribers.
     let lockAlreadyHeld = false;
     if (automationEnabled === "true") {
       const existing = await db.appConfig.findUnique({ where: { key: "HOURLY_REPORT_LOCK" } });
-      if (existing) {
-        const lockTime = parseInt(existing.value, 10);
-        const LOCK_TTL_MS = 59 * 60 * 1000;
-        if (!Number.isNaN(lockTime) && Date.now() - lockTime < LOCK_TTL_MS) {
-          lockAlreadyHeld = true;
-        }
+      if (existing && existing.value === getCairoHourBucket()) {
+        lockAlreadyHeld = true;
       }
     }
 
@@ -169,14 +172,17 @@ export async function GET() {
     );
 
     // ========================================
-    // Auto-send hourly report (DEDUPLICATED — atomic lock)
+    // Auto-send hourly report (DEDUPLICATED — Cairo hour-bucket lock)
     // ========================================
-    // Three layers of protection ensure exactly ONE message per chat per hour:
-    //   1. acquireHourlyReportLock() — atomic DB lock, only one caller per
-    //      55-min window can proceed (kills race conditions between Vercel
-    //      Cron / UptimeRobot / in-process cron).
-    //   2. wasChatSentRecently(chatId) — per-chat check inside the send loop
-    //      so the same chat never gets 2 messages even if registered twice.
+    // Three layers of protection ensure exactly ONE message per chat per
+    // Cairo hour:
+    //   1. acquireHourlyReportLock() — DB lock keyed on the Cairo hour
+    //      bucket ("YYYY-MM-DD-HH"). Only one caller per hour can proceed.
+    //      Using hour-bucket (not timestamp TTL) means send-loop latency
+    //      never causes a false "already sent" in the next hour.
+    //   2. wasChatSentRecently(chatId) — per-chat hour-bucket check inside
+    //      the send loop so the same chat never gets 2 messages even if
+    //      registered twice or the global lock raced.
     //   3. In-memory chatId dedup of the user list.
     let reportSent = false;
     let reportDetails = "";
