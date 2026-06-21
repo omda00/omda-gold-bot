@@ -268,6 +268,7 @@ export async function register() {
 
   // Initial fire after a short delay (let the server finish booting)
   setTimeout(() => {
+    console.log("[scheduler] 🔔 Initial catch-up tick firing...");
     pollAndTrigger().catch((err) =>
       console.error("[scheduler] Initial poll error:", err)
     );
@@ -275,13 +276,16 @@ export async function register() {
 
   // Then every 5 minutes
   const interval = setInterval(() => {
+    console.log("[scheduler] 🔔 5-min tick firing...");
     pollAndTrigger().catch((err) =>
       console.error("[scheduler] Interval poll error:", err)
     );
   }, POLL_INTERVAL_MS);
 
-  // Keep the interval alive
-  interval.unref?.();
+  // NOTE: Do NOT call interval.unref() — in Next.js 16 with Turbopack,
+  // unref() causes the timer to be garbage-collected after register()
+  // returns, so the callbacks never fire. The dev server process itself
+  // stays alive (HTTP server), keeping the interval alive too.
 
   const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
   console.log(`[scheduler] ✅ Scheduler active since ${cairoTime}`);

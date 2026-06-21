@@ -1,7 +1,7 @@
 /**
  * Cron Service — Standalone redundant trigger for hourly Telegram reports
  *
- * STRATEGY: TTL-BASED POLLING (fires every 5 minutes)
+ * STRATEGY: TTL-BASED POLLING (fires every 5 minutes via setInterval)
  * ----------------------------------------------------
  * This standalone bun process survives dev server restarts. It polls
  * production /api/automation/run every 5 minutes. Production checks the
@@ -16,16 +16,15 @@
  *   • Redundant with instrumentation.ts scheduler — if either is alive,
  *     the hourly report fires
  *
- * WHY NOT wall-clock :01?
- * The previous design fired only at :01 Cairo. If the process was down
- * at :01, the hour was missed entirely. The 5-min TTL approach catches
- * up automatically on the next tick after the lock expires.
+ * WHY setInterval (not node-cron)?
+ * node-cron's timer doesn't reliably keep the bun process alive in all
+ * environments. A plain setInterval is simpler, has no dependencies, and
+ * is guaranteed to fire as long as the process is alive.
  */
-
-import cron from "node-cron";
 
 const PRODUCTION_URL = "https://omda-gold-bot.vercel.app";
 const ADMIN_PASSWORD = "908070";
+const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Track state
 let lastRunTime: string | null = null;
@@ -35,6 +34,18 @@ let totalRuns = 0;
 let successRuns = 0;
 let skipRuns = 0;
 let errorRuns = 0;
+
+// =============================================
+// CRASH PROTECTION — never exit on unhandled errors
+// =============================================
+// Without these handlers, any unhandled promise rejection or uncaught
+// exception would kill the process, breaking the 24/7 hourly trigger.
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ unhandledRejection (ignored):", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("⚠️ uncaughtException (ignored):", err instanceof Error ? err.message : String(err));
+});
 
 /**
  * Get admin session token from production
@@ -62,10 +73,6 @@ async function getAdminToken(): Promise<string | null> {
  * Production's /api/cron/refresh-prices checks the global lock FIRST:
  *   - If lock held (sent < 59 min ago) → returns immediately, no scrape
  *   - If lock expired → scrapes prices + sends to all active users
- *
- * We don't do any pre-dedup here — production's lock is the single source
- * of truth and is atomic. This avoids the buggy /api/logs pre-check that
- * could skip a needed send if only some users received the last report.
  */
 async function runAutomation(): Promise<boolean> {
   const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
@@ -96,7 +103,6 @@ async function runAutomation(): Promise<boolean> {
 
     if (response.ok) {
       if (data.skipped === "lock_held") {
-        // Normal case: lock held, no report due. Quiet log.
         console.log(`⏰ [${cairoTime}] ⏭️ Lock held — no report due`);
         lastRunStatus = "skipped (lock held)";
         skipRuns++;
@@ -157,23 +163,14 @@ async function runCycle(): Promise<void> {
 }
 
 // =============================================
-// Schedule: fire every 5 minutes
-// =============================================
-// The production lock (59-min TTL) ensures exactly ONE send per hour.
-// All other ticks are cheap no-ops (lock held → early return, no scrape).
-cron.schedule("*/5 * * * *", async () => {
-  await runCycle();
-});
-
-// =============================================
 // Start
 // =============================================
 const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
 console.log(`🚀 Cron Service started at ${cairoTime}`);
 console.log(`📡 Production URL: ${PRODUCTION_URL}`);
-console.log(`⏱️  Polling every 5 minutes (TTL-based, self-healing)`);
+console.log(`⏱️  Polling every ${POLL_INTERVAL_MS / 1000}s via setInterval (TTL-based, self-healing)`);
 console.log(`🔒 Production lock (59-min TTL) guarantees exactly ONE send per hour`);
-console.log(`\n⏳ Waiting for first tick...`);
+console.log(`🛡️  Crash-protected: unhandledRejection + uncaughtException are caught`);
 
 // Fire immediately on startup (catch-up for missed hours)
 setTimeout(() => {
@@ -181,8 +178,15 @@ setTimeout(() => {
   runCycle();
 }, 5000);
 
-// Heartbeat — log stats every 5 minutes
+// Then every 5 minutes — plain setInterval (no unref, keeps process alive)
+setInterval(() => {
+  runCycle();
+}, POLL_INTERVAL_MS);
+
+// Heartbeat — log every 5 minutes so we know the process is alive
 setInterval(() => {
   const now = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
-  console.log(`💓 [${now}] Heartbeat | Sent: ${successRuns} | Skipped: ${skipRuns} | Errors: ${errorRuns} | Total: ${totalRuns} | Last: ${lastRunStatus || "none"} | Running: ${isRunning}`);
+  console.log(`💓 [${now}] Heartbeat | Sent: ${successRuns} | Skipped: ${skipRuns} | Errors: ${errorRuns} | Total: ${totalRuns} | Last: ${lastRunStatus || "none"}`);
 }, 300000);
+
+console.log(`\n⏳ First tick in 5s, then every ${POLL_INTERVAL_MS / 1000}s...`);
