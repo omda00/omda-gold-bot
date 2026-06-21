@@ -97,16 +97,18 @@ export async function register() {
       console.log(`[scheduler] ⏰ [${cairoTime}] Firing production /api/automation/run...`);
 
       // Obtain an admin session token so the (now auth-protected)
-      // /api/automation/run endpoint accepts the request. The token is
-      // also reused for the dedup check below.
+      // /api/automation/run endpoint accepts the request.
       const adminToken = await getAdminToken();
 
-      // Dedup check
-      const recentlySent = await wasReportSentRecently();
-      if (recentlySent) {
-        console.log(`[scheduler] ⏭️ Skipped — recent send detected`);
-        return;
-      }
+      // NOTE: The scheduler NO LONGER does its own dedup check. The production
+      // /api/cron/refresh-prices endpoint has an atomic DB lock (59-min TTL)
+      // that is the SINGLE source of truth for dedup. The old local dedup
+      // check (wasReportSentRecently, 55 min) caused problems: if ANY send
+      // happened in the last 55 min (including manual tests or UptimeRobot
+      // triggers), the scheduler would skip the next :01 send — breaking the
+      // hourly schedule. By relying solely on the production lock, we ensure
+      // the scheduler always fires at :01 and lets the lock decide whether
+      // to actually send.
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",

@@ -60,4 +60,6 @@ server.log
 /db/
 
 # Mini services
-/mini-services/
+/mini-services/db/custom.db
+tool-results/
+worklog.md
