@@ -614,3 +614,39 @@ Stage Summary:
   Price fetcher healthy (~1.1s parallel fetches from iSagha + Google Finance).
 - ✅ Overall: site is interactive and fully functional. Auto-refresh polling working.
   No issues found; no code changes were made (read-only verification as instructed).
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix intermittent hourly delivery — ensure all subscribers receive reports reliably 24/7
+
+Work Log:
+- Diagnosed root cause via production NotificationLog analysis:
+  * Hourly reports were firing at :02 UTC (03:02, 04:02, 05:02) — all 4 active users received ✅
+  * 3 blocked users (Michael, BEBO, Dark Shadow) auto-deactivated correctly
+  * BUT 06:02, 07:02, 08:02 UTC were ALL MISSED — dev server was down from ~05:xx to 08:33 UTC
+  * Root cause: old scheduler fired ONLY at UTC minute :01 — if dev server was down at that exact minute, the entire hour was lost with no catch-up
+- Confirmed /start works on production (webhook set, recent bot_registration logs: FinalVerify, FinalTest, WebhookRetest at 08:35-08:38)
+- Redesigned scheduler architecture to 3-layer redundant TTL-based polling:
+  1. instrumentation.ts: poll production every 5 min (was :01 only) — self-healing via lock TTL
+  2. cron-service (standalone bun daemon): also polls every 5 min — survives dev server restarts
+  3. Homepage self-heal: client-side fetch to production on dashboard mount — tertiary fallback
+- Optimized refresh-prices/route.ts: check lock BEFORE scraping (early return when locked)
+  * Prevents 288 scrapes/day from 5-min polling — only scrape when actually sending
+- Fixed critical bug: interval.unref() in instrumentation.ts caused timers to NEVER fire in Next.js 16
+  * Removing unref() fixed it — verified initial tick fires and logs "Lock held"
+- Replaced node-cron with plain setInterval in cron-service (more reliable in bun)
+- Added crash protection (unhandledRejection + uncaughtException handlers) to cron-service
+- Started both services via start-stop-daemon (reliable daemonization):
+  * Dev server: PID 9178 (next-server), instrumentation.ts scheduler active
+  * Cron-service: PID 9128 (bun), polling every 5 min
+- Pushed all fixes to GitHub (commits ba699d9, c465836) — Vercel auto-deploying
+
+Stage Summary:
+- Root cause was single-point-of-failure: :01 wall-clock trigger with no catch-up
+- New TTL-based design: any of 3 triggers can fire the report; lock guarantees exactly ONE per hour
+- Self-healing: if sandbox was down for hours, first tick after restart sends catch-up immediately
+- Verified working: dev server scheduler initial tick fired at 12:15:16 Cairo → "Lock held" (correct)
+- All 4 active production users (The Pyramid, Ōmda, Test Test, owner 750182271) receive reports
+- 3 blocked users auto-deactivated (won't be retried, surface in admin dashboard)
+- /start works on production (webhook set, resilient upsertTelegramUser handles missing constraint)
