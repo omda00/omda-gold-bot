@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { LayoutDashboard, BarChart3, Settings, Bell, Play, Calculator, Bot, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -88,6 +88,34 @@ export default function Home() {
   }, [sendTestToOwner]);
 
   const automationEnabled = config?.AUTOMATION_ENABLED === "true";
+
+  // ========================================
+  // SELF-HEAL: trigger production catch-up on dashboard mount
+  // ========================================
+  // When the owner opens the dashboard, fire a single request to production's
+  // /api/cron/refresh-prices. Production checks the global hourly lock FIRST:
+  //   - If lock held (sent < 59 min ago) → returns immediately, no scrape
+  //   - If lock expired → scrapes + sends to all active users (catch-up)
+  //
+  // This is the TERTIARY fallback (after instrumentation.ts + cron-service).
+  // If both the dev server and cron-service were down, the owner opening the
+  // dashboard triggers an immediate catch-up. Safe due to the 3-layer dedup.
+  const selfHealFired = useRef(false);
+  useEffect(() => {
+    if (selfHealFired.current) return;
+    selfHealFired.current = true;
+    const triggerCatchUp = async () => {
+      try {
+        await fetch("https://omda-gold-bot.vercel.app/api/cron/refresh-prices", {
+          method: "GET",
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch {
+        // Silent — this is a best-effort catch-up trigger
+      }
+    };
+    triggerCatchUp();
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-amber-50/10 dark:to-amber-950/5">

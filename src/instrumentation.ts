@@ -1,21 +1,36 @@
 /**
- * Instrumentation — Starts the hourly Telegram report scheduler
+ * Instrumentation — Reliable hourly Telegram report scheduler
  *
- * This runs ONCE when the Next.js server starts. It sets up a setInterval
- * that fires every 60 seconds and checks if the current UTC minute is :01.
- * When it is, the scheduler:
- *   1. Calls PRODUCTION /api/automation/run — sends to all PRODUCTION users
- *   2. Sends directly to LOCAL DB users — new subscribers registered via
- *      the telegram-poller mini-service (which handles /start locally
- *      because the production webhook is broken)
+ * STRATEGY: TTL-BASED POLLING (not wall-clock aligned)
+ * ----------------------------------------------------
+ * Previous design fired only when UTC minute === :01. This was fragile:
+ * if the dev server was down/restarting at :01, the entire hour was
+ * missed with no catch-up (this caused 06:02, 07:02, 08:02 UTC to be
+ * skipped when the dev server restarted at 08:33).
  *
- * WHY LOCAL SENDS:
- * The production webhook is broken (missing @@unique constraint on Neon DB).
- * The telegram-poller mini-service handles /start by forwarding to the LOCAL
- * webhook, which registers users in the LOCAL SQLite DB. These local users
- * need to receive hourly reports too. The scheduler sends to them directly
- * via the Telegram Bot API, skipping any user that also exists on production
- * (to avoid duplicates — production /api/automation/run handles those).
+ * New design: poll every 5 minutes. Each tick calls production
+ * /api/cron/refresh-prices. That endpoint checks the global hourly lock
+ * (59-min TTL) FIRST and returns immediately if the lock is held (no
+ * scraping, no sending — cheap). Only when the lock has expired does it
+ * scrape + send. This means:
+ *
+ *   • Exactly ONE send per hour (lock guarantees it)
+ *   • Self-healing: if the dev server was down for 3 hours, the first
+ *     tick after restart sees an expired lock and sends immediately
+ *   • No dependency on wall-clock alignment
+ *
+ * REDUNDANCY:
+ *   - This scheduler (in the dev server) is the PRIMARY trigger.
+ *   - mini-services/cron-service (standalone bun process) is the
+ *     SECONDARY trigger — survives dev server restarts.
+ *   - Homepage self-heal is the TERTIARY trigger — fires when the owner
+ *     opens the dashboard.
+ *   All three call the same production endpoint; the 3-layer dedup
+ *   (global lock + per-chat dedup + in-memory dedup) prevents duplicates.
+ *
+ * LOCAL USERS:
+ * Also sends to LOCAL DB users (new subscribers via telegram-poller)
+ * that are NOT on production, to avoid duplicate sends.
  */
 
 export async function register() {
@@ -26,7 +41,7 @@ export async function register() {
 
   const PRODUCTION_URL = "https://omda-gold-bot.vercel.app";
   const ADMIN_PASSWORD = "908070";
-  const DEDUP_MINUTES = 55;
+  const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
   // Guard against double-registration (HMR in dev mode)
   const globalAny = globalThis as unknown as { __hourlySchedulerStarted?: boolean };
@@ -36,7 +51,6 @@ export async function register() {
   }
   globalAny.__hourlySchedulerStarted = true;
 
-  let lastFiredHour = -1;
   let isSending = false;
 
   // Dynamically import DB + telegram (only available in Node runtime)
@@ -107,14 +121,13 @@ export async function register() {
       const goldPrice = allPrices.gold?.price ?? 0;
       const goldBuyPrice = allPrices.gold?.buyPrice ?? null;
       const goldSellPrice = allPrices.gold?.sellPrice ?? null;
-      // Change % for 21k is on the KaratPriceResult, not on PriceFetchResult
       const gold21 = allPrices.allKarats.find((k) => k.karat === 21);
       const goldChange = gold21?.changePercent ?? 0;
       const goldSource = allPrices.gold?.source ?? "unknown";
       const allKarats = allPrices.allKarats ?? [];
       const goldPound = allPrices.goldPound ?? null;
       const usdEgpPrice = allPrices.usdEgp?.price ?? 0;
-      const usdEgpChange = 0; // USD change % not available from fetchAllPrices; DB-only
+      const usdEgpChange = 0;
       const usdEgpSource = allPrices.usdEgp?.source ?? "unknown";
 
       const message = buildHourlyReport({
@@ -141,7 +154,6 @@ export async function register() {
       for (const user of localOnly) {
         try {
           const result = await sendTelegramMessage(user.botToken, user.chatId, message);
-          // Log to local DB
           await db.notificationLog.create({
             data: {
               type: "hourly_report",
@@ -183,14 +195,22 @@ export async function register() {
     }
   }
 
-  async function sendHourlyReport(): Promise<void> {
+  /**
+   * Poll production /api/cron/refresh-prices.
+   * Production checks the global lock FIRST — if held, returns immediately
+   * (no scrape, no send). If the lock has expired (~1 hour since last send),
+   * production scrapes fresh prices and sends to ALL production users.
+   *
+   * After triggering production, also send to LOCAL-only users (those not
+   * on production) so new subscribers via telegram-poller get reports too.
+   */
+  async function pollAndTrigger(): Promise<void> {
     if (isSending) return;
     isSending = true;
     try {
       const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
-      console.log(`[scheduler] ⏰ [${cairoTime}] Firing production /api/automation/run...`);
 
-      // Obtain an admin session token so the (now auth-protected)
+      // Obtain an admin session token so the auth-protected
       // /api/automation/run endpoint accepts the request.
       const adminToken = await getAdminToken();
 
@@ -199,59 +219,70 @@ export async function register() {
       };
       if (adminToken) {
         headers.Cookie = `admin_session=${adminToken}`;
-      } else {
-        console.warn(
-          `[scheduler] ⚠️ No admin token — /api/automation/run may reject with 401 on the new production code`
-        );
       }
 
+      // Call production /api/automation/run (auth-protected) which redirects
+      // to /api/cron/refresh-prices (the single source of truth with the
+      // 3-layer dedup system).
       const response = await fetch(`${PRODUCTION_URL}/api/automation/run`, {
         method: "POST",
         headers,
         signal: AbortSignal.timeout(120000),
       });
       const data = await response.json() as {
+        skipped?: string;
+        hourlyReport?: { sent: boolean; details?: string };
         notifications?: Array<{ type: string; sent: boolean; details?: string }>;
         error?: string;
       };
 
       if (response.ok) {
-        const notif = data.notifications?.[0];
-        console.log(`[scheduler] ✅ Production send: ${notif?.details || "OK"}`);
+        if (data.skipped === "lock_held") {
+          // Lock held — no report due this tick. This is the normal case
+          // (11 out of 12 ticks per hour). Log quietly.
+          console.log(`[scheduler] ⏭️ [${cairoTime}] Lock held — no report due`);
+        } else if (data.hourlyReport?.sent) {
+          const notif = data.notifications?.[0];
+          console.log(`[scheduler] 📨 [${cairoTime}] Report sent: ${notif?.details || data.hourlyReport.details || "OK"}`);
+          // Also send to LOCAL-only users (production send just completed)
+          const productionChatIds = await getProductionChatIds();
+          await sendToLocalUsers(productionChatIds);
+        } else {
+          console.log(`[scheduler] ℹ️ [${cairoTime}] No report sent: ${data.hourlyReport?.details || "unknown reason"}`);
+        }
       } else {
-        console.error(`[scheduler] ❌ Production send failed: ${data.error}`);
+        console.error(`[scheduler] ❌ [${cairoTime}] Production call failed: ${data.error || response.status}`);
       }
-
-      // Also send to LOCAL DB users (new subscribers via telegram-poller)
-      const productionChatIds = await getProductionChatIds();
-      await sendToLocalUsers(productionChatIds);
     } catch (err) {
-      console.error(`[scheduler] ❌ Error:`, err instanceof Error ? err.message : String(err));
+      console.error(`[scheduler] ❌ Poll error:`, err instanceof Error ? err.message : String(err));
     } finally {
       isSending = false;
     }
   }
 
-  // Check every 60 seconds
-  const interval = setInterval(async () => {
-    const now = new Date();
-    const utcMinute = now.getUTCMinutes();
-    const utcHour = now.getUTCHours();
-    const hourKey = utcHour * 100 + utcMinute;
+  // Fire immediately on startup (catch-up for any missed hours while the
+  // dev server was down), then every 5 minutes.
+  console.log(`[scheduler] 🚀 Starting TTL-based scheduler (polls every ${POLL_INTERVAL_MS / 1000}s)`);
+  console.log(`[scheduler] 📡 Production target: ${PRODUCTION_URL}/api/automation/run`);
+  console.log(`[scheduler] 🔄 Self-healing: if dev server was down, first tick sends catch-up report`);
 
-    // Fire when UTC minute is :01 (and we haven't fired this hour)
-    if (utcMinute === 1 && hourKey !== lastFiredHour) {
-      lastFiredHour = hourKey;
-      await sendHourlyReport();
-    }
-  }, 60000);
+  // Initial fire after a short delay (let the server finish booting)
+  setTimeout(() => {
+    pollAndTrigger().catch((err) =>
+      console.error("[scheduler] Initial poll error:", err)
+    );
+  }, 10000);
+
+  // Then every 5 minutes
+  const interval = setInterval(() => {
+    pollAndTrigger().catch((err) =>
+      console.error("[scheduler] Interval poll error:", err)
+    );
+  }, POLL_INTERVAL_MS);
 
   // Keep the interval alive
   interval.unref?.();
 
   const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
-  console.log(`[scheduler] 🚀 Hourly scheduler started at ${cairoTime}`);
-  console.log(`[scheduler] 📡 Production target: ${PRODUCTION_URL}/api/automation/run`);
-  console.log(`[scheduler] 📤 Local DB users: also sent directly (skipping production users)`);
-  console.log(`[scheduler] ⏰ Fires at :01 UTC every hour (= :01 Cairo every hour)`);
+  console.log(`[scheduler] ✅ Scheduler active since ${cairoTime}`);
 }

@@ -37,6 +37,56 @@ export async function GET() {
 
     const automationEnabled = await getConfig("AUTOMATION_ENABLED");
 
+    // ========================================
+    // EARLY LOCK CHECK — avoid expensive web scraping when we won't send
+    // ========================================
+    // Callers (instrumentation.ts scheduler, cron-service, homepage self-heal)
+    // poll this endpoint every 5 minutes. Without this early check, every
+    // poll would trigger a full web scrape (iSagha + Google Finance) —
+    // 288 scrapes/day, risking IP bans and wasting resources.
+    //
+    // The lock has a 59-min TTL. If it's still held, we know no report is
+    // due, so we skip scraping entirely and return immediately. Prices are
+    // still served from the DB (last fetched values) to the dashboard.
+    //
+    // Only when the lock is acquirable (i.e. ~1 hour since last send) do we
+    // proceed to scrape fresh prices and send the report.
+    let lockAlreadyHeld = false;
+    if (automationEnabled === "true") {
+      const existing = await db.appConfig.findUnique({ where: { key: "HOURLY_REPORT_LOCK" } });
+      if (existing) {
+        const lockTime = parseInt(existing.value, 10);
+        const LOCK_TTL_MS = 59 * 60 * 1000;
+        if (!Number.isNaN(lockTime) && Date.now() - lockTime < LOCK_TTL_MS) {
+          lockAlreadyHeld = true;
+        }
+      }
+    }
+
+    if (lockAlreadyHeld) {
+      // Lock is fresh — no report due this tick. Skip scraping entirely.
+      // Return the latest known prices from the DB so the caller gets a
+      // meaningful response without paying the scrape cost.
+      const gold = await db.priceRecord.findFirst({
+        where: { symbol: "GOLD_EGP" },
+        orderBy: { createdAt: "desc" },
+      });
+      const usdEgp = await db.priceRecord.findFirst({
+        where: { symbol: "USD_EGP" },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({
+        success: true,
+        skipped: "lock_held",
+        message: "Hourly report already sent this hour — skipping scrape",
+        prices: {
+          gold: gold?.sellPrice ?? null,
+          usdEgp: usdEgp?.price ?? null,
+        },
+        hourlyReport: { sent: false, details: "lock held (already sent this hour)" },
+      });
+    }
+
     const allPrices = await fetchAllPrices();
 
     // Save whatever we got from the web

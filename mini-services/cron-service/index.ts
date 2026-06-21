@@ -1,27 +1,31 @@
 /**
- * Cron Service - Guarantees exactly ONE hourly Telegram report at :01 Cairo
+ * Cron Service — Standalone redundant trigger for hourly Telegram reports
  *
- * STRATEGY:
- * This service fires at :01 Cairo every hour and calls the PRODUCTION app's
- * /api/automation/run endpoint. That endpoint sends to ALL registered users
- * (owner + customers) and logs to the production NotificationLog.
+ * STRATEGY: TTL-BASED POLLING (fires every 5 minutes)
+ * ----------------------------------------------------
+ * This standalone bun process survives dev server restarts. It polls
+ * production /api/automation/run every 5 minutes. Production checks the
+ * global hourly lock (59-min TTL) FIRST and returns immediately if the
+ * lock is held (no scraping, no sending — cheap). Only when the lock has
+ * expired does production scrape + send.
  *
- * Because production's /api/cron/refresh-prices has a 55-minute dedup
- * (wasReportSentRecently), any subsequent trigger at ~:24 (UptimeRobot,
- * Vercel Cron) will be SKIPPED — ensuring only ONE message per hour.
+ * This means:
+ *   • Exactly ONE send per hour (lock guarantees it)
+ *   • Self-healing: if this service was down for 3 hours, the first tick
+ *     after restart sees an expired lock and sends immediately
+ *   • Redundant with instrumentation.ts scheduler — if either is alive,
+ *     the hourly report fires
  *
- * DEDUP SAFEGUARD:
- * Before calling /api/automation/run, this service checks production
- * /api/logs for a successful "hourly_report" in the last 55 minutes.
- * If found, it skips — preventing duplicates if the service restarts
- * or fires twice.
+ * WHY NOT wall-clock :01?
+ * The previous design fired only at :01 Cairo. If the process was down
+ * at :01, the hour was missed entirely. The 5-min TTL approach catches
+ * up automatically on the next tick after the lock expires.
  */
 
 import cron from "node-cron";
 
 const PRODUCTION_URL = "https://omda-gold-bot.vercel.app";
 const ADMIN_PASSWORD = "908070";
-const DEDUP_MINUTES = 55;
 
 // Track state
 let lastRunTime: string | null = null;
@@ -30,6 +34,7 @@ let isRunning = false;
 let totalRuns = 0;
 let successRuns = 0;
 let skipRuns = 0;
+let errorRuns = 0;
 
 /**
  * Get admin session token from production
@@ -52,81 +57,20 @@ async function getAdminToken(): Promise<string | null> {
 }
 
 /**
- * Check if a successful hourly_report was sent in the last N minutes.
- * Uses the production /api/logs endpoint (requires admin auth).
- * Returns true if a recent send was found (should skip).
- */
-async function wasReportSentRecently(): Promise<boolean> {
-  const token = await getAdminToken();
-  if (!token) {
-    console.log("⚠️ Could not verify dedup (no admin token) — proceeding with send");
-    return false;
-  }
-
-  try {
-    const resp = await fetch(`${PRODUCTION_URL}/api/logs?limit=50`, {
-      headers: { Cookie: `admin_session=${token}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    const data = await resp.json() as { logs?: Array<{ type: string; success: boolean; sentAt: string }> };
-    const logs = data.logs || [];
-
-    const now = Date.now();
-    const cutoff = now - DEDUP_MINUTES * 60 * 1000;
-
-    for (const log of logs) {
-      if (log.type === "hourly_report" && log.success) {
-        const sentAt = new Date(log.sentAt).getTime();
-        if (sentAt > cutoff) {
-          const minsAgo = Math.round((now - sentAt) / 60000);
-          console.log(`⏭️ Dedup: last successful send was ${minsAgo} min ago (< ${DEDUP_MINUTES} min) — skipping`);
-          return true;
-        }
-      }
-    }
-    return false;
-  } catch (err) {
-    console.error("Dedup check failed:", err instanceof Error ? err.message : String(err));
-    return false; // If we can't check, proceed with send
-  }
-}
-
-/**
- * Check if automation is enabled on production
- */
-async function isAutomationEnabled(): Promise<boolean> {
-  try {
-    const resp = await fetch(`${PRODUCTION_URL}/api/config`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (resp.ok) {
-      const config = await resp.json() as Record<string, string>;
-      return config.AUTOMATION_ENABLED === "true";
-    }
-  } catch {
-    // If we can't reach config, assume enabled
-  }
-  return true;
-}
-
-/**
  * Call production /api/automation/run — sends hourly report to ALL users.
  *
- * AUTH: The production endpoint now requires an admin session cookie.
- * We obtain one via /api/auth/admin (using the admin password) and pass
- * it as a Cookie header. If token retrieval fails we still attempt the
- * call (production may still be running old, unauthenticated code), but
- * we log a warning because the new code will reject it with 401.
+ * Production's /api/cron/refresh-prices checks the global lock FIRST:
+ *   - If lock held (sent < 59 min ago) → returns immediately, no scrape
+ *   - If lock expired → scrapes prices + sends to all active users
  *
- * DEDUP: we rely on the cron-service dedup check (wasReportSentRecently)
- * plus the production 55-min atomic lock to prevent double-sends.
+ * We don't do any pre-dedup here — production's lock is the single source
+ * of truth and is atomic. This avoids the buggy /api/logs pre-check that
+ * could skip a needed send if only some users received the last report.
  */
 async function runAutomation(): Promise<boolean> {
   const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
-  console.log(`⏰ [${cairoTime}] Calling production /api/automation/run...`);
 
   try {
-    // Obtain admin session token for the auth-protected endpoint
     const adminToken = await getAdminToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -134,9 +78,7 @@ async function runAutomation(): Promise<boolean> {
     if (adminToken) {
       headers.Cookie = `admin_session=${adminToken}`;
     } else {
-      console.warn(
-        `⏰ [${cairoTime}] ⚠️ No admin token — /api/automation/run may reject with 401 on the new production code`
-      );
+      console.warn(`⏰ [${cairoTime}] ⚠️ No admin token — production may reject with 401`);
     }
 
     const response = await fetch(`${PRODUCTION_URL}/api/automation/run`, {
@@ -146,33 +88,53 @@ async function runAutomation(): Promise<boolean> {
     });
 
     const data = await response.json() as {
+      skipped?: string;
+      hourlyReport?: { sent: boolean; details?: string };
       notifications?: Array<{ type: string; sent: boolean; details?: string; error?: string }>;
       error?: string;
     };
 
     if (response.ok) {
-      console.log(`⏰ [${cairoTime}] ✅ Production automation completed`);
-      if (data.notifications && Array.isArray(data.notifications)) {
-        for (const n of data.notifications) {
-          const status = n.sent ? "✅" : "❌";
-          console.log(`⏰ [${cairoTime}] 📤 ${n.type}: ${status} ${n.details || n.error || ""}`);
+      if (data.skipped === "lock_held") {
+        // Normal case: lock held, no report due. Quiet log.
+        console.log(`⏰ [${cairoTime}] ⏭️ Lock held — no report due`);
+        lastRunStatus = "skipped (lock held)";
+        skipRuns++;
+        return true;
+      } else if (data.hourlyReport?.sent) {
+        console.log(`⏰ [${cairoTime}] ✅ Report sent: ${data.hourlyReport.details || "OK"}`);
+        if (data.notifications) {
+          for (const n of data.notifications) {
+            const status = n.sent ? "✅" : "❌";
+            console.log(`⏰ [${cairoTime}] 📤 ${n.type}: ${status} ${n.details || n.error || ""}`);
+          }
         }
+        lastRunStatus = "sent";
+        successRuns++;
+        return true;
+      } else {
+        console.log(`⏰ [${cairoTime}] ℹ️ No report: ${data.hourlyReport?.details || "unknown"}`);
+        lastRunStatus = "no-report";
+        return true;
       }
-      return true;
     } else {
-      console.error(`⏰ [${cairoTime}] ❌ Production automation failed:`, data.error);
+      console.error(`⏰ [${cairoTime}] ❌ Production failed: ${data.error || response.status}`);
+      lastRunStatus = "error";
+      errorRuns++;
       return false;
     }
   } catch (error) {
     console.error(`⏰ [${cairoTime}] ❌ Automation error:`, error instanceof Error ? error.message : String(error));
+    lastRunStatus = "error";
+    errorRuns++;
     return false;
   }
 }
 
 /**
- * Run the hourly report cycle with dedup protection
+ * Run one polling cycle.
  */
-async function runHourlyCycle(): Promise<void> {
+async function runCycle(): Promise<void> {
   if (isRunning) {
     console.log("⏳ Already running, skipping...");
     return;
@@ -181,48 +143,27 @@ async function runHourlyCycle(): Promise<void> {
   totalRuns++;
 
   try {
-    const enabled = await isAutomationEnabled();
-    if (!enabled) {
-      console.log("⏸️ Production automation is disabled. Skipping.");
-      lastRunStatus = "skipped (automation disabled)";
-      skipRuns++;
-      return;
-    }
-
-    // DEDUP CHECK: skip if a successful report was sent in the last 55 min
-    const recentlySent = await wasReportSentRecently();
-    if (recentlySent) {
-      lastRunStatus = "skipped (dedup)";
-      skipRuns++;
-      return;
-    }
-
-    const success = await runAutomation();
+    await runAutomation();
     lastRunTime = new Date().toISOString();
-    lastRunStatus = success ? "success" : "error";
-    if (success) successRuns++;
   } catch (error) {
     console.error("❌ Cycle error:", error instanceof Error ? error.message : String(error));
-    lastRunTime = new Date().toISOString();
     lastRunStatus = "error";
+    errorRuns++;
   } finally {
     isRunning = false;
   }
 
-  console.log(`📊 Stats: ${successRuns} sent, ${skipRuns} skipped, ${totalRuns} total runs`);
+  console.log(`📊 Stats: ${successRuns} sent, ${skipRuns} skipped, ${errorRuns} errors, ${totalRuns} total`);
 }
 
 // =============================================
-// Setup Cron Job — fires at :01 Cairo every hour
+// Schedule: fire every 5 minutes
 // =============================================
-// :01 Cairo = :01 of every hour in UTC (shifted by 3h).
-// Examples: 01:01 Cairo = 22:01 UTC, 02:01 Cairo = 23:01 UTC, etc.
-// The user receives the message at HH:01 Cairo time.
-cron.schedule("1 * * * *", async () => {
-  const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
-  console.log(`\n⏰ [${cairoTime}] === Hourly cron triggered (:01 Cairo) ===`);
-  await runHourlyCycle();
-}, { timezone: "Africa/Cairo" });
+// The production lock (59-min TTL) ensures exactly ONE send per hour.
+// All other ticks are cheap no-ops (lock held → early return, no scrape).
+cron.schedule("*/5 * * * *", async () => {
+  await runCycle();
+});
 
 // =============================================
 // Start
@@ -230,13 +171,18 @@ cron.schedule("1 * * * *", async () => {
 const cairoTime = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
 console.log(`🚀 Cron Service started at ${cairoTime}`);
 console.log(`📡 Production URL: ${PRODUCTION_URL}`);
-console.log(`✅ Hourly cron: Every hour at :01 (Cairo time)`);
-console.log(`✅ Dedup: Skips if a successful report was sent < ${DEDUP_MINUTES} min ago`);
-console.log(`✅ Target: Production /api/automation/run (sends to ALL users)`);
-console.log(`\n⏳ Waiting for next :01 Cairo...`);
+console.log(`⏱️  Polling every 5 minutes (TTL-based, self-healing)`);
+console.log(`🔒 Production lock (59-min TTL) guarantees exactly ONE send per hour`);
+console.log(`\n⏳ Waiting for first tick...`);
 
-// Keep the process alive
+// Fire immediately on startup (catch-up for missed hours)
+setTimeout(() => {
+  console.log(`\n🔄 Initial catch-up tick...`);
+  runCycle();
+}, 5000);
+
+// Heartbeat — log stats every 5 minutes
 setInterval(() => {
   const now = new Date().toLocaleString("en-EG", { timeZone: "Africa/Cairo" });
-  console.log(`💓 [${now}] Heartbeat | Sent: ${successRuns} | Skipped: ${skipRuns} | Total: ${totalRuns} | Last: ${lastRunStatus || "none"} | Running: ${isRunning}`);
-}, 300000); // 5 minutes
+  console.log(`💓 [${now}] Heartbeat | Sent: ${successRuns} | Skipped: ${skipRuns} | Errors: ${errorRuns} | Total: ${totalRuns} | Last: ${lastRunStatus || "none"} | Running: ${isRunning}`);
+}, 300000);
