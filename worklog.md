@@ -760,3 +760,44 @@ Stage Summary:
 - ✅ 3 طبقات dedup لا تزال فعّالة (hour-bucket lock + per-chat + in-memory) — ضمان رسالة واحدة لكل مشترك كل ساعة
 - أول إطلاق للـ cron الجديد: الساعة 08:00:00 بتوقيت القاهرة (top of the hour)
 - المشتركون الـ 4 النشطون سيبدأون استقبال التحديثات على :00 ابتداءً من الساعة القادمة
+
+---
+Task ID: cloudflare-sole-sender
+Agent: main (Z.ai Code)
+Task: حل مشكلة الإرسال المزدوج (:00 و :04) — جعل Cloudflare هو المرسل الوحيد
+
+Work Log:
+- شخّصت المشكلة من dev.log: `[scheduler] 📨 [6/22/2026, 8:04:16 AM] Report sent: تم الإرسال إلى 4/6 مستخدم`
+  * المصدر: الـ dev server scheduler (instrumentation.ts) بيطلق كل 5 دقائق → يستدعي /api/automation/run على production → اللي بيعمل redirect لـ /api/cron/refresh-prices → اللي بيرسل للكل
+  * المشكلة الجذرية: نظامين إرسال مستقلين بقفلين مستقلين:
+    - Cloudflare Worker (cron :00) → قفل في Cloudflare KV
+    - Vercel /api/cron/refresh-prices → قفل في Neon DB
+    * القفلين ما بيعرفوش عن بعض → كلاهما بيرسل → تكرار
+- instrumentation.ts كان فيه `return;` (no-op) بالفعل، لكن الـ dev server الشغّال (PID 1127، بدأ 04:09) حمل الكود القديم قبل التعديل. Next.js register() بتيجي مرة واحدة عند الإقلاع ومبتعملش hot-reload.
+- عدّلت /api/cron/refresh-prices/route.ts:
+  * شيلت بلوك الـ "Auto-send hourly report" بالكامل (acquireHourlyReportLock + sendReportToAllUsers + sendReportViaGlobalConfig)
+  * الاستيرادات: شيلت acquireHourlyReportLock, sendReportToAllUsers, sendReportViaGlobalConfig, buildHourlyReport — خليت getCairoHourBucket (للـ early check)
+  * الـ endpoint دلوقتي بيجمع الأسعار بس (scrape + save) للـ dashboard — مابيرسلش أي رسالة Telegram
+- عدّلت /api/automation/run/route.ts:
+  * المسار الافتراضي: بقى return فوري بدل redirect لـ /api/cron/refresh-prices
+  * ?test=true (للمالك فقط): زاد ما هو — لسه شغّال
+- أعدت تشغيل الـ dev server:
+  * قتلت PID 1110 + children (الـ dev server القديم بالكود القديم)
+  * بدأت dev server جديد (PID 4873)
+  * تحققت من dev.log: `[scheduler] ℹ️ Scheduler disabled — moved to Cloudflare Workers cron` ✅
+  * تحققت: 0 tick بعد إعادة التشغيل (مفيش 5-min tick firing) ✅
+- تحققت من Cloudflare schedule: "0 * * * *" فقط (مفيش schedules تانية) ✅
+- تحققت إن مفيش cron-service ولا telegram-poller شغّالين ✅
+- Lint: passed بدون أخطاء ✅
+- رفعت التعديلات على GitHub (commit eef9837) — Vercel هيعمل auto-deploy
+
+Stage Summary:
+- ✅ Cloudflare Worker هو المرسل الوحيد لتقارير الساعة (cron "0 * * * *" = :00 بالظبط)
+- ✅ الـ :04 duplicate اتمسح نهائياً (الـ dev server scheduler بقى no-op + Vercel endpoints مابترسلش)
+- ✅ 3 طبقات حماية ضد التكرار (كلها في Cloudflare KV):
+  1. Global hour-bucket lock (HOURLY_REPORT_LOCK)
+  2. Per-chat hour-bucket (LAST_REPORT_CHAT_<id>)
+  3. In-memory chatId dedup
+- ✅ الـ dashboard لسه بيشتغل (الأسعار بتيجي من /api/prices + /api/cron/refresh-prices بيجمع بس مابيرسلش)
+- ✅ ?test=true للمالك لسه شغّال على Vercel + /__test على Cloudflare Worker
+- أول إرسال على :00: الساعة 09:00:00 EEST (القاهرة) — رسالة واحدة لكل مشترك
