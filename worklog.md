@@ -801,3 +801,30 @@ Stage Summary:
 - ✅ الـ dashboard لسه بيشتغل (الأسعار بتيجي من /api/prices + /api/cron/refresh-prices بيجمع بس مابيرسلش)
 - ✅ ?test=true للمالك لسه شغّال على Vercel + /__test على Cloudflare Worker
 - أول إرسال على :00: الساعة 09:00:00 EEST (القاهرة) — رسالة واحدة لكل مشترك
+
+---
+Task ID: cloudflare-remove-branding-text
+Agent: main (Z.ai Code)
+Task: حذف النص "🤖 يعمل عبر Cloudflare Workers — إرسال مضمون 24/7" من رسائل البوت
+
+Work Log:
+- بحثت عن النص في كل ملفات المشروع → وُجد في ملفين:
+  1. cloudflare-worker/src/index.ts (line 162) — رسالة الترحيب /start
+  2. cloudflare-worker/src/price-fetcher.ts (line 278) — تقرير الأسعار الساعي
+- عدّلت index.ts: شيلت السطر `🤖 <i>يعمل عبر Cloudflare Workers — إرسال مضمون 24/7</i>` + الـ \n\n قبله. رسالة /start دلوقتي بتنتهي بـ `/help — المساعدة`.
+- عدّلت price-fetcher.ts: شيلت سطر `report += \`\n\n🤖 <i>يعمل عبر Cloudflare Workers — إرسال مضمون 24/7</i>\`;`. التقرير دلوقتي بينتهي بـ `📌 المصادر: iSagha.com + Google Finance`.
+- تأكدت إن مفيش أي تكرارات تانية للنص (grep على كل المشروع → 0 نتائج)
+- عملت redeploy للـ Worker عبر `wrangler deploy` (CLOUDFLARE_API_TOKEN):
+  * الكود اترفع بنجاح (Uploaded omda-gold-bot)
+  * cron schedule فشل عبر wrangler (محدودية الـ token) لكن الـ schedule كان مضبوط بالفعل عبر الـ API على "0 * * * *"
+- تحققت من الـ schedule: ✅ "0 * * * *" لسه مفعّل
+- تحققت من /__health: ✅ Worker يعمل
+- اختبرت /__test (إرسال تجريبي للمالك): ✅ ok: true — الرسالة وصلت بدون النص المحذوف
+
+Stage Summary:
+- ✅ النص "🤖 يعمل عبر Cloudflare Workers — إرسال مضمون 24/7" اتشال نهائياً من:
+  1. رسالة الترحيب /start
+  2. تقرير الأسعار الساعي (اللي بيوصل كل المشتركين على :00)
+- ✅ الكود منشور على Cloudflare Worker — التغيير فعّال فوراً
+- ✅ الـ cron "0 * * * *" لسه مفعّل (رسالة واحدة لكل مشترك على :00)
+- المشتركون هيستلموا التقارير الجاية بدون النص المحذوف

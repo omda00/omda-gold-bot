@@ -158,8 +158,7 @@ async function handleTelegramWebhook(
           `💡 أوامر البوت:\n` +
           `/start — تسجيل / تفعيل\n` +
           `/stop — إيقاف الإشعارات\n` +
-          `/help — المساعدة\n\n` +
-          `🤖 <i>يعمل عبر Cloudflare Workers — إرسال مضمون 24/7</i>`;
+          `/help — المساعدة`;
 
         await sendTelegramMessage(botToken, chatId, welcomeMessage);
         console.log(`[webhook] ✅ New subscriber: ${userName} (chatId ${chatId})`);

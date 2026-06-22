@@ -275,7 +275,6 @@ export function buildHourlyReport(params: {
   }
 
   report += `\n📌 المصادر: iSagha.com + Google Finance`;
-  report += `\n\n🤖 <i>يعمل عبر Cloudflare Workers — إرسال مضمون 24/7</i>`;
 
   return report;
 }
