@@ -33,9 +33,9 @@ import { buildHourlyReport } from "@/lib/report-sender";
  *   ?test=true  → TEST mode: scrape prices + send ONLY to the owner
  *                 (chatId 750182271). Bypasses the dedup lock so it can be
  *                 run any time without affecting the hourly schedule.
- *   (default)   → Production mode: redirect to /api/cron/refresh-prices
- *                 which uses the 3-layer hour-bucket dedup system to send
- *                 to ALL active subscribers exactly once per Cairo hour.
+ *   (default)   → DISABLED: returns immediately. Hourly reports are now sent
+ *                 EXCLUSIVELY by the Cloudflare Worker (cron "0 * * * *").
+ *                 This path no longer sends to avoid duplicate sends.
  */
 async function checkAuth(): Promise<boolean> {
   return await getAdminSession();
@@ -177,31 +177,23 @@ export async function POST(request: NextRequest) {
   }
 
   // ──────────────────────────────────────────────────────────
-  // PRODUCTION MODE: redirect to /api/cron/refresh-prices
+  // PRODUCTION MODE: disabled — moved to Cloudflare Worker
   // ──────────────────────────────────────────────────────────
-  try {
-    const cronUrl = `${requestUrl.origin}/api/cron/refresh-prices`;
-
-    console.log(`[automation/run] → redirecting to ${cronUrl}`);
-    const response = await fetch(cronUrl, {
-      // Allow up to 2 minutes for price fetch + Telegram sends
-      signal: AbortSignal.timeout(120000),
-    });
-
-    const data = await response.json();
-    return NextResponse.json({
-      ...data,
-      via: "automation/run → cron/refresh-prices",
-    });
-  } catch (error) {
-    console.error("[automation/run] Error redirecting to cron:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to redirect to cron/refresh-prices",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
-    );
-  }
+  // Hourly reports are now sent EXCLUSIVELY by the Cloudflare Worker
+  // (Cron Trigger "0 * * * *" = minute 0 of every hour) at
+  // https://omda-gold-bot.fces7007.workers.dev
+  //
+  // This endpoint no longer triggers hourly sends to avoid duplicates:
+  // the Worker uses a Cloudflare KV lock while /api/cron/refresh-prices
+  // used a Neon DB lock — two independent locks caused double sends
+  // (:00 from Worker + :04 from the dev-server scheduler hitting this path).
+  //
+  // Use ?test=true for an owner-only test send (still works).
+  console.log("[automation/run] ℹ️ Production send disabled — handled by Cloudflare Worker");
+  return NextResponse.json({
+    success: true,
+    skipped: "moved_to_cloudflare",
+    message: "Hourly reports are handled by Cloudflare Worker (cron 0 * * * *)",
+    hourlyReport: { sent: false, details: "Handled by Cloudflare Worker" },
+  });
 }

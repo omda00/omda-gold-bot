@@ -6,13 +6,7 @@ import {
   isRateLimited,
 } from "@/lib/price-fetcher";
 import { getConfig } from "@/lib/config-seeder";
-import {
-  acquireHourlyReportLock,
-  sendReportToAllUsers,
-  sendReportViaGlobalConfig,
-  buildHourlyReport,
-  getCairoHourBucket,
-} from "@/lib/report-sender";
+import { getCairoHourBucket } from "@/lib/report-sender";
 
 // Karat symbol mapping
 const KARAT_SYMBOLS: Record<number, string> = {
@@ -25,12 +19,15 @@ const KARAT_SYMBOLS: Record<number, string> = {
 const GOLD_POUND_SYMBOL = "GOLD_POUND_EGP";
 
 /**
- * GET /api/cron/refresh-prices - Cron: Refresh prices AND auto-send hourly reports
+ * GET /api/cron/refresh-prices - Refresh prices (Telegram send DISABLED)
  *
- * Called by UptimeRobot every 30 minutes and Vercel Cron every hour.
- * - Always refreshes prices from the web
- * - Automatically sends Telegram hourly report IF 55+ minutes since last report
- *   (deduplicated — won't send twice in the same hour)
+ * This endpoint ONLY refreshes prices from the web (scrape + save to DB) so
+ * the dashboard has fresh data. It NO LONGER sends Telegram hourly reports —
+ * those are handled EXCLUSIVELY by the Cloudflare Worker (Cron Trigger
+ * "0 * * * *") to avoid duplicate sends from two independent lock systems.
+ *
+ * Owner-only test sends: use /api/automation/run?test=true or the Worker's
+ * /__test endpoint.
  */
 export async function GET() {
   try {
@@ -172,65 +169,24 @@ export async function GET() {
     );
 
     // ========================================
-    // Auto-send hourly report (DEDUPLICATED — Cairo hour-bucket lock)
+    // HOURLY REPORT — now handled by Cloudflare Worker (cron "0 * * * *")
     // ========================================
-    // Three layers of protection ensure exactly ONE message per chat per
-    // Cairo hour:
-    //   1. acquireHourlyReportLock() — DB lock keyed on the Cairo hour
-    //      bucket ("YYYY-MM-DD-HH"). Only one caller per hour can proceed.
-    //      Using hour-bucket (not timestamp TTL) means send-loop latency
-    //      never causes a false "already sent" in the next hour.
-    //   2. wasChatSentRecently(chatId) — per-chat hour-bucket check inside
-    //      the send loop so the same chat never gets 2 messages even if
-    //      registered twice or the global lock raced.
-    //   3. In-memory chatId dedup of the user list.
-    let reportSent = false;
-    let reportDetails = "";
-
-    if (automationEnabled === "true" && gold && usdEgp) {
-      const gotLock = await acquireHourlyReportLock();
-
-      if (gotLock) {
-        console.log("[cron/refresh-prices] 📨 Hourly lock acquired — sending report...");
-
-        const hourlyReport = buildHourlyReport({
-          goldPrice: gold.price,
-          goldBuyPrice: gold.buyPrice,
-          goldSellPrice: gold.sellPrice,
-          goldChange: gold.change ?? 0,
-          goldSource: gold.source || "multi-source",
-          allKarats: allPrices.allKarats || [],
-          goldPound: allPrices.goldPound || null,
-          usdEgpPrice: usdEgp.price,
-          usdEgpChange: usdEgp.change ?? 0,
-          usdEgpSource: usdEgp.source || "multi-source",
-        });
-
-        const activeUsers = await db.telegramUser.findMany({ where: { active: true } });
-
-        if (activeUsers.length > 0) {
-          const result = await sendReportToAllUsers(hourlyReport, "hourly_report", "Hourly Price Report");
-          reportSent = result.sent > 0;
-          reportDetails = `تم الإرسال إلى ${result.sent}/${result.total} مستخدم` +
-            (result.deactivated ? ` (تم إلغاء تفعيل ${result.deactivated} مستخدم حظر البوت)` : "");
-          console.log(
-            `[cron/refresh-prices] 📨 Report sent: ${result.sent}/${result.total}` +
-            (result.skipped ? ` (skipped ${result.skipped} already-sent)` : "") +
-            (result.deactivated ? ` (deactivated ${result.deactivated} blocked)` : "")
-          );
-        } else {
-          const result = await sendReportViaGlobalConfig(hourlyReport, "hourly_report", "Hourly Price Report");
-          reportSent = result.ok;
-          reportDetails = result.ok ? "تم الإرسال عبر الإعدادات العامة" : `فشل: ${result.error}`;
-          console.log(`[cron/refresh-prices] 📨 Report via global config: ${result.ok ? "success" : result.error}`);
-        }
-      } else {
-        console.log("[cron/refresh-prices] ⏭️ Hourly report lock held by another caller — skipping (already sent this hour)");
-        reportDetails = "تم الإرسال بالفعل هذه الساعة (lock held)";
-      }
-    } else if (automationEnabled !== "true") {
-      console.log("[cron/refresh-prices] ⏭️ Automation disabled — skipping report");
-    }
+    // Telegram hourly reports are sent EXCLUSIVELY by the Cloudflare Worker
+    // at https://omda-gold-bot.fces7007.workers.dev (Cron Trigger at minute 0
+    // of every hour). This Vercel endpoint NO LONGER sends Telegram messages.
+    //
+    // REASON: the Worker uses a Cloudflare KV lock while this endpoint used a
+    // Neon DB lock — two INDEPENDENT locks. When both systems ran, the Worker
+    // sent at :00 (KV lock) and this endpoint sent again at ~:04 (Neon lock
+    // not held) → duplicate messages. Disabling the send here makes Cloudflare
+    // the SOLE sender; this endpoint now ONLY refreshes prices (scrape + save)
+    // so the dashboard has fresh data.
+    //
+    // Owner-only test sends are still available via /api/automation/run?test=true
+    // and the Worker's /__test endpoint.
+    const reportSent = false;
+    const reportDetails = "Handled by Cloudflare Worker (cron 0 * * * *)";
+    console.log("[cron/refresh-prices] ℹ️ Telegram send disabled — handled by Cloudflare Worker");
 
     return NextResponse.json({
       success: true,
