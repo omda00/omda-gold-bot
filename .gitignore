@@ -66,3 +66,9 @@ worklog.md
 
 # Dev server PID files
 .zscripts/
+
+# Cloudflare Worker — local dev files (keep code, ignore deps)
+/cloudflare-worker/node_modules/
+/cloudflare-worker/.wrangler/
+/cloudflare-worker/.dev.vars
+

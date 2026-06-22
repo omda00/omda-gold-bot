@@ -39,6 +39,22 @@ export async function register() {
   // Only run in development (this is the local dev server scheduler)
   if (process.env.NODE_ENV !== "development") return;
 
+  // ════════════════════════════════════════════════════════════════
+  // SCHEDULER DISABLED — moved to Cloudflare Workers (24/7 cron)
+  // ════════════════════════════════════════════════════════════════
+  // The hourly Telegram report is now handled by a Cloudflare Worker
+  // with a guaranteed Cron Trigger at :01 every hour. This is more
+  // reliable than the dev-server-based scheduler (which depends on the
+  // dev server being up, and on Vercel's API being reachable).
+  //
+  // The Worker code lives in /cloudflare-worker/ and is deployed at:
+  //   https://omda-gold-bot.fces7007.workers.dev
+  //
+  // Keeping this file in case we ever need to fall back to the old
+  // approach, but it's a no-op now.
+  console.log("[scheduler] ℹ️ Scheduler disabled — moved to Cloudflare Workers cron (https://omda-gold-bot.fces7007.workers.dev)");
+  return;
+
   const PRODUCTION_URL = "https://omda-gold-bot.vercel.app";
   const ADMIN_PASSWORD = "908070";
   const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes

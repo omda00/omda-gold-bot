@@ -1,0 +1,17 @@
+{
+  "name": "omda-gold-bot-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for Omda Gold Bot — 24/7 hourly Telegram reports via Cron Triggers",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.0.0"
+  }
+}
