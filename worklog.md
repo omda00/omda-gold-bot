@@ -723,3 +723,40 @@ Stage Summary:
 - /start و /stop يعملان عبر الـ Worker ويتم sync إلى Vercel Neon DB
 - الـ Vercel app ما زال يعمل للوحة التحكم + admin UI
 - تم التحقق من الإرسال لكل المشتركين الـ 4 النشطين بنجاح
+
+---
+Task ID: cloudflare-cron-:00
+Agent: main (Z.ai Code)
+Task: تعديل موعد إرسال تحديث الساعة على Cloudflare من :01 إلى :00 لكل ساعة
+
+Work Log:
+- قرأت الحالة الحالية للـ Cloudflare Worker (cloudflare-worker/wrangler.toml + src/index.ts)
+- تحققت من الـ schedule الحالي المنشور: "1 * * * *" (الدقيقة 1 من كل ساعة)
+- عدّلت cloudflare-worker/wrangler.toml: cron = "1 * * * *" → cron = "0 * * * *"
+- عدّلت cloudflare-worker/src/index.ts (5 مواضع تشير إلى :01):
+  * تعليق الـ scheduled handler: ":01 every hour" → ":00 every hour"
+  * تعليق داخل الـ fetch handler: ":01 every hour" → ":00 every hour"
+  * رسالة next_cron: "minute 1 of every hour" → "minute 0 of every hour"
+  * رسالة الترحيب /start: "أول تقرير هيوصلك في الساعة الجاية (على :01)" → "(على :00)"
+  * رسالة إعادة التفعيل: "هتصلك التحديثات كل ساعة على :01" → "على :00"
+- عدّلت cloudflare-worker/README.md (مخطط الـ architecture + مثال curl)
+- حدّثت الـ schedule المنشور مباشرةً عبر Cloudflare API:
+  PUT /accounts/{id}/workers/scripts/omda-gold-bot/schedules
+  body: [{"cron":"0 * * * *"}]
+  → success: true
+- أعدت deploy الـ Worker عبر `wrangler deploy` (باستخدام CLOUDFLARE_API_TOKEN):
+  * الكود اترفع بنجاح (Total Upload: 49.26 KiB)
+  * cron triggers فشل عبر wrangler (محدودية صلاحيات الـ token) لكن الـ schedule كان مضبوطاً بالفعل عبر الـ API مباشرةً
+- تحققت من الـ schedule النهائي عبر API: ✅ "0 * * * *" مفعّل
+- تحققت من /__health: ✅ Worker يعمل
+- تحققت من / (status): ✅ next_cron = "minute 0 of every hour (Cairo time)" — يثبت أن الكود الجديد منشور
+- حسابت أول إطلاق cron القادم: 2026-06-22 05:00:00 UTC = 08:00:00 EEST (Cairo) — تماماً على :00
+
+Stage Summary:
+- ✅ تم تغيير موعد إرسال تحديث الساعة من :01 إلى :00 (بداية كل ساعة) على Cloudflare
+- ✅ الـ cron trigger المنشور: "0 * * * *" — يُطلق في الدقيقة 0 من كل ساعة UTC
+- ✅ الكود منشور من جديد مع رسائل المستخدم المُحدّثة (تقول :00 بدل :01)
+- ✅ wrangler.toml متزامن مع الـ schedule المنشور (عمليات deploy المستقبلية لن تتراجع)
+- ✅ 3 طبقات dedup لا تزال فعّالة (hour-bucket lock + per-chat + in-memory) — ضمان رسالة واحدة لكل مشترك كل ساعة
+- أول إطلاق للـ cron الجديد: الساعة 08:00:00 بتوقيت القاهرة (top of the hour)
+- المشتركون الـ 4 النشطون سيبدأون استقبال التحديثات على :00 ابتداءً من الساعة القادمة

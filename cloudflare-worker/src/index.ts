@@ -6,7 +6,7 @@
  * HANDLERS:
  *   1. fetch()   — Telegram webhook (handles /start, /stop, /help)
  *                  Also exposes /__health and /__test endpoints.
- *   2. scheduled() — Cron Trigger fires at :01 every hour.
+ *   2. scheduled() — Cron Trigger fires at :00 every hour.
  *                    Fetches prices, acquires hour-bucket lock, sends to
  *                    ALL active subscribers.
  *
@@ -73,7 +73,7 @@ const worker = {
       return Response.json({
         ok: true,
         message: "Omda Gold Bot Worker is running. Use /__health for status, /__test for a test send to the owner, or ?force=1 to trigger the hourly send.",
-        next_cron: "minute 1 of every hour (Cairo time)",
+        next_cron: "minute 0 of every hour (Cairo time)",
       });
     }
 
@@ -81,7 +81,7 @@ const worker = {
   },
 
   // ===========================================
-  // SCHEDULED handler — Cron Trigger at :01 every hour
+  // SCHEDULED handler — Cron Trigger at :00 every hour
   // ===========================================
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log(`[cron] 🔔 Scheduled trigger fired at ${new Date().toISOString()}`);
@@ -154,7 +154,7 @@ async function handleTelegramWebhook(
           `  • أسعار الذهب (عيار 24، 22، 21، 18)\n` +
           `  • جنيه الذهب\n` +
           `  • سعر الدولار\n\n` +
-          `🔔 أول تقرير هيوصلك في الساعة الجاية (على :01)\n\n` +
+          `🔔 أول تقرير هيوصلك في الساعة الجاية (على :00)\n\n` +
           `💡 أوامر البوت:\n` +
           `/start — تسجيل / تفعيل\n` +
           `/stop — إيقاف الإشعارات\n` +
@@ -167,7 +167,7 @@ async function handleTelegramWebhook(
         await sendTelegramMessage(
           botToken,
           chatId,
-          `👋 أهلاً بيك تاني يا ${userName}!\n\n✅ تم تفعيل الإشعارات\n📊 هتصلك التحديثات كل ساعة على :01\n\n💡 لو عايز توقف الإشعارات ابعت /stop`
+          `👋 أهلاً بيك تاني يا ${userName}!\n\n✅ تم تفعيل الإشعارات\n📊 هتصلك التحديثات كل ساعة على :00\n\n💡 لو عايز توقف الإشعارات ابعت /stop`
         );
         console.log(`[webhook] ✅ Reactivated: ${userName} (chatId ${chatId})`);
       }

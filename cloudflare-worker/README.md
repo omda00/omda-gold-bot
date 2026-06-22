@@ -22,7 +22,7 @@ Telegram ──webhook──> Cloudflare Worker (fetch handler)
                             ├─ /stop  → deactivate subscriber
                             └─ /help  → show help
 
-Cloudflare Cron ──:01──> Worker (scheduled handler)
+Cloudflare Cron ──:00──> Worker (scheduled handler)
                             │
                             ├─ acquireHourlyLock (KV hour-bucket)
                             ├─ fetchAllPrices (iSagha + Google Finance)
@@ -64,7 +64,7 @@ curl -X PUT \
   "https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/workers/scripts/omda-gold-bot/schedules" \
   -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '[{"cron":"1 * * * *"}]'
+  -d '[{"cron":"0 * * * *"}]'
 ```
 
 ## Telegram Webhook

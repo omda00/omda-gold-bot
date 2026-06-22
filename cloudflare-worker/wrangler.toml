@@ -11,12 +11,12 @@ compatibility_flags = ["nodejs_compat"]
 # flaky). Cloudflare's scheduler runs every minute and dispatches to our
 # Worker at the configured times.
 #
-# "1 * * * *" = minute 1 of every hour (i.e. :01), every day.
-# This matches the user's requirement: "تحديث الساعة في مواعيدها على :01".
+# "0 * * * *" = minute 0 of every hour (i.e. :00), every day.
+# This matches the user's requirement: "تحديث الساعة على :00".
 # The Worker's scheduled() handler acquires an hour-bucket lock (stored in
-# Neon DB) so even if multiple triggers fire, only ONE send per hour.
+# KV) so even if multiple triggers fire, only ONE send per hour.
 [[triggers.crons]]
-cron = "1 * * * *"
+cron = "0 * * * *"
 
 # ===========================================
 # KV NAMESPACE — subscriber cache + dedup
