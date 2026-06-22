@@ -680,3 +680,46 @@ Stage Summary:
 - المشتركون الجدد: يتم تسجيلهم عبر /start ويحصلون على أول تقرير في الساعة التالية تلقائياً
 - الرسائل التجريبية: تذهب للمالك فقط (750182271) عبر ?test=true
 - مصدران للـ trigger: dev server scheduler (أساسي) + cron-service (ثانوي) — كلاهما يعمل
+
+---
+Task ID: cloudflare-migration
+Agent: main (Z.ai Code)
+Task: تحويل بوت التيليجرام إلى Cloudflare لضمان الإرسال 24/7
+
+Work Log:
+- تحققت من Cloudflare API token (cfut_...) — صالح وحساب fces7007@gmail.com
+- حصلت على account ID: 584db3c713b5d57e9c99987185fd043f
+- أنشأت مجلد cloudflare-worker مع package.json, wrangler.toml, tsconfig.json
+- كتبت Worker code (src/index.ts) مع:
+  - fetch handler: Telegram webhook (/start, /stop, /help) + /__health + /__test + /__trigger
+  - scheduled handler: cron كل ساعة على :01
+- كتبت price-fetcher.ts: استخراج أسعار الذهب من iSagha + USD/EGP من Google Finance
+- كتبت db.ts: إدارة المشتركين عبر Vercel admin API + KV cache + hour-bucket dedup
+- كتبت telegram.ts: Telegram Bot API sender
+- أنشأت KV namespace SUBSCRIBERS (id: 0b56e3ecfe53487daa7f436ae881c225)
+- deploy الـ Worker على https://omda-gold-bot.fces7007.workers.dev
+- أضفت cron schedule "1 * * * *" عبر Cloudflare API
+- ضبطت secrets: BOT_TOKEN, ADMIN_PASSWORD, PRODUCTION_URL
+- اكتشفت خطأ extractKaratFromCells: كان يأخذ cells[0] (اسم العيار) بدلاً من cells[1] (سعر البيع) → gold=21 بدلاً من 5985. تم الإصلاح.
+- اكتشفت خطأ botToken masked: production API يرجع "****3dzns". الحل: استخدام env.BOT_TOKEN لكل المشتركين (بوت واحد).
+- اختبرت /__test: ✅ تم الإرسال للمالك فقط
+- اختبرت /__trigger?force=1: ✅ تم الإرسال لكل الـ 4 مشتركين نشطين (4 sent, 0 failed)
+- اختبرت /start عبر webhook simulation: ✅ تم تسجيل مشترك جديد
+- ضبطت Telegram webhook على https://omda-gold-bot.fces7007.workers.dev
+- أوقفت dev server scheduler (instrumentation.ts) لتجنب التكرار
+- أوقفت cron-service mini-service لتجنب التكرار
+- رفعت التعديلات على GitHub (commit 483105a)
+
+Stage Summary:
+- البوت الآن يعمل بالكامل على Cloudflare Workers — 24/7 إرسال مضمون عبر Cron Triggers
+- Worker URL: https://omda-gold-bot.fces7007.workers.dev
+- Cron: "1 * * * *" = كل ساعة على :01 (Cairo time)
+- Telegram webhook مضبوط على الـ Worker
+- 3 طبقات dedup (كلها في Cloudflare KV):
+  1. Global hour-bucket lock (HOURLY_REPORT_LOCK)
+  2. Per-chat hour-bucket (LAST_REPORT_CHAT_<id>)
+  3. In-memory chatId dedup
+- المشتركون يتم جلبهم من Vercel admin API (مع KV cache fallback)
+- /start و /stop يعملان عبر الـ Worker ويتم sync إلى Vercel Neon DB
+- الـ Vercel app ما زال يعمل للوحة التحكم + admin UI
+- تم التحقق من الإرسال لكل المشتركين الـ 4 النشطين بنجاح
