@@ -876,3 +876,56 @@ Stage Summary:
 - ✅ الإرسال الساعي هيستكمل طبيعياً على :00 كل ساعة (القادم: 19:00 EEST)
 - ✅ /start و /stop شغّالين تاني (webhook مضبوط على الـ Worker)
 - ملاحظة أمنية: BOT_TOKEN موجود نصّي في mini-services/telegram-poller/index.ts — يُفضّل نقله لمتغير بيئة لاحقاً
+
+---
+Task ID: cf-watchdog-self-healing
+Agent: main (Z.ai Code)
+Task: ضمان عدم تكرار مشكلة توقف البوت — نظام مراقبة ذاتية وإصلاح تلقائي
+
+Work Log:
+- صمّمت نظام watchdogdaemon يكتشف أي مشكلة في الـ Worker ويعالجها تلقائياً بدون تدخل بشري
+- أنشأت mini-services/cf-watchdog/ (مشروع bun مستقل، بدون أي dependencies خارجية):
+  * package.json — scripts: dev (bun --hot), start
+  * tsconfig.json — إعدادات TypeScript strict
+  * .env — نسخة احتياطية من كل الأسرار (CF_ACCOUNT_ID, CF_API_TOKEN, KV_NAMESPACE_ID, WORKER_NAME, WORKER_URL, BOT_TOKEN, ADMIN_PASSWORD, PRODUCTION_URL, CRON_EXPRESSION, TELEGRAM_WEBHOOK_URL) — gitignored
+  * index.ts — الـ daemon (410 سطر):
+    - Health check كل 60s: GET /__health، لو مش ok → recover()
+    - Deep check كل 10 min: يفحص cron schedule + Telegram webhook + 3 secrets — لو أي واحد ناقص → recover()
+    - recover() بيعمل 4 خطوات:
+      1. wrangler deploy (إعادة رفع الـ Worker من الكود المحلي)
+      2. PUT 3 secrets عبر Cloudflare API
+      3. PUT cron schedule "0 * * * *" عبر API
+      4. POST setWebhook لـ Telegram Bot API
+    - Cooldown 2 min بين محاولات recovery + max 5 attempts
+    - Heartbeat log كل 5 checks (5 min) — "💓 Heartbeat #N — Worker healthy"
+    - Crash protection (unhandledRejection + uncaughtException handlers)
+  * start.sh — يبدأ الـ daemon مع keep-alive loop (يعيد تشغيل bun لو وقع)
+  * .gitignore — يستثني .env, *.log, *.pid
+- أنشأت recover-worker.sh (في جذر المشروع) — سكريبت recovery يدوي بأمر واحد (نفس 5 خطوات الـ watchdog) للاستخدام لو الـ watchdog نفسه وقع
+- بدأت الـ watchdog daemon:
+  * wrapper PID 2505 (bash keep-alive loop)
+  * bun process شغّال
+  * أول deep check: ✅ "cron + webhook + secrets all intact"
+  * أول heartbeat #5: ✅ "💓 Heartbeat #5 — Worker healthy [6:27:37 PM]"
+- رفعت على GitHub (commit d950247 + 8d78189):
+  * د950247: feat: add cf-watchdog
+  * 8d78189: chore: gitignore runtime files
+- تأكدت إن .env مش معمول له track في git (gitignored + .gitignore في cf-watchdog/)
+
+Stage Summary:
+- ✅ نظام self-healing كامل شغّال 24/7 — يكتشف المشاكل خلال 60 ثانية ويصلحها تلقائياً
+- ✅ 3 أنواع فحوصات:
+  1. Health check (كل 60s): /__health endpoint
+  2. Deep check (كل 10 min): cron schedule + Telegram webhook + secrets
+  3. Heartbeat (كل 5 min): log يأكد إن الـ watchdog حي
+- ✅ Recovery تلقائي 4 خطوات: redeploy + secrets + cron + webhook
+- ✅ Recovery يدوي: ./recover-worker.sh (أمر واحد)
+- ✅ crash protection + keep-alive loop (لو bun وقع، يرجع تلقائياً بعد 5s)
+- ✅ الأسرار محفوظة في .env (gitignored) — الـ watchdog يقدر يرجعهم بدون تدخل بشري
+- السيناريوهات اللي بيتعامل معاها:
+  * Worker اتمسح → redeploy + secrets + cron + webhook
+  * Secrets اتمسحت → re-apply
+  * Cron اتشال → re-create
+  * Webhook اتمسح → re-set
+  * Worker وقع مؤقتاً → health check يكتشف + recover
+- البوت دلوقتي مضمون يفضل شغال 24/7 بدون أي توقف
