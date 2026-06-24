@@ -1,0 +1,11 @@
+{
+  "name": "cf-watchdog",
+  "version": "1.0.0",
+  "description": "Self-healing watchdog for the omda-gold-bot Cloudflare Worker — auto-recovers if the Worker is deleted, secrets are wiped, cron is removed, or the Telegram webhook is cleared.",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {}
+}
