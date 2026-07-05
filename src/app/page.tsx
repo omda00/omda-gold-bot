@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { LayoutDashboard, BarChart3, Settings, Bell, Play, Calculator, Bot, Send } from "lucide-react";
+import { LayoutDashboard, BarChart3, Settings, Bell, Calculator, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 
 import { useDashboardData } from "@/hooks/use-dashboard";
 import { DashboardHeader } from "@/components/dashboard/header";
@@ -33,8 +32,6 @@ export default function Home() {
     triggerFetchPrices,
     updateConfig,
     testTelegram,
-    runAutomation,
-    sendTestToOwner,
     fetchCalculatorData,
     addTelegramUser,
     deleteTelegramUser,
@@ -58,34 +55,6 @@ export default function Home() {
       toast.error("حدث خطأ في الاتصال — يتم عرض آخر الأسعار المتاحة", { duration: 5000 });
     }
   }, [triggerFetchPrices]);
-
-  const handleRunAutomation = useCallback(async () => {
-    try {
-      const result = await runAutomation();
-      if (result) {
-        toast.success("تم تشغيل الأتمتة بنجاح");
-      }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "فشل تشغيل الأتمتة"
-      );
-    }
-  }, [runAutomation]);
-
-  const handleTestSend = useCallback(async () => {
-    try {
-      const result = await sendTestToOwner();
-      if (result?.success) {
-        toast.success("تم إرسال رسالة التجربة للمالك فقط — لم يتم إزعاج المشتركين");
-      } else {
-        toast.error(result?.error || "فشل إرسال رسالة التجربة");
-      }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "فشل إرسال رسالة التجربة"
-      );
-    }
-  }, [sendTestToOwner]);
 
   const automationEnabled = config?.AUTOMATION_ENABLED === "true";
 
@@ -174,41 +143,6 @@ export default function Home() {
                 </TabsTrigger>
               )}
             </TabsList>
-
-            {activeTab === "dashboard" && isAdmin && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTestSend}
-                  disabled={loading.testSend}
-                  title="يرسل رسالة تجربة للمالك فقط (dukeomda) دون إزعاج المشتركين. لا يؤثر على الإرسال المجدول."
-                  className="gap-1.5 rounded-xl border-amber-300 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30 h-8 text-xs font-bold"
-                >
-                  <Send
-                    className={`w-3.5 h-3.5 ${
-                      loading.testSend ? "animate-pulse" : ""
-                    }`}
-                  />
-                  إرسال تجريبي للمالك
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRunAutomation}
-                  disabled={loading.automation}
-                  title="زر إداري — يظهر للمسؤول فقط لتشغيل دورة الأتمتة يدوياً (تحديث الأسعار + إرسال تقرير فوري لكل المشتركين النشطين)."
-                  className="gap-1.5 rounded-xl border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/30 h-8 text-xs font-bold"
-                >
-                  <Play
-                    className={`w-3.5 h-3.5 ${
-                      loading.automation ? "animate-pulse" : ""
-                    }`}
-                  />
-                  تشغيل الأتمتة
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* TAB 1: Dashboard */}
